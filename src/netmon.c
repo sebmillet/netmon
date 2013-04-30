@@ -340,6 +340,15 @@ void check_t_destroy(struct check_t *chk) {
 }
 
 //
+//
+//
+void blank_time_last_status_change(struct check_t *chk) {
+  strncpy(chk->time_last_status_change, "", sizeof(chk->time_last_status_change));
+  chk->h_time_last_status_change = -1;
+  chk->m_time_last_status_change = -1;
+}
+
+//
 // Create a check struct
 //
 void check_t_create(struct check_t *chk) {
@@ -360,8 +369,7 @@ void check_t_create(struct check_t *chk) {
   chk->prev_status = ST_UNDEF;
   chk->str_prev_status = NULL;
 
-  memset(chk->time_last_status_change, ' ', sizeof(chk->time_last_status_change) - 1);
-  chk->time_last_status_change[sizeof(chk->time_last_status_change) - 1] = '\0';
+  blank_time_last_status_change(chk);
 }
 
 //
@@ -790,6 +798,30 @@ void almost_neverending_loop() {
 
       if (chk->prev_status != chk->status && chk->prev_status != ST_UNDEF) {
         get_strnow_short_width(chk->time_last_status_change, sizeof(chk->time_last_status_change));
+        chk->h_time_last_status_change = hour0;
+        chk->m_time_last_status_change = minute0;
+      }
+
+        // The whole code below is used to erase the information "last status change"
+        // 23 hours after, so that there is no confusion in the day.
+        // Note that the test would work for any duration from 1 hour to 23 hours,
+        // by replacing the 23 below.
+      if (chk->h_time_last_status_change >= 0) {
+          // M1 = Mark 1 = time at which the status last changed, minus 1 hour
+          // Expressed in minutes since midnight.
+        int M1 = ((chk->h_time_last_status_change + 23) % 24) * 60 + chk->m_time_last_status_change;
+          // M2 = Mark 2 = time at which the status last changed
+          // Expressed in minutes since midnight.
+        int M2 = chk->h_time_last_status_change * 60 + chk->m_time_last_status_change;
+          // MN = Mark N = now
+          // Expressed in minutes since midnight.
+        int MN = hour0 * 60 + minute0;
+          // MN must be in the interval [M1, M2[, the test takes into account the case where
+          // midnight is in [M1, M2[.
+        if ((M1 < M2 && MN >= M1 && MN < M2) ||
+          (M1 > M2 && (MN >= M1 || MN < M2))) {
+          blank_time_last_status_change(chk);
+        }
       }
 
       my_logf(LL_NORMAL, LP_DATETIME, "%s -> %s", chk->display_name, ST_TO_LONGSTR[chk->status]);

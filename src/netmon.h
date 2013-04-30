@@ -74,6 +74,8 @@ struct check_t {
   int status;
   int prev_status;
   char time_last_status_change[STRNOW_SHORT_WIDTH + 1];
+  int h_time_last_status_change;
+  int m_time_last_status_change;
   char *str_prev_status;
 };
 
