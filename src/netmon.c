@@ -88,12 +88,12 @@ struct img_file_t img_files[] = {
   {"st-fail.png", NULL, 0}      // ST_FAIL
 };
 
-const char *ST_TO_IMAGENAME_FORHTML[] = {
-  "st-undef.png",   // ST_UNDEF
-  "st-unknown.png", // ST_UNKNOWN
-  "st-ok.png",      // ST_OK
-  "st-fail.png"     // ST_FAIL
-};
+/*const char *ST_TO_IMAGENAME_FORHTML[] = {*/
+/*  "st-undef.png",   // ST_UNDEF*/
+/*  "st-unknown.png", // ST_UNKNOWN*/
+/*  "st-ok.png",      // ST_OK*/
+/*  "st-fail.png"     // ST_FAIL*/
+/*};*/
 const char *ST_TO_BGCOLOR_FORHTML[] = {
   "#FFFFFF", // ST_UNDEF
   "#B0B0B0", // ST_UNKNOWN
@@ -118,10 +118,10 @@ char g_log_file[SMALLSTRSIZE];
 const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
 char g_cfg_file[SMALLSTRSIZE];
 
-#define DEFAULT_CHECK_INTERVAL 60
+#define DEFAULT_CHECK_INTERVAL 180
 long int g_check_interval;
 int g_check_interval_set = FALSE;
-#define DEFAULT_NB_KEEP_LAST_STATUS 40
+#define DEFAULT_NB_KEEP_LAST_STATUS 20
 long int g_nb_keep_last_status = -1;
 int g_nb_keep_last_status_set = FALSE;
 
@@ -132,6 +132,10 @@ int g_display_name_width_set = FALSE;
 #define DEFAULT_HTML_REFRESH_PERIOD 20
 long int g_html_refresh_interval = DEFAULT_HTML_REFRESH_PERIOD;
 int g_html_refresh_interval_set = FALSE;
+
+#define DEFAULT_HTML_NB_COLUMNS 2
+long int g_html_nb_columns = DEFAULT_HTML_NB_COLUMNS;
+int g_html_nb_columns_set = FALSE;
 
 long int g_buffer_size = DEFAULT_BUFFER_SIZE;
 int g_buffer_size_set = FALSE;
@@ -310,7 +314,8 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"html_refresh_interval", CFG_S_GENERAL, &g_html_refresh_interval, NULL, NULL, 0, &g_html_refresh_interval_set, FALSE},
   {"html_title", CFG_S_GENERAL, NULL, NULL, g_html_title, sizeof(g_html_title), &g_html_title_set, FALSE},
   {"html_directory", CFG_S_GENERAL, NULL, NULL, g_html_directory, sizeof(g_html_directory), &g_html_directory_set, FALSE},
-  {"html_file", CFG_S_GENERAL, NULL, NULL, g_html_file, sizeof(g_html_file), &g_html_file_set, FALSE}
+  {"html_file", CFG_S_GENERAL, NULL, NULL, g_html_file, sizeof(g_html_file), &g_html_file_set, FALSE},
+  {"html_nb_columns", CFG_S_GENERAL, &g_html_nb_columns, NULL, NULL, 0, &g_html_nb_columns_set, FALSE}
 };
 
 //
@@ -878,28 +883,34 @@ void almost_neverending_loop() {
     if (H != NULL) {
       char now[20];
       get_str_now(now, sizeof(now));
-      fputs("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\015\012", H);
-      fputs("<html>\015\012", H);
-      fputs("<head>\015\012", H);
-      fprintf(H, "<META HTTP-EQUIV=\"Refresh\" CONTENT=\"%li\">\015\012", g_html_refresh_interval);
-      fputs("</head>\015\012", H);
-      fputs("<body>\015\012", H);
-      fprintf(H, "<h1>%s</h1>\015\012", g_html_title);
-      fputs("<hr>\015\012", H);
-      fprintf(H, "<h3>Last check: %s</h3>\015\012", now);
-      fprintf(H, "<p>Last check done in %6.3fs<br>\015\012", elapsed);
+      fputs("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n", H);
+      fputs("<html>\n", H);
+      fputs("<head>\n", H);
+      fprintf(H, "<META HTTP-EQUIV=\"Refresh\" CONTENT=\"%li\">\n", g_html_refresh_interval);
+      fputs("</head>\n", H);
+      fputs("<body>\n", H);
+      fprintf(H, "<h1>%s</h1>\n", g_html_title);
+      fputs("<hr>\n", H);
+      fprintf(H, "<h3>Last check: %s</h3>\n", now);
+      fprintf(H, "<p>Last check done in %6.3fs<br>\n", elapsed);
       if (g_nb_keep_last_status >= 1) {
-        fprintf(H, "Check interval = %li second%s, range = %li min<br>\015\012",
+        fprintf(H, "Check interval = %li second%s, range = %li min<br>\n",
           g_check_interval, g_check_interval >= 2 ? "s" : "", (g_check_interval * g_nb_keep_last_status) / 60);
       }
       fputs("</p>", H);
-      fputs("<table cellpadding=\"2\" cellspacing=\"1\" border=\"1\">\015\012", H);
-      fputs("<tr><td>Name</td><td>Status</td><td>Last *</td>", H);
-      if (g_nb_keep_last_status >= 1)
-        fputs("<td>History</td>", H);
-      fputs("</tr>", H);
+      fputs("<table cellpadding=\"2\" cellspacing=\"1\" border=\"1\">\n", H);
+      fputs("<tr>\n", H);
+      int i;
+      for (i = 0; i < g_html_nb_columns; ++i) {
+        fputs("<td>Name</td><td>Status</td><td>Last *</td>", H);
+        if (g_nb_keep_last_status >= 1)
+          fputs("<td>History</td>", H);
+          fputs("\n", H);
+      }
+      fputs("</tr>\n", H);
     }
 
+    int counter = 0;
     for (II = 0; II < g_nb_checks; ++II) {
       struct check_t *chk = &checks[II];
       if (!chk->is_valid)
@@ -921,8 +932,9 @@ void almost_neverending_loop() {
       }
 
       if (H != NULL) {
-        fputs("<tr>\015\012", H);
-        fprintf(H, "<td>%s</td><td bgcolor=\"%s\">%s</td>\015\012",
+        if (counter % g_html_nb_columns == 0)
+          fputs("<tr>\n", H);
+        fprintf(H, "<td>%s</td><td bgcolor=\"%s\">%s</td>\n",
           chk->display_name, ST_TO_BGCOLOR_FORHTML[chk->status], ST_TO_LONGSTR_FORHTML[chk->status]);
         fprintf(H, "<td>%s</td>", chk->time_last_status_change);
         if (g_nb_keep_last_status >= 1) {
@@ -937,20 +949,21 @@ void almost_neverending_loop() {
             }
             if (j > ST_LAST)
               j = ST_UNKNOWN;
-            fprintf(H, "<img src=\"%s\">", ST_TO_IMAGENAME_FORHTML[j]);
+            fprintf(H, "<img src=\"%s\">\n", img_files[j].file_name);
           }
-          fputs("</td>", H);
+          fprintf(H, "</td>\n");
         }
-        fputs("</tr>\015\012", H);
+        if (counter % g_html_nb_columns == g_html_nb_columns - 1)
+          fputs("</tr>\n", H);
       }
-
+      ++counter;
     }
 
     if (H != NULL) {
-      fputs("</table>\015\012", H);
-      fputs("<p>* Time at which the status last changed\015\012</p>", H);
-      fputs("</body>\015\012", H);
-      fputs("</html>\015\012", H);
+      fputs("</table>\n", H);
+      fputs("<p>* Time at which the status last changed\n</p>", H);
+      fputs("</body>\n", H);
+      fputs("</html>\n", H);
       fclose(H);
     }
 
