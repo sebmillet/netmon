@@ -1,0 +1,67 @@
+
+   netmon, a portable TCP probing program
+   ======================================
+
+$Date: 2013-04-30 21:52:00 +0200 (mar. 30 avril 2013) $
+
+Contents:
+
+      I. WHAT IS NETMON?
+     II. WHY NETMON?
+    III. LICENCE
+     IV. COMPILATION AND INSTALLATION
+
+
+
+I.    WHAT IS NETMON?
+
+It is meant to probe hosts for availability on TCP ports.
+
+
+
+II.   WHY NETMON?
+
+I wanted a minimalistic program compatible with Windows and Linux out of the
+box - Shinken is perfect but Windows compatibility is done to the expense of
+massive compatibility layers. Also I wanted something small and easy to
+configure.
+
+
+
+III.  LICENCE
+
+See COPYING file that comes along with the package the program belongs to.
+
+
+
+IV.   COMPILATION AND INSTALLATION
+
+- Linux
+
+The file of name INSTALL, distributed with netmon source files, gives
+instructions to compile and install the program, using the usual
+    ./configure
+    make
+    make install
+sequence.
+This INSTALL file is the one provided by default by autotools.
+
+- Windows
+
+You have to install Mingw and run
+    mingw32-make.exe -f makefile.gcc
+Mingw is licensed under GPL mostly (as of beginning of 2012), its homepage is
+    http://www.mingw.org
+
+Borland was not tested, neither Visual C++. If ever used, one showstopper to
+fix will be the getopt library, used to parse long options.
+
+Mingw makefile generation
+
+    There is no need to recreate makefile.gcc, if ever you wish to do it any
+    way, you have to install Bakefile and run the batch
+        gen-win-makefile.cmd
+    Bakefile is a system allowing multi-platforms control of compilation, you
+    can find it here:
+        http://www.bakefile.org
+
