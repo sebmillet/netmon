@@ -23,7 +23,7 @@ extern size_t const st_ok_len;
 extern char const st_fail[];
 extern size_t const st_fail_len;
 
-/*#define DEBUG*/
+#define DEBUG
 
 loglevel_t current_log_level = LL_NORMAL;
 
@@ -412,19 +412,14 @@ void fs_concatene(char *dst, const char *src, size_t dst_len) {
 // Destroy a check struct
 //
 void check_t_destroy(struct check_t *chk) {
-  dbg_write("mark a\n");
   if (chk->display_name != NULL)
     free(chk->display_name);
-  dbg_write("mark b\n");
   if (chk->host_name != NULL)
     free(chk->host_name);
-  dbg_write("mark c\n");
   if (chk->expect != NULL)
     free(chk->expect);
-  dbg_write("mark d\n");
   if (chk->str_prev_status != NULL)
     free(chk->str_prev_status);
-  dbg_write("mark e\n");
 }
 
 //
@@ -481,7 +476,6 @@ void check_t_getready(struct check_t *chk) {
 void clean_checks() {
   int i;
   for (i = 0; i < g_nb_checks; ++i) {
-    dbg_write("cleaning check #%i\n", i);
     check_t_destroy(&checks[i]);
   }
 }
@@ -1085,7 +1079,7 @@ void atexit_handler() {
     return;
   quitting = TRUE;
 
-  clean_checks();
+/*  clean_checks();*/
 
   my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_NAME " stop");
   my_logs(LL_NORMAL, LP_NOTHING, "");
@@ -1504,7 +1498,7 @@ void create_img_files() {
   for (i = 0; i <= ST_LAST; ++i) {
     strncpy(buf, g_html_directory, sizeof(buf));
     fs_concatene(buf, img_files[i].file_name, sizeof(buf));
-    FILE *IMG = fopen(buf, "w+");
+    FILE *IMG = fopen(buf, "wb+");
 
     if (IMG == NULL) {
       my_logf(LL_ERROR, LP_DATETIME, "Unable to create %s", buf);
@@ -1586,9 +1580,12 @@ int main(int argc, char *argv[]) {
 
   almost_neverending_loop();
 
-  if (quitting)
+  if (quitting) {
+    Sleep(2000);
     return EXIT_FAILURE;
+  }
   quitting = TRUE;
+  Sleep(2000);
 
   my_logs(LL_VERBOSE, LP_DATETIME, PACKAGE_NAME " end");
   my_logs(LL_NORMAL, LP_NOTHING, "");
