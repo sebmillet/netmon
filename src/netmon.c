@@ -23,7 +23,7 @@ extern size_t const st_ok_len;
 extern char const st_fail[];
 extern size_t const st_fail_len;
 
-/*#define DEBUG*/
+#define DEBUG
 
 loglevel_t current_log_level = LL_NORMAL;
 
@@ -412,14 +412,19 @@ void fs_concatene(char *dst, const char *src, size_t dst_len) {
 // Destroy a check struct
 //
 void check_t_destroy(struct check_t *chk) {
-  if (chk->display_name)
+  dbg_write("mark a\n");
+  if (chk->display_name != NULL)
     free(chk->display_name);
-  if (chk->host_name)
+  dbg_write("mark b\n");
+  if (chk->host_name != NULL)
     free(chk->host_name);
-  if (chk->expect)
+  dbg_write("mark c\n");
+  if (chk->expect != NULL)
     free(chk->expect);
-  if (chk->str_prev_status)
+  dbg_write("mark d\n");
+  if (chk->str_prev_status != NULL)
     free(chk->str_prev_status);
+  dbg_write("mark e\n");
 }
 
 //
@@ -475,8 +480,10 @@ void check_t_getready(struct check_t *chk) {
 //
 void clean_checks() {
   int i;
-  for (i = 0; i < g_nb_checks; ++i)
+  for (i = 0; i < g_nb_checks; ++i) {
+    dbg_write("cleaning check #%i\n", i);
     check_t_destroy(&checks[i]);
+  }
 }
 
 //
@@ -718,7 +725,7 @@ int socket_read_line_alloc(int sock, char** out, int trace) {
   char ch;
   int nb;
 
-  *out = (char *)malloc(sizeof(char) * size);
+  *out = (char *)malloc(size);
 
   for (;;) {
     if ((nb = recv(sock, &ch, 1, 0)) == SOCKET_ERROR) {
@@ -1496,17 +1503,21 @@ void create_img_files() {
     fs_concatene(buf, img_files[i].file_name, sizeof(buf));
     FILE *IMG = fopen(buf, "w+");
 
-    int j;
-    const char const *v = img_files[i].var;
-    size_t l = img_files[i].var_len;
+    if (IMG == NULL) {
+      my_logf(LL_ERROR, LP_DATETIME, "Unable to create %s", buf);
+    } else {
+      int j;
+      const char const *v = img_files[i].var;
+      size_t l = img_files[i].var_len;
 
-/*    dbg_write("Creating %s of size %lu\n", buf, l);*/
+  /*    dbg_write("Creating %s of size %lu\n", buf, l);*/
 
-    if (IMG != NULL) {
-      for (j = 0; (unsigned int)j < l; ++j) {
-        fputc(v[j], IMG);
+      if (IMG != NULL) {
+        for (j = 0; (unsigned int)j < l; ++j) {
+          fputc(v[j], IMG);
+        }
+        fclose(IMG);
       }
-      fclose(IMG);
     }
   }
 
