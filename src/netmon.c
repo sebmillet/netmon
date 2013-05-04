@@ -23,7 +23,7 @@ extern size_t const st_ok_len;
 extern char const st_fail[];
 extern size_t const st_fail_len;
 
-#define DEBUG
+/*#define DEBUG*/
 
 loglevel_t current_log_level = LL_NORMAL;
 
@@ -175,7 +175,7 @@ const char FS_SEPARATOR = '\\';
 #define DEFAULT_HTML_DIRECTORY (".")
 #define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
 
-void os_sleep(int seconds) {
+void os_sleep(long int seconds) {
   unsigned long int msecs = (unsigned long int)seconds * 1000;
   Sleep(msecs);
 }
@@ -249,7 +249,7 @@ const char FS_SEPARATOR = '/';
 #define DEFAULT_HTML_DIRECTORY (".")
 #define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
 
-void os_sleep(int seconds) {
+void os_sleep(long int seconds) {
   sleep(seconds);
 }
 
@@ -337,8 +337,8 @@ const struct readcfg_var_t readcfg_vars[] = {
 //
 ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
 
-#define MY_GETLINE_INITIAL_ALLOCATE 2
-#define MY_GETLINE_MIN_INCREASE   4
+#define MY_GETLINE_INITIAL_ALLOCATE 30
+#define MY_GETLINE_MIN_INCREASE     30
 #define MY_GETLINE_COEF_INCREASE    1
 
   if (*lineptr == NULL || *n == 0) {
@@ -1063,8 +1063,13 @@ void almost_neverending_loop() {
     my_logf(LL_NORMAL, LP_DATETIME, "Check done in %fs", elapsed);
 
     if (g_check_interval && !g_test_mode) {
-      my_logf(LL_VERBOSE, LP_DATETIME, "Now sleeping for %li second(s)", g_check_interval);
-      os_sleep(g_check_interval);
+      long int delay = g_check_interval - (long int)elapsed;
+      if (delay < 1)
+        delay = 1;
+      if (delay > g_check_interval)
+        delay = g_check_interval;
+      my_logf(LL_VERBOSE, LP_DATETIME, "Now sleeping for %li second(s) (interval = %li)", delay, g_check_interval);
+      os_sleep(delay);
     } else {
       break;
     }
@@ -1382,14 +1387,6 @@ void read_configuration_file(const char *cf) {
                 match = TRUE;
                 struct readcfg_var_t cfg = readcfg_vars[i];
 
-/*                if (cfg.section == CFG_S_TCPPROBE) {*/
-/*                  struct check_t *chk = &checks[cur_check < 0 ? 0 : cur_check];*/
-/*                  if (cfg.plint_target != NULL) cfg.plint_target = (long int *)(((int *)cfg.plint_target - &chk00.is_valid) + &chk->is_valid);*/
-/*                  if (cfg.p_pchar_target != NULL) cfg.p_pchar_target = (char **)(((int *)cfg.p_pchar_target - &chk00.is_valid) + &chk->is_valid);*/
-/*                  if (cfg.pchar_target != NULL) cfg.pchar_target = (char *)(((int *)cfg.pchar_target - &chk00.is_valid) + &chk->is_valid);*/
-/*                  cfg.pint_var_set = (cfg.pint_var_set - &chk00.is_valid) + &chk->is_valid;*/
-/*                }*/
-
                 if (read_status != cfg.section) {
                   my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s not allowed in this section",
                     cf, line_number, key);
@@ -1581,11 +1578,9 @@ int main(int argc, char *argv[]) {
   almost_neverending_loop();
 
   if (quitting) {
-    Sleep(2000);
     return EXIT_FAILURE;
   }
   quitting = TRUE;
-  Sleep(2000);
 
   my_logs(LL_VERBOSE, LP_DATETIME, PACKAGE_NAME " end");
   my_logs(LL_NORMAL, LP_NOTHING, "");
