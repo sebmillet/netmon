@@ -175,6 +175,11 @@ const char FS_SEPARATOR = '\\';
 #define DEFAULT_HTML_DIRECTORY (".")
 #define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
 
+void os_sleep(int seconds) {
+  unsigned long int msecs = (unsigned long int)seconds * 1000;
+  Sleep(msecs);
+}
+
 void os_set_sock_nonblocking_mode(int sock) {
   u_long iMode = 1;
   int iResult = ioctlsocket(sock, FIONBIO, &iMode);
@@ -243,6 +248,10 @@ void os_closesocket(int sock) {
 const char FS_SEPARATOR = '/';
 #define DEFAULT_HTML_DIRECTORY (".")
 #define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
+
+void os_sleep(int seconds) {
+  sleep(seconds);
+}
 
 void os_set_sock_nonblocking_mode(int sock) {
   long arg = fcntl(sock, F_GETFL, NULL);
@@ -592,7 +601,7 @@ void my_log_telnet(const int is_received, const char *s) {
 int connect_with_timeout(const struct sockaddr_in *server, int *connection_sock, struct timeval *tv, const char *desc) {
   fd_set fdset;
   FD_ZERO(&fdset);
-  FD_SET(*connection_sock, &fdset);
+  FD_SET((unsigned int)*connection_sock, &fdset);
 
   os_set_sock_nonblocking_mode(*connection_sock);
 
@@ -605,7 +614,7 @@ int connect_with_timeout(const struct sockaddr_in *server, int *connection_sock,
         my_logf(LL_ERROR, LP_DATETIME, "Timeout connecting to %s, %s", desc, os_last_err_desc(s_err, sizeof(s_err)));
         res = 1;
       } else {
-        int so_error;
+        char so_error;
         socklen_t len = sizeof(so_error);
         getsockopt(*connection_sock, SOL_SOCKET, SO_ERROR, &so_error, &len);
         if (so_error != 0) {
@@ -702,7 +711,7 @@ int s_begins_with(const char *s, const char *begins_with) {
 // Fill a string with current date/time, format is
 //    dd/mm hh:mm:ss
 //
-get_str_now(char *s, size_t s_len) {
+void get_str_now(char *s, size_t s_len) {
   int year; int month; int day;
   int hour; int minute; int second; long unsigned int usec;
   get_datetime_of_day(&year, &month, &day, &hour, &minute, &second, &usec);
@@ -714,7 +723,7 @@ get_str_now(char *s, size_t s_len) {
 // Fill a string with current time, format is
 //    hh:mm
 //
-get_strnow_short_width(char *s, size_t s_len) {
+void get_strnow_short_width(char *s, size_t s_len) {
   int year; int month; int day;
   int hour; int minute; int second; long unsigned int usec;
   get_datetime_of_day(&year, &month, &day, &hour, &minute, &second, &usec);
@@ -971,7 +980,8 @@ void almost_neverending_loop() {
 
     if (g_check_interval && !g_test_mode) {
       my_logf(LL_VERBOSE, LP_DATETIME, "Now sleeping for %li second(s)", g_check_interval);
-      sleep(g_check_interval);
+/*      sleep(g_check_interval);*/
+      Sleep(g_check_interval_set * 1000);
     } else {
       break;
     }
@@ -997,18 +1007,27 @@ void atexit_handler() {
 // Manage signals
 //
 void sigterm_handler(int sig) {
+    // To avoid warning "unused parameter"
+  (void)sig;
+
   flag_interrupted = TRUE;
   my_logs(LL_VERBOSE, LP_DATETIME, "Received TERM signal, quitting...");
   exit(EXIT_FAILURE);
 }
 
 void sigabrt_handler(int sig) {
+    // To avoid warning "unused parameter"
+  (void)sig;
+
   flag_interrupted = TRUE;
   my_logs(LL_VERBOSE, LP_DATETIME, "Received ABORT signal, quitting...");
   exit(EXIT_FAILURE);
 }
 
 void sigint_handler(int sig) {
+    // To avoid warning "unused parameter"
+  (void)sig;
+
   flag_interrupted = TRUE;
   my_logs(LL_VERBOSE, LP_DATETIME, "Received INT signal, quitting...");
   exit(EXIT_FAILURE);
@@ -1072,13 +1091,6 @@ void parse_options(int argc, char *argv[]) {
 
   int c;
   int option_index = 0;
-
-  int ii;
-
-  char *pos;
-
-  int server_name_set = FALSE;
-  int server_port_set = FALSE;
 
   strncpy(g_log_file, DEFAULT_LOGFILE, sizeof(g_log_file));
   strncpy(g_cfg_file, DEFAULT_CFGFILE, sizeof(g_cfg_file));
@@ -1147,7 +1159,7 @@ void parse_options(int argc, char *argv[]) {
 //
 // Check a check variable
 //
-check_t_check(struct check_t *chk, const char *cf, int line_number) {
+void check_t_check(struct check_t *chk, const char *cf, int line_number) {
   g_nb_checks++;
 
   int is_valid = TRUE;
@@ -1280,7 +1292,7 @@ void read_configuration_file(const char *cf) {
           } else {
             int i;
             int match = FALSE;
-            for (i = 0; i < sizeof(readcfg_vars) / sizeof(*readcfg_vars); ++i) {
+            for (i = 0; (unsigned int)i < sizeof(readcfg_vars) / sizeof(*readcfg_vars); ++i) {
               if (strcasecmp(key, readcfg_vars[i].name) == 0) {
                 match = TRUE;
                 struct readcfg_var_t cfg = readcfg_vars[i];
@@ -1296,7 +1308,7 @@ void read_configuration_file(const char *cf) {
                   my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s not allowed in this section",
                     cf, line_number, key);
                 } else {
-                  long int n;
+                  long int n = 0;
                   if (cfg.plint_target != NULL)
                     n = atoi(value);
                   if (cfg.plint_target != NULL && strlen(value) == 0) {
@@ -1406,7 +1418,7 @@ void create_img_files() {
     dbg_write("Creating %s of size %lu\n", buf, l);
 
     if (IMG != NULL) {
-      for (j = 0; j < l; ++j) {
+      for (j = 0; (unsigned int)j < l; ++j) {
         fputc(v[j], IMG);
       }
       fclose(IMG);
