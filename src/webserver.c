@@ -186,6 +186,9 @@ int envoie_fichier(FILE* stream, char* chemin, int keepalive)
   if (strstr(chemin,"..")) return envoie_404(stream, chemin);
 
   /* ouverture et vérifications */
+
+  printf("Will try to open '%s'\n", chemin);
+
   fd = open(chemin, O_RDONLY);
   if (fd==-1) return envoie_404(stream, chemin);
   if (fstat(fd, &s)==-1 || !S_ISREG(s.st_mode) || !(s.st_mode & S_IROTH))

@@ -1084,6 +1084,7 @@ void atexit_handler() {
     return;
   quitting = TRUE;
 
+  // Works under Linux but not under Windows, I don't know why...
 /*  clean_checks();*/
 
   my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_NAME " stop");
