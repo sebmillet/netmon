@@ -287,6 +287,11 @@ void os_closesocket(int sock) {
 
 #endif
 
+
+  // * *** *
+  // * ALL *
+  // * *** *
+
 char g_html_directory[BIGSTRSIZE] = DEFAULT_HTML_DIRECTORY;
 int g_html_directory_set = FALSE;
 char g_html_file[SMALLSTRSIZE] = DEFAULT_HTML_FILE;
@@ -326,6 +331,70 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"html_file", CFG_S_GENERAL, NULL, NULL, g_html_file, sizeof(g_html_file), &g_html_file_set, FALSE},
   {"html_nb_columns", CFG_S_GENERAL, &g_html_nb_columns, NULL, NULL, 0, &g_html_nb_columns_set, FALSE}
 };
+
+//
+// My implementation of getline()
+//
+ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
+
+#define MY_GETLINE_INITIAL_ALLOCATE 2
+#define MY_GETLINE_MIN_INCREASE   4
+#define MY_GETLINE_COEF_INCREASE    1
+
+  if (*lineptr == NULL || *n == 0) {
+    *n = MY_GETLINE_INITIAL_ALLOCATE;
+    *lineptr = (char *)malloc(*n);
+    if (*lineptr == NULL) {
+      errno = ENOMEM;
+      return -1;
+    }
+  }
+  char *write_head = *lineptr;
+  size_t char_read = 0;
+  int c;
+  while (1) {
+
+      // Check there's enough memory to store read characters
+    if (*n - char_read <= 2) {
+      size_t increase = *n * MY_GETLINE_COEF_INCREASE;
+      if (increase < MY_GETLINE_MIN_INCREASE)
+        increase = MY_GETLINE_MIN_INCREASE;
+        (*n) += increase;
+
+      *lineptr = (char *)realloc(*lineptr, *n);
+
+      if (*lineptr == NULL) {
+        errno = ENOMEM;
+        return -1;
+      }
+    }
+
+      // Now read one character from stream
+    c = getc(stream);
+
+      // Deal with /IO error
+    if (ferror(stream) != 0)
+      return -1;
+
+      // Deal with end of file
+    if (c == EOF) {
+      if (char_read == 0)
+        return -1;
+      else
+        break;
+    }
+
+    *write_head++ = c;
+    ++char_read;
+
+      // Deal with newline character
+    if (c == '\n' || c == '\r')
+      break;
+  }
+
+  *write_head = '\0';
+  return char_read;
+}
 
 //
 // concatene a path and a file name
@@ -732,15 +801,75 @@ void get_strnow_short_width(char *s, size_t s_len) {
 }
 
 //
-// Main loop
 //
-void almost_neverending_loop() {
+//
+int perform_a_check(struct check_t *chk) {
   char server_desc[SMALLSTRSIZE];
 
     // String to store error descriptions
   char s_err[ERR_STR_BUFSIZE];
 
   struct timeval tv;
+
+  snprintf(server_desc, sizeof(server_desc), "%s:%li", chk->host_name, chk->port);
+
+    // Resolving server name
+  struct sockaddr_in server;
+  struct hostent *hostinfo = NULL;
+  my_logf(LL_DEBUG, LP_DATETIME, "Running gethosbyname() on %s", chk->host_name);
+  hostinfo = gethostbyname(chk->host_name);
+  if (hostinfo == NULL) {
+    my_logf(LL_ERROR, LP_DATETIME, "Unknown host %s, %s", chk->host_name, os_last_err_desc(s_err, sizeof(s_err)));
+    return ST_UNKNOWN;
+  }
+
+  int status = ST_FAIL;
+
+  int connection_sock;
+  if ((connection_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == SOCKET_ERROR) {
+    fatal_error("socket() error to create connection socket, %s", os_last_err_desc(s_err, sizeof(s_err)));
+  }
+  server.sin_family = AF_INET;
+  server.sin_port = htons((uint16_t)chk->port);
+  server.sin_addr = *(struct in_addr *)hostinfo->h_addr;
+  my_logf(LL_DEBUG, LP_DATETIME, "Connecting to %s (%s)...", chk->display_name, server_desc);
+    // tv value is undefined after call to connect() as per documentation, so
+    // it is to be re-set every time.
+  tv.tv_sec = g_connect_timeout;
+  tv.tv_usec = 0;
+  if (connect_with_timeout(&server, &connection_sock, &tv, server_desc) == 0) {
+    my_logf(LL_VERBOSE, LP_DATETIME, "Connected to %s", server_desc);
+
+    if (chk->expect_set && strlen(chk->expect) >= 1) {
+
+      char *response;
+      int read_res = 0;
+      if ((read_res = socket_read_line_alloc(connection_sock, &response, current_log_level == LL_DEBUG)) < 0) {
+        os_closesocket(connection_sock);
+      } else if (s_begins_with(response, chk->expect)) {
+        my_logf(LL_DEBUG, LP_DATETIME, "Expected answer: '%s'", response);
+        status = ST_OK;
+      } else {
+        my_logf(LL_DEBUG, LP_DATETIME, "Unexpected answer: '%s' (expected '%s')", response, chk->expect);
+      }
+      free(response);
+
+    } else {
+      status = ST_OK;
+    }
+
+    os_closesocket(connection_sock);
+    my_logf(LL_VERBOSE, LP_DATETIME, "Disconnected from %s", server_desc);
+  }
+
+  return status;
+
+}
+
+//
+// Main loop
+//
+void almost_neverending_loop() {
 
   do {
     int II;
@@ -757,56 +886,10 @@ void almost_neverending_loop() {
       if (!chk->is_valid)
         continue;
 
-      int status = ST_FAIL;
+      int status = perform_a_check(chk);
+      if (status < 0 || status > ST_LAST)
+        internal_error("almost_neverending_loop", __FILE__, __LINE__);
 
-      snprintf(server_desc, sizeof(server_desc), "%s:%li", chk->host_name, chk->port);
-
-        // Resolving server name
-      struct sockaddr_in server;
-      struct hostent *hostinfo = NULL;
-      my_logf(LL_DEBUG, LP_DATETIME, "Running gethosbyname() on %s", chk->host_name);
-      hostinfo = gethostbyname(chk->host_name);
-      if (hostinfo == NULL) {
-        my_logf(LL_ERROR, LP_DATETIME, "Unknown host %s, %s", chk->host_name, os_last_err_desc(s_err, sizeof(s_err)));
-        status = ST_UNKNOWN;
-      } else {
-        int connection_sock;
-        if ((connection_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == SOCKET_ERROR) {
-          fatal_error("socket() error to create connection socket, %s", os_last_err_desc(s_err, sizeof(s_err)));
-        }
-        server.sin_family = AF_INET;
-        server.sin_port = htons((uint16_t)chk->port);
-        server.sin_addr = *(struct in_addr *)hostinfo->h_addr;
-        my_logf(LL_DEBUG, LP_DATETIME, "Connecting to %s (%s)...", chk->display_name, server_desc);
-          // tv value is undefined after call to connect() as per documentation, so
-          // it is to be re-set every time.
-        tv.tv_sec = g_connect_timeout;
-        tv.tv_usec = 0;
-        if (connect_with_timeout(&server, &connection_sock, &tv, server_desc) == 0) {
-          my_logf(LL_VERBOSE, LP_DATETIME, "Connected to %s", server_desc);
-
-          if (chk->expect_set && strlen(chk->expect) >= 1) {
-
-            char *response;
-            int read_res = 0;
-            if ((read_res = socket_read_line_alloc(connection_sock, &response, current_log_level == LL_DEBUG)) < 0) {
-              os_closesocket(connection_sock);
-            } else if (s_begins_with(response, chk->expect)) {
-              my_logf(LL_DEBUG, LP_DATETIME, "Expected answer: '%s'", response);
-              status = ST_OK;
-            } else {
-              my_logf(LL_DEBUG, LP_DATETIME, "Unexpected answer: '%s' (expected '%s')", response, chk->expect);
-            }
-            free(response);
-
-          } else {
-            status = ST_OK;
-          }
-
-          os_closesocket(connection_sock);
-          my_logf(LL_VERBOSE, LP_DATETIME, "Disconnected from %s", server_desc);
-        }
-      }
       chk->prev_status = chk->status;
       chk->status = status;
 
@@ -962,7 +1045,7 @@ void almost_neverending_loop() {
           }
           fprintf(H, "</td>\n");
         }
-        if (counter % g_html_nb_columns == g_html_nb_columns - 1)
+        if (counter % g_html_nb_columns == g_html_nb_columns - 1 || counter == nb_valid_checks - 1)
           fputs("</tr>\n", H);
       }
       ++counter;
@@ -980,8 +1063,7 @@ void almost_neverending_loop() {
 
     if (g_check_interval && !g_test_mode) {
       my_logf(LL_VERBOSE, LP_DATETIME, "Now sleeping for %li second(s)", g_check_interval);
-/*      sleep(g_check_interval);*/
-      Sleep(g_check_interval_set * 1000);
+      os_sleep(g_check_interval);
     } else {
       break;
     }
@@ -1192,15 +1274,16 @@ void read_configuration_file(const char *cf) {
   my_logf(LL_VERBOSE, LP_DATETIME, "Reading configuration from '%s'", cf);
 
   ssize_t nb_bytes;
-  char *line;
-  size_t l = 0;
+  char *line = NULL;
+  size_t len = 0;
   int line_number = 0;
   int check_line_number = -1;
   int read_status = CFG_S_NONE;
 
   int cur_check = -1;
 
-  while ((nb_bytes = getline(&line, &l, FCFG)) != -1) {
+  while ((nb_bytes = my_getline(&line, &len, FCFG)) != -1) {
+    line[nb_bytes - 1] = '\0';
     ++line_number;
 
     char *b = line;
@@ -1385,7 +1468,9 @@ void read_configuration_file(const char *cf) {
 
   strncpy(g_html_complete_file_name, g_html_directory, sizeof(g_html_complete_file_name));
   fs_concatene(g_html_complete_file_name, g_html_file, sizeof(g_html_complete_file_name));
-  dbg_write("Output HTML file = %s\n", g_html_complete_file_name);
+
+/*  dbg_write("Output HTML file = %s\n", g_html_complete_file_name);*/
+
 }
 
 //
@@ -1415,7 +1500,7 @@ void create_img_files() {
     const char const *v = img_files[i].var;
     size_t l = img_files[i].var_len;
 
-    dbg_write("Creating %s of size %lu\n", buf, l);
+/*    dbg_write("Creating %s of size %lu\n", buf, l);*/
 
     if (IMG != NULL) {
       for (j = 0; (unsigned int)j < l; ++j) {

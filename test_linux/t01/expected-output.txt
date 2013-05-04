@@ -39,9 +39,9 @@ Configuration file 'netmon.ini', section of line 42: no port defined, discarding
 Configuration file 'netmon.ini', line 52: null value not allowed
 Configuration file 'netmon.ini', line 54: empty value not allowed
 Configuration file 'netmon.ini', section of line 51: no port defined, discarding check
-keep_last_status not defined, taking default = 40
+keep_last_status not defined, taking default = 20
 check_interval = 0
-keep_last_status = 40
+keep_last_status = 20
 display_name_width = 20
 html_directory = ../www
 html_file = netmon.html
