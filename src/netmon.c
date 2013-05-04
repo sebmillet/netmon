@@ -23,7 +23,7 @@ extern size_t const st_ok_len;
 extern char const st_fail[];
 extern size_t const st_fail_len;
 
-#define DEBUG
+/*#define DEBUG*/
 
 loglevel_t current_log_level = LL_NORMAL;
 
@@ -1325,6 +1325,7 @@ void read_configuration_file(const char *cf) {
               if (cur_check < 0) {
                 internal_error("read_configuration_file", __FILE__, __LINE__);
               }
+              checks[cur_check] = chk00;
               check_t_check(&checks[cur_check], cf, check_line_number);
             } else if (cur_check >= 0) {
               internal_error("read_configuration_file", __FILE__, __LINE__);
@@ -1337,7 +1338,7 @@ void read_configuration_file(const char *cf) {
               read_status = CFG_S_NONE;
             } else {
               read_status = CFG_S_TCPPROBE;
-              check_t_create(&checks[cur_check]);
+              check_t_create(&chk00);
             }
           } else {
             my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: unknown section name '%s'", cf, line_number, section_name);
@@ -1386,13 +1387,14 @@ void read_configuration_file(const char *cf) {
               if (strcasecmp(key, readcfg_vars[i].name) == 0) {
                 match = TRUE;
                 struct readcfg_var_t cfg = readcfg_vars[i];
-                if (cfg.section == CFG_S_TCPPROBE) {
-                  struct check_t *chk = &checks[cur_check < 0 ? 0 : cur_check];
-                  if (cfg.plint_target != NULL) cfg.plint_target = (long int *)(((int *)cfg.plint_target - &chk00.is_valid) + &chk->is_valid);
-                  if (cfg.p_pchar_target != NULL) cfg.p_pchar_target = (char **)(((int *)cfg.p_pchar_target - &chk00.is_valid) + &chk->is_valid);
-                  if (cfg.pchar_target != NULL) cfg.pchar_target = (char *)(((int *)cfg.pchar_target - &chk00.is_valid) + &chk->is_valid);
-                  cfg.pint_var_set = (cfg.pint_var_set - &chk00.is_valid) + &chk->is_valid;
-                }
+
+/*                if (cfg.section == CFG_S_TCPPROBE) {*/
+/*                  struct check_t *chk = &checks[cur_check < 0 ? 0 : cur_check];*/
+/*                  if (cfg.plint_target != NULL) cfg.plint_target = (long int *)(((int *)cfg.plint_target - &chk00.is_valid) + &chk->is_valid);*/
+/*                  if (cfg.p_pchar_target != NULL) cfg.p_pchar_target = (char **)(((int *)cfg.p_pchar_target - &chk00.is_valid) + &chk->is_valid);*/
+/*                  if (cfg.pchar_target != NULL) cfg.pchar_target = (char *)(((int *)cfg.pchar_target - &chk00.is_valid) + &chk->is_valid);*/
+/*                  cfg.pint_var_set = (cfg.pint_var_set - &chk00.is_valid) + &chk->is_valid;*/
+/*                }*/
 
                 if (read_status != cfg.section) {
                   my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s not allowed in this section",
@@ -1452,6 +1454,7 @@ void read_configuration_file(const char *cf) {
   if (cur_check >= 0) {
     if (check_line_number < 0)
       internal_error("read_configuration_file", __FILE__, __LINE__);
+    checks[cur_check] = chk00;
     check_t_check(&checks[cur_check], cf, check_line_number);
   }
 
