@@ -25,7 +25,7 @@ extern size_t const st_ok_len;
 extern char const st_fail[];
 extern size_t const st_fail_len;
 
-/*#define DEBUG*/
+#define DEBUG
 
 loglevel_t g_current_log_level = LL_NORMAL;
 int g_trace_network_traffic;
@@ -142,7 +142,7 @@ int g_html_nb_columns_set = FALSE;
 
 #if defined(_WIN32) || defined(_WIN64)
 #define DEFAULT_WEBSERVER_ON TRUE
-#define DEFAULT_WEBSERVER_ON 80
+#define DEFAULT_WEBSERVER_PORT 80
 #else
 #define DEFAULT_WEBSERVER_ON FALSE
 #define DEFAULT_WEBSERVER_PORT 8080
@@ -171,14 +171,14 @@ pthread_mutex_t mutex;
 
 void my_pthread_mutex_lock(pthread_mutex_t *m) {
   char s_err[SMALLSTRSIZE];
-  if (pthread_mutex_lock(m))
-    fatal_error("my_pthread_mutex_lock(): pthread_mutex_lock() error, %s", os_last_err_desc(s_err, sizeof(s_err)));
+  if ((errno = pthread_mutex_lock(m)) != 0)
+    fatal_error("pthread_mutex_lock(): %s", errno_error(s_err, sizeof(s_err)));
 }
 
 void my_pthread_mutex_unlock(pthread_mutex_t *m) {
   char s_err[SMALLSTRSIZE];
-  if (pthread_mutex_unlock(m))
-    fatal_error("my_pthread_mutex_lock(): pthread_mutex_unlock() error, %s", os_last_err_desc(s_err, sizeof(s_err)));
+  if ((errno = pthread_mutex_unlock(m)) != 0)
+    fatal_error("pthread_mutex_unlock(): %s", errno_error(s_err, sizeof(s_err)));
 }
 
 #ifdef DEBUG
@@ -265,6 +265,10 @@ void os_closesocket(int sock) {
   closesocket(sock);
 }
 
+int add_reader_access_right(const char *f) {
+  return 0;
+}
+
 #define strcasecmp _stricmp
 #define strncasecmp _strnicmp
 
@@ -313,6 +317,21 @@ int os_last_network_op_is_in_progress() {
 
 void os_closesocket(int sock) {
   close(sock);
+}
+
+int add_reader_access_right(const char *f) {
+  struct stat s;
+  int r = 0;
+  if (!stat(f, &s)) {
+    s.st_mode |= S_IRUSR | S_IRGRP | S_IROTH;
+    r = chmod(f, s.st_mode);
+  }
+  if (r) {
+    char s_err[SMALLSTRSIZE];
+    errno_error(s_err, sizeof(s_err));
+    my_logf(LL_ERROR, LP_DATETIME, "Unable to change mode of file '%s': ", f, s_err);
+  }
+  return -1;
 }
 
 #endif
@@ -480,6 +499,8 @@ void blank_time_last_status_change(struct check_t *chk) {
 // Create a check struct
 //
 void check_t_create(struct check_t *chk) {
+  dbg_write("Creating check...\n");
+
   chk->is_valid = FALSE;
 
   chk->display_name_set = FALSE;
@@ -651,9 +672,7 @@ void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt, size_t dt_bufsiz
 // Output log string, used by my_log only
 //
 void my_log_core_output(const char *s, size_t dt_len) {
-  char s_err[ERR_STR_BUFSIZE];
-
-/*  my_pthread_mutex_lock(&mutex);*/
+  my_pthread_mutex_lock(&mutex);
 
   if (log_fd) {
     fputs(s, log_fd);
@@ -672,7 +691,7 @@ void my_log_core_output(const char *s, size_t dt_len) {
     fflush(stdout);
   }
 
-/*  my_pthread_mutex_unlock(&mutex);*/
+  my_pthread_mutex_unlock(&mutex);
 }
 
 //
@@ -682,16 +701,12 @@ void my_logs(const loglevel_t log_level, const logdisp_t log_disp, const char *s
   if (log_level > g_current_log_level)
     return;
 
-  my_pthread_mutex_lock(&mutex);
-
   char dt[REGULAR_STR_STRBUFSIZE];
   size_t dt_len;
 
   my_log_core_get_dt_str(log_disp, dt, sizeof(dt), &dt_len);
   strncat(dt, s, sizeof(dt));
   my_log_core_output(dt, dt_len);
-
-  my_pthread_mutex_unlock(&mutex);
 }
 
 //
@@ -701,8 +716,6 @@ void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *f
 
   if (log_level > g_current_log_level)
     return;
-
-  my_pthread_mutex_lock(&mutex);
 
   char dt[REGULAR_STR_STRBUFSIZE];
   size_t dt_len;
@@ -714,8 +727,6 @@ void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *f
   va_end(args);
   strncat(dt, str, sizeof(dt));
   my_log_core_output(dt, dt_len);
-
-  my_pthread_mutex_unlock(&mutex);
 }
 
 //
@@ -1159,7 +1170,7 @@ void almost_neverending_loop() {
       fputs("</body>\n", H);
       fputs("</html>\n", H);
       fclose(H);
-      add_access_right(g_html_complete_file_name, S_IRUSR | S_IRGRP | S_IROTH);
+      add_reader_access_right(g_html_complete_file_name);
     }
 
     my_logf(LL_NORMAL, LP_DATETIME, "Check done in %fs", elapsed);
@@ -1397,6 +1408,8 @@ void read_configuration_file(const char *cf) {
     line[nb_bytes - 1] = '\0';
     ++line_number;
 
+    dbg_write("Line %i: '%s'\n", line_number, line);
+
     char *b = line;
     while (isspace(*b)) b++;
     size_t blen = strlen(b);
@@ -1435,17 +1448,24 @@ void read_configuration_file(const char *cf) {
               internal_error("read_configuration_file", __FILE__, __LINE__);
             }
             ++cur_check;
+
+            dbg_write("New check: %i\n", cur_check);
+
             check_line_number = line_number;
             if (cur_check >= MAX_CHECKS) {
               --cur_check;
-              my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: reached max number of checks (%i)", cf, line_number, MAX_CHECKS);
+              my_logf(LL_ERROR, LP_DATETIME,
+                "Configuration file '%s', line %i: reached max number of checks (%i)",
+                cf, line_number, MAX_CHECKS);
               read_status = CS_NONE;
             } else {
               read_status = CS_TCPPROBE;
               check_t_create(&chk00);
             }
           } else {
-            my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: unknown section name '%s'", cf, line_number, section_name);
+            my_logf(LL_ERROR, LP_DATETIME,
+              "Configuration file '%s', line %i: unknown section name '%s'",
+              cf, line_number, section_name);
           }
         }
         break;
@@ -1460,16 +1480,27 @@ void read_configuration_file(const char *cf) {
           my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: syntax error", cf, line_number);
         } else {
 
-          size_t n = slen + 1;
-          char *orig_key = (char *)malloc(n);
+          dbg_write("mark x\n");
+
+          if (slen >= SMALLSTRSIZE)
+            slen = SMALLSTRSIZE;
+
+          char orig_key[SMALLSTRSIZE];
           char *key = orig_key;
+          size_t n = slen + 1;
+          if (n > sizeof(orig_key))
+            n = sizeof(orig_key);
           strncpy(key, b, n);
-          key[slen] = '\0';
+          key[n - 1] = '\0';
           key = trim(key);
 
+          dbg_write("mark y\n");
+
           n = blen - slen + 1;
-          char *orig_value = (char *)malloc(n);
+          char orig_value[BIGSTRSIZE];
           char *value = orig_value;
+          if (n > sizeof(orig_value))
+            n = sizeof(orig_value);
           strncpy(value, e + 1, n);
           value = trim(value);
           size_t l = strlen(value);
@@ -1482,6 +1513,8 @@ void read_configuration_file(const char *cf) {
             ++value;
           }
 
+          dbg_write("mark z\n");
+
           if (strlen(key) == 0) {
             my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: syntax error", cf, line_number);
           } else {
@@ -1493,46 +1526,61 @@ void read_configuration_file(const char *cf) {
                 struct readcfg_var_t cfg = readcfg_vars[i];
 
                 if (read_status != cfg.section) {
-                  my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s not allowed in this section",
+                  my_logf(LL_ERROR, LP_DATETIME,
+                    "Configuration file '%s', line %i: variable %s not allowed in this section",
                     cf, line_number, key);
                 } else {
                   long int n = 0;
                   if (cfg.plint_target != NULL && cfg.var_type == V_INT)
                     n = atoi(value);
                   if (cfg.plint_target != NULL && strlen(value) == 0) {
-                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed", cf, line_number);
+                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed",
+                      cf, line_number);
                   } else if (cfg.plint_target != NULL && cfg.var_type == V_INT && n == 0 && !cfg.allow_null) {
-                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: null value not allowed", cf, line_number);
-                  } else if ((cfg.p_pchar_target != NULL || cfg.pchar_target != NULL) && strlen(value) == 0 && !cfg.allow_null) {
-                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed", cf, line_number);
+                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: null value not allowed",
+                      cf, line_number);
+                  } else if ((cfg.p_pchar_target != NULL || cfg.pchar_target != NULL) &&
+                                strlen(value) == 0 && !cfg.allow_null) {
+                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed",
+                      cf, line_number);
                   } else if (*cfg.pint_var_set) {
-                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s already defined", cf, line_number, key);
+                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s already defined",
+                      cf, line_number, key);
                   } else if (cfg.plint_target != NULL) {
 
                     if (cfg.var_type == V_INT) {
+
+                      dbg_write("mark a\n");
+
                         // Variable of type long int
                       *cfg.plint_target = n;
                       *cfg.pint_var_set = TRUE;
                     } else {
+
+                        // Variable of type long int with yes/no input
                       if (strcasecmp(value, V_YESNO_STRYES) == 0) {
                         *cfg.plint_target = TRUE;
                       } else if (strcasecmp(value, V_YESNO_STRNO) == 0) {
                         *cfg.plint_target = FALSE;
                       } else {
-                        my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s must be set to yes or no",
+                        my_logf(LL_ERROR, LP_DATETIME,
+                          "Configuration file '%s', line %i: variable %s must be set to yes or no",
                           cf, line_number, key);
                       }
+
                     }
 
                   } else if (cfg.p_pchar_target != NULL) {
-                    
+
                       // Variable of type string, need to malloc
+                    dbg_write("mark a\n");
                     if (*cfg.p_pchar_target != NULL)
                       internal_error("read_configuration_file", __FILE__, __LINE__);
                     size_t nn = strlen(value) + 1;
                     *cfg.p_pchar_target = (char *)malloc(nn);
                     strncpy(*cfg.p_pchar_target, value, nn);
                     *cfg.pint_var_set = TRUE;
+                    dbg_write("mark b\n");
 
                   } else if (cfg.pchar_target != NULL) {
 
@@ -1548,12 +1596,10 @@ void read_configuration_file(const char *cf) {
               }
             }
             if (!match) {
-              my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: unknown variable %s", cf, line_number, key);
+              my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: unknown variable %s",
+                cf, line_number, key);
             }
           }
-
-          free(orig_value);
-          free(orig_key);
         }
       break;
     }
@@ -1588,21 +1634,6 @@ void read_configuration_file(const char *cf) {
 
 /*  dbg_write("Output HTML file = %s\n", g_html_complete_file_name);*/
 
-}
-
-int add_access_right(const char *f, mode_t additional_rights) {
-  struct stat s;
-  int r = 0;
-  if (!stat(f, &s)) {
-    s.st_mode |= additional_rights;
-    r = chmod(f, s.st_mode);
-  }
-  if (r) {
-    char s_err[SMALLSTRSIZE];
-    errno_error(s_err, sizeof(s_err));
-    my_logf(LL_ERROR, LP_DATETIME, "Unable to change mode of file '%s': ", f, s_err);
-  }
-  return -1;
 }
 
 //
@@ -1645,7 +1676,7 @@ void create_img_files() {
       }
     }
 
-    add_access_right(buf, S_IRUSR | S_IRGRP | S_IROTH);
+    add_reader_access_right(buf);
   }
 
 }
@@ -1843,7 +1874,7 @@ int manage_web_transaction(int sock, const struct sockaddr_in *remote_sin) {
     else if (strcasecmp(pos, "ini") == 0 || strcasecmp(pos, "log") == 0)
       content_type = "text/ascii";
   }
- 
+
     // No way to work with binary files and kep-alive? I don't find...
   keep_alive = FALSE;
 
@@ -1888,8 +1919,6 @@ int manage_web_transaction(int sock, const struct sockaddr_in *remote_sin) {
 // Manages web server
 //
 void *webserver(void *p) {
-  (void *)p;
-
   int listen_sock = server_listen(g_webserver_port, WEBSERVER_LOG_PREFIX);
   if (listen_sock == 0) {
     return NULL;
@@ -1918,10 +1947,15 @@ int main(int argc, char *argv[]) {
 
   parse_options(argc, argv);
 
-  atexit(atexit_handler);
-  signal(SIGTERM, sigterm_handler);
-  signal(SIGABRT, sigabrt_handler);
-  signal(SIGINT, sigint_handler);
+/*  atexit(atexit_handler);*/
+/*  signal(SIGTERM, sigterm_handler);*/
+/*  signal(SIGABRT, sigabrt_handler);*/
+/*  signal(SIGINT, sigint_handler);*/
+
+  if ((errno = pthread_mutex_init(&mutex, NULL)) != 0) {
+    char s_err[SMALLSTRSIZE];
+    fatal_error("pthread_mutex_init(): %s", errno_error(s_err, sizeof(s_err)));
+  }
 
   my_log_open();
   my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_STRING " start");

@@ -38,6 +38,7 @@
     <sys-lib>Ws2_32</sys-lib>
     <sys-lib>Advapi32</sys-lib>
     <sys-lib>Shell32</sys-lib>
+    <sys-lib>pthread</sys-lib>
   </exe>
 </makefile>
 

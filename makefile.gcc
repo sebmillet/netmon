@@ -73,7 +73,7 @@ clean:
 	-if exist build\netmon.exe del build\netmon.exe
 
 build\netmon.exe: $(NETMON_OBJECTS)
-	$(CC) -o $@ $(NETMON_OBJECTS)   $(__DEBUG_FLAG) $(LDFLAGS)  -lWs2_32 -lAdvapi32 -lShell32
+	$(CC) -o $@ $(NETMON_OBJECTS)   $(__DEBUG_FLAG) $(LDFLAGS)  -lWs2_32 -lAdvapi32 -lShell32 -lpthread
 
 build\netmon_netmon.o: src/netmon.c
 	$(CC) -c -o $@ $(NETMON_CFLAGS) $(CPPDEPS) $<

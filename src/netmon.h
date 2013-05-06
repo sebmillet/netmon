@@ -55,6 +55,7 @@ void os_closesocket(int sock);
 
 void fatal_error(const char *format, ...);
 void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *format, ...);
+char *errno_error(char *s, size_t s_len);
 
 #define STRNOW_SHORT_WIDTH 5
 struct check_t {
