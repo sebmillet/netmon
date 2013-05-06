@@ -2,6 +2,7 @@
 
 bin_PROGRAMS=netmon
 netmon_SOURCES=netmon.c netmon.h img/st-undef.c img/st-unknown.c img/st-ok.c img/st-fail.c
+netmon_LDFLAGS=-lpthread
 
 img/st-undef.c: img/st-undef.png
 	img/rdtosrc.sh $<

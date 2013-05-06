@@ -24,7 +24,7 @@ AC_ARG_ENABLE(debug,
               enable_debug="$enableval", enable_debug="no")
 
 if test "${enable_debug}" = yes ; then
-  CFLAGS="$CFLAGS -DDEBUG"
+  CFLAGS="$CFLAGS -DDEBUG -g"
 fi
 
 # Checks for programs.
@@ -45,6 +45,8 @@ AC_TYPE_UINT16_T
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([atexit gethostbyname gettimeofday memset select socket strcasecmp strerror strncasecmp strstr])
+
+AC_CHECK_LIB(pthread, pthread_create)
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile])

@@ -13,6 +13,8 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/stat.h>
+#include <pthread.h>
 
 extern char const st_undef[];
 extern size_t const st_undef_len;
@@ -25,7 +27,8 @@ extern size_t const st_fail_len;
 
 /*#define DEBUG*/
 
-loglevel_t current_log_level = LL_NORMAL;
+loglevel_t g_current_log_level = LL_NORMAL;
+int g_trace_network_traffic;
 
 #if defined(_WIN32) || defined(_WIN64)
 
@@ -109,8 +112,8 @@ struct check_t checks[MAX_CHECKS];
 int g_nb_checks = 0;
 int nb_valid_checks = 0;
 
-const char *PREFIX_RECEIVED = "<<< ";
-const char *PREFIX_SENT = ">>> ";
+#define PREFIX_RECEIVED "<<< "
+#define PREFIX_SENT ">>> "
 
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
 char g_log_file[SMALLSTRSIZE];
@@ -137,6 +140,19 @@ int g_html_refresh_interval_set = FALSE;
 long int g_html_nb_columns = DEFAULT_HTML_NB_COLUMNS;
 int g_html_nb_columns_set = FALSE;
 
+#if defined(_WIN32) || defined(_WIN64)
+#define DEFAULT_WEBSERVER_ON TRUE
+#define DEFAULT_WEBSERVER_ON 80
+#else
+#define DEFAULT_WEBSERVER_ON FALSE
+#define DEFAULT_WEBSERVER_PORT 8080
+#endif
+long int g_webserver_on = DEFAULT_WEBSERVER_ON;
+int g_webserver_on_set = FALSE;
+long int g_webserver_port = DEFAULT_WEBSERVER_PORT;
+int g_webserver_port_set = FALSE;
+#define WEBSERVER_LOG_PREFIX  "WEBSERVER"
+
 long int g_buffer_size = DEFAULT_BUFFER_SIZE;
 int g_buffer_size_set = FALSE;
 long int g_connect_timeout = DEFAULT_CONNECT_TIMEOUT;
@@ -150,6 +166,20 @@ FILE *log_fd;
 
 int flag_interrupted = FALSE;
 int quitting = FALSE;
+
+pthread_mutex_t mutex;
+
+void my_pthread_mutex_lock(pthread_mutex_t *m) {
+  char s_err[SMALLSTRSIZE];
+  if (pthread_mutex_lock(m))
+    fatal_error("my_pthread_mutex_lock(): pthread_mutex_lock() error, %s", os_last_err_desc(s_err, sizeof(s_err)));
+}
+
+void my_pthread_mutex_unlock(pthread_mutex_t *m) {
+  char s_err[SMALLSTRSIZE];
+  if (pthread_mutex_unlock(m))
+    fatal_error("my_pthread_mutex_lock(): pthread_mutex_unlock() error, %s", os_last_err_desc(s_err, sizeof(s_err)));
+}
 
 #ifdef DEBUG
 void dbg_write(const char *fmt, ...) {
@@ -299,12 +329,17 @@ int g_html_file_set = FALSE;
 char g_html_complete_file_name[BIGSTRSIZE];
 
 #define CFGK_COMMENT_CHAR ';'
-const char *CFG_S_GENERAL_STR  = "general";
-const char *CFG_S_TCPCHECK_STR = "tcp-probe";
+const char *CS_GENERAL_STR  = "general";
+const char *CS_TCPCHECK_STR = "tcp-probe";
 
-enum {CFG_S_NONE, CFG_S_GENERAL, CFG_S_TCPPROBE};
+const char *V_YESNO_STRYES = "yes";
+const char *V_YESNO_STRNO = "no";
+
+enum {CS_NONE, CS_GENERAL, CS_TCPPROBE};
+enum {V_STR, V_INT, V_YESNO};
 struct readcfg_var_t {
   const char *name;
+  int var_type;
   int section;
   long int *plint_target;
   char **p_pchar_target;
@@ -316,21 +351,31 @@ struct readcfg_var_t {
 
 struct check_t chk00;
 const struct readcfg_var_t readcfg_vars[] = {
-  {"display_name", CFG_S_TCPPROBE, NULL, &(chk00.display_name), NULL, 0, &(chk00.display_name_set), FALSE},
-  {"host_name", CFG_S_TCPPROBE, NULL, &(chk00.host_name), NULL, 0, &(chk00.host_name_set), FALSE},
-  {"port", CFG_S_TCPPROBE, &(chk00.port), NULL, NULL, 0, &(chk00.port_set), FALSE},
-  {"expect", CFG_S_TCPPROBE, NULL, &(chk00.expect), NULL, 0, &(chk00.expect_set), FALSE},
-  {"check_interval", CFG_S_GENERAL, &g_check_interval, NULL, NULL, 0, &g_check_interval_set, TRUE},
-  {"buffer_size", CFG_S_GENERAL, &g_buffer_size, NULL, NULL, 0, &g_buffer_size_set, FALSE},
-  {"connect_timeout", CFG_S_GENERAL, &g_connect_timeout, NULL, NULL, 0, &g_connect_timeout_set, FALSE},
-  {"keep_last_status", CFG_S_GENERAL, &g_nb_keep_last_status, NULL, NULL, 0, &g_nb_keep_last_status_set, TRUE},
-  {"display_name_width", CFG_S_GENERAL, &g_display_name_width, NULL, NULL, 0, &g_display_name_width_set, FALSE},
-  {"html_refresh_interval", CFG_S_GENERAL, &g_html_refresh_interval, NULL, NULL, 0, &g_html_refresh_interval_set, FALSE},
-  {"html_title", CFG_S_GENERAL, NULL, NULL, g_html_title, sizeof(g_html_title), &g_html_title_set, FALSE},
-  {"html_directory", CFG_S_GENERAL, NULL, NULL, g_html_directory, sizeof(g_html_directory), &g_html_directory_set, FALSE},
-  {"html_file", CFG_S_GENERAL, NULL, NULL, g_html_file, sizeof(g_html_file), &g_html_file_set, FALSE},
-  {"html_nb_columns", CFG_S_GENERAL, &g_html_nb_columns, NULL, NULL, 0, &g_html_nb_columns_set, FALSE}
+  {"display_name", V_STR, CS_TCPPROBE, NULL, &(chk00.display_name), NULL, 0, &(chk00.display_name_set), FALSE},
+  {"host_name", V_STR, CS_TCPPROBE, NULL, &(chk00.host_name), NULL, 0, &(chk00.host_name_set), FALSE},
+  {"port", V_INT, CS_TCPPROBE, &(chk00.port), NULL, NULL, 0, &(chk00.port_set), FALSE},
+  {"expect", V_STR, CS_TCPPROBE, NULL, &(chk00.expect), NULL, 0, &(chk00.expect_set), FALSE},
+  {"check_interval", V_INT, CS_GENERAL, &g_check_interval, NULL, NULL, 0, &g_check_interval_set, TRUE},
+  {"buffer_size", V_INT, CS_GENERAL, &g_buffer_size, NULL, NULL, 0, &g_buffer_size_set, FALSE},
+  {"connect_timeout", V_INT, CS_GENERAL, &g_connect_timeout, NULL, NULL, 0, &g_connect_timeout_set, FALSE},
+  {"keep_last_status", V_INT, CS_GENERAL, &g_nb_keep_last_status, NULL, NULL, 0, &g_nb_keep_last_status_set, TRUE},
+  {"display_name_width", V_INT, CS_GENERAL, &g_display_name_width, NULL, NULL, 0, &g_display_name_width_set, FALSE},
+  {"html_refresh_interval", V_INT, CS_GENERAL, &g_html_refresh_interval, NULL, NULL, 0, &g_html_refresh_interval_set, FALSE},
+  {"html_title", V_STR, CS_GENERAL, NULL, NULL, g_html_title, sizeof(g_html_title), &g_html_title_set, FALSE},
+  {"html_directory", V_STR, CS_GENERAL, NULL, NULL, g_html_directory, sizeof(g_html_directory), &g_html_directory_set, FALSE},
+  {"html_file", V_STR, CS_GENERAL, NULL, NULL, g_html_file, sizeof(g_html_file), &g_html_file_set, FALSE},
+  {"html_nb_columns", V_INT, CS_GENERAL, &g_html_nb_columns, NULL, NULL, 0, &g_html_nb_columns_set, FALSE},
+  {"webserver_on", V_YESNO, CS_GENERAL, &g_webserver_on, NULL, NULL, 0, &g_webserver_on_set, FALSE},
+  {"webserver_port", V_INT, CS_GENERAL, &g_webserver_port, NULL, NULL, 0, &g_webserver_port_set, FALSE}
 };
+
+//
+// Converts errno into a readable string
+//
+char *errno_error(char *s, size_t s_len) {
+  snprintf(s, s_len, "Error %i, %s", errno, strerror(errno));
+  return s;
+}
 
 //
 // My implementation of getline()
@@ -510,11 +555,10 @@ void fatal_error(const char *format, ...) {
   va_list args;
   va_start(args, format);
 
-  char *str = (char *)malloc(REGULAR_STR_STRBUFSIZE);
-  vsnprintf(str, REGULAR_STR_STRBUFSIZE, format, args);
-  strncat(str, "\n", REGULAR_STR_STRBUFSIZE);
+  char str[REGULAR_STR_STRBUFSIZE];
+  vsnprintf(str, sizeof(str), format, args);
+  strncat(str, "\n", sizeof(str));
   fprintf(stderr, str, NULL);
-  free(str);
   va_end(args);
   exit(EXIT_FAILURE);
 }
@@ -569,6 +613,24 @@ void get_datetime_of_day(int *year, int *month, int *day, int *hour, int *minute
 }
 
 //
+// Date & time to str for network HTTP usage
+//
+char *my_ctime_r(const time_t *timep, char *buf, size_t buflen) {
+  my_pthread_mutex_lock(&mutex);
+
+  char *c = ctime(timep);
+  if (c == NULL)
+    return c;
+  strncpy(buf, c, buflen);
+  buf[buflen - 1] = '\0';
+  trim(buf);
+
+  my_pthread_mutex_unlock(&mutex);
+
+  return buf;
+}
+
+//
 // Prepare prefix string, used by my_log only
 //
 void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt, size_t dt_bufsize, size_t *dt_len) {
@@ -589,6 +651,10 @@ void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt, size_t dt_bufsiz
 // Output log string, used by my_log only
 //
 void my_log_core_output(const char *s, size_t dt_len) {
+  char s_err[ERR_STR_BUFSIZE];
+
+/*  my_pthread_mutex_lock(&mutex);*/
+
   if (log_fd) {
     fputs(s, log_fd);
     fputs("\n", log_fd);
@@ -605,63 +671,51 @@ void my_log_core_output(const char *s, size_t dt_len) {
     puts(t);
     fflush(stdout);
   }
+
+/*  my_pthread_mutex_unlock(&mutex);*/
 }
 
 //
 // Output a string in the program log
 //
 void my_logs(const loglevel_t log_level, const logdisp_t log_disp, const char *s) {
-  if (log_level > current_log_level)
+  if (log_level > g_current_log_level)
     return;
 
-  char *dt = (char *)malloc(REGULAR_STR_STRBUFSIZE);
+  my_pthread_mutex_lock(&mutex);
+
+  char dt[REGULAR_STR_STRBUFSIZE];
   size_t dt_len;
 
-  my_log_core_get_dt_str(log_disp, dt, REGULAR_STR_STRBUFSIZE, &dt_len);
-  strncat(dt, s, REGULAR_STR_STRBUFSIZE);
+  my_log_core_get_dt_str(log_disp, dt, sizeof(dt), &dt_len);
+  strncat(dt, s, sizeof(dt));
   my_log_core_output(dt, dt_len);
 
-  free(dt);
+  my_pthread_mutex_unlock(&mutex);
 }
 
 //
 // Output a formatted string in the program log
 //
 void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *format, ...) {
-  va_list args;
-  va_start(args, format);
 
-  if (log_level > current_log_level)
+  if (log_level > g_current_log_level)
     return;
 
-  char *dt = (char *)malloc(REGULAR_STR_STRBUFSIZE);
+  my_pthread_mutex_lock(&mutex);
+
+  char dt[REGULAR_STR_STRBUFSIZE];
   size_t dt_len;
-  char *str = (char *)malloc(REGULAR_STR_STRBUFSIZE);
-
-  my_log_core_get_dt_str(log_disp, dt, REGULAR_STR_STRBUFSIZE, &dt_len);
-
-  vsnprintf(str, REGULAR_STR_STRBUFSIZE, format, args);
-  strncat(dt, str, REGULAR_STR_STRBUFSIZE);
+  char str[REGULAR_STR_STRBUFSIZE];
+  my_log_core_get_dt_str(log_disp, dt, sizeof(dt), &dt_len);
+  va_list args;
+  va_start(args, format);
+  vsnprintf(str, sizeof(str), format, args);
+  va_end(args);
+  strncat(dt, str, sizeof(dt));
   my_log_core_output(dt, dt_len);
 
-  free(str);
-  free(dt);
-
-  va_end(args);
-}
-
-//
-// Log a telnet line
-//
-void my_log_telnet(const int is_received, const char *s) {
-  char prefix[50];
-  strncpy(prefix, is_received ? PREFIX_RECEIVED : PREFIX_SENT, sizeof(prefix));
-  size_t m = strlen(prefix) + strlen(s) + 1;
-  char *tmp = (char *)malloc(m);
-  strncpy(tmp, prefix, m);
-  strncat(tmp, s, m);
-  my_logs(LL_NORMAL, LP_DATETIME, tmp);
-  free(tmp);
+  my_pthread_mutex_unlock(&mutex);
 }
 
 //
@@ -710,16 +764,18 @@ int connect_with_timeout(const struct sockaddr_in *server, int *connection_sock,
 // Return -1 if an error occured, 1 if reading is successful,
 // 0 if transmission is closed.
 //
-int socket_read_line_alloc(int sock, char** out, int trace) {
+int socket_read_line_alloc(int sock, char **out, int trace, int *size) {
   const int INITIAL_READLINE_BUFFER_SIZE = 100;
 
-  int size = INITIAL_READLINE_BUFFER_SIZE;
   int i = 0;
   int cr = FALSE;
   char ch;
   int nb;
 
-  *out = (char *)malloc(size);
+  if (*out == NULL) {
+    *size = INITIAL_READLINE_BUFFER_SIZE;
+    *out = (char *)malloc(*size);
+  }
 
   for (;;) {
     if ((nb = recv(sock, &ch, 1, 0)) == SOCKET_ERROR) {
@@ -729,12 +785,12 @@ int socket_read_line_alloc(int sock, char** out, int trace) {
       return -1;
     }
 
-    if (i >= size) {
-      if (size * 2 <= MAX_READLINE_SIZE) {
-        size *= 2;
-        *out = (char *)realloc(*out, size);
+    if (i >= *size) {
+      if (*size * 2 <= MAX_READLINE_SIZE) {
+        *size *= 2;
+        *out = (char *)realloc(*out, *size);
       } else {
-        (*out)[size - 1] = '\0';
+        (*out)[*size - 1] = '\0';
         break;
       }
     }
@@ -757,17 +813,54 @@ int socket_read_line_alloc(int sock, char** out, int trace) {
     i++;
   }
 
-
   if (nb == 0) {
     return 0;
   } else {
     if (trace) {
-      my_logf(LL_VERBOSE, LP_DATETIME, "<<< %s", *out);
+      my_logf(LL_VERBOSE, LP_DATETIME, PREFIX_RECEIVED "%s", *out);
     }
     return 1;
   }
 }
 
+//
+// Send a line to a socket
+// Return 0 if OK, -1 if error.
+// Manage logging an error code and closing socket.
+//
+int socket_line_sendf(int *s, int trace, const char *fmt, ...) {
+
+  if (*s == -1) {
+    return -1;
+  }
+
+    // Newline (\015\012) + null terminating character
+  int l = strlen(fmt) + 100;
+  char *tmp;
+  tmp = (char *)malloc(l + 1);
+
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(tmp, l, fmt, args);
+  va_end(args);
+
+  if (trace)
+    my_logf(LL_VERBOSE, LP_DATETIME, PREFIX_SENT "%s", tmp);
+
+  strncat(tmp, "\015\012", l);
+
+  int e = send(*s, tmp, strlen(tmp), 0);
+
+  free(tmp);
+  if (e == SOCKET_ERROR) {
+    char s_err[ERR_STR_BUFSIZE];
+    my_logf(LL_ERROR, LP_DATETIME, "Error sending to socket, error %s", os_last_err_desc(s_err, sizeof(s_err)));
+    os_closesocket(*s);
+    *s = -1;
+    return -1;
+  }
+  return 0;
+}
 
 //
 // Return true if s begins with prefix, false otherwise
@@ -843,9 +936,10 @@ int perform_a_check(struct check_t *chk) {
 
     if (chk->expect_set && strlen(chk->expect) >= 1) {
 
-      char *response;
+      char *response = NULL;
+      int response_size;
       int read_res = 0;
-      if ((read_res = socket_read_line_alloc(connection_sock, &response, current_log_level == LL_DEBUG)) < 0) {
+      if ((read_res = socket_read_line_alloc(connection_sock, &response, g_trace_network_traffic, &response_size)) < 0) {
         os_closesocket(connection_sock);
       } else if (s_begins_with(response, chk->expect)) {
         my_logf(LL_DEBUG, LP_DATETIME, "Expected answer: '%s'", response);
@@ -1046,8 +1140,15 @@ void almost_neverending_loop() {
           }
           fprintf(H, "</td>\n");
         }
-        if (counter % g_html_nb_columns == g_html_nb_columns - 1 || counter == nb_valid_checks - 1)
+        if (counter % g_html_nb_columns == g_html_nb_columns - 1 || counter == nb_valid_checks - 1) {
+          int k;
+          for (k = counter; k % g_html_nb_columns != g_html_nb_columns - 1; ++k) {
+            fputs("<td></td><td></td><td></td>", H);
+            if (g_nb_keep_last_status >= 1)
+              fputs("<td></td>", H);
+          }
           fputs("</tr>\n", H);
+        }
       }
       ++counter;
     }
@@ -1058,6 +1159,7 @@ void almost_neverending_loop() {
       fputs("</body>\n", H);
       fputs("</html>\n", H);
       fclose(H);
+      add_access_right(g_html_complete_file_name, S_IRUSR | S_IRGRP | S_IROTH);
     }
 
     my_logf(LL_NORMAL, LP_DATETIME, "Check done in %fs", elapsed);
@@ -1223,11 +1325,11 @@ void parse_options(int argc, char *argv[]) {
         break;
 
       case 'v':
-        current_log_level++;
+        g_current_log_level++;
         break;
 
       case 'q':
-        current_log_level--;
+        g_current_log_level--;
         break;
 
       case '?':
@@ -1239,10 +1341,12 @@ void parse_options(int argc, char *argv[]) {
   }
   if (optind < argc)
     option_error("Trailing options");
-  if (current_log_level < LL_ERROR)
-    current_log_level = LL_ERROR;
-  if (current_log_level > LL_DEBUG)
-    current_log_level = LL_DEBUG;
+  if (g_current_log_level < LL_ERROR)
+    g_current_log_level = LL_ERROR;
+  if (g_current_log_level > LL_DEBUG)
+    g_current_log_level = LL_DEBUG;
+
+  g_trace_network_traffic = (g_current_log_level == LL_DEBUG);
 }
 
 //
@@ -1285,7 +1389,7 @@ void read_configuration_file(const char *cf) {
   size_t len = 0;
   int line_number = 0;
   int check_line_number = -1;
-  int read_status = CFG_S_NONE;
+  int read_status = CS_NONE;
 
   int cur_check = -1;
 
@@ -1318,9 +1422,9 @@ void read_configuration_file(const char *cf) {
           section_name[slen] = '\0';
           my_logf(LL_DEBUG, LP_DATETIME, "Entering section '%s'", section_name);
 
-          if (strcasecmp(section_name, CFG_S_GENERAL_STR) == 0) {
-            read_status = CFG_S_GENERAL;
-          } else if (strcasecmp(section_name, CFG_S_TCPCHECK_STR) == 0) {
+          if (strcasecmp(section_name, CS_GENERAL_STR) == 0) {
+            read_status = CS_GENERAL;
+          } else if (strcasecmp(section_name, CS_TCPCHECK_STR) == 0) {
             if (check_line_number >= 1) {
               if (cur_check < 0) {
                 internal_error("read_configuration_file", __FILE__, __LINE__);
@@ -1335,9 +1439,9 @@ void read_configuration_file(const char *cf) {
             if (cur_check >= MAX_CHECKS) {
               --cur_check;
               my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: reached max number of checks (%i)", cf, line_number, MAX_CHECKS);
-              read_status = CFG_S_NONE;
+              read_status = CS_NONE;
             } else {
-              read_status = CFG_S_TCPPROBE;
+              read_status = CS_TCPPROBE;
               check_t_create(&chk00);
             }
           } else {
@@ -1393,11 +1497,11 @@ void read_configuration_file(const char *cf) {
                     cf, line_number, key);
                 } else {
                   long int n = 0;
-                  if (cfg.plint_target != NULL)
+                  if (cfg.plint_target != NULL && cfg.var_type == V_INT)
                     n = atoi(value);
                   if (cfg.plint_target != NULL && strlen(value) == 0) {
                     my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed", cf, line_number);
-                  } else if (cfg.plint_target != NULL && n == 0 && !cfg.allow_null) {
+                  } else if (cfg.plint_target != NULL && cfg.var_type == V_INT && n == 0 && !cfg.allow_null) {
                     my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: null value not allowed", cf, line_number);
                   } else if ((cfg.p_pchar_target != NULL || cfg.pchar_target != NULL) && strlen(value) == 0 && !cfg.allow_null) {
                     my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed", cf, line_number);
@@ -1405,9 +1509,20 @@ void read_configuration_file(const char *cf) {
                     my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s already defined", cf, line_number, key);
                   } else if (cfg.plint_target != NULL) {
 
-                      // Variable of type long int
-                    *cfg.plint_target = n;
-                    *cfg.pint_var_set = TRUE;
+                    if (cfg.var_type == V_INT) {
+                        // Variable of type long int
+                      *cfg.plint_target = n;
+                      *cfg.pint_var_set = TRUE;
+                    } else {
+                      if (strcasecmp(value, V_YESNO_STRYES) == 0) {
+                        *cfg.plint_target = TRUE;
+                      } else if (strcasecmp(value, V_YESNO_STRNO) == 0) {
+                        *cfg.plint_target = FALSE;
+                      } else {
+                        my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s must be set to yes or no",
+                          cf, line_number, key);
+                      }
+                    }
 
                   } else if (cfg.p_pchar_target != NULL) {
                     
@@ -1475,6 +1590,21 @@ void read_configuration_file(const char *cf) {
 
 }
 
+int add_access_right(const char *f, mode_t additional_rights) {
+  struct stat s;
+  int r = 0;
+  if (!stat(f, &s)) {
+    s.st_mode |= additional_rights;
+    r = chmod(f, s.st_mode);
+  }
+  if (r) {
+    char s_err[SMALLSTRSIZE];
+    errno_error(s_err, sizeof(s_err));
+    my_logf(LL_ERROR, LP_DATETIME, "Unable to change mode of file '%s': ", f, s_err);
+  }
+  return -1;
+}
+
 //
 // Create files used for HTML display
 //
@@ -1514,8 +1644,274 @@ void create_img_files() {
         fclose(IMG);
       }
     }
+
+    add_access_right(buf, S_IRUSR | S_IRGRP | S_IROTH);
   }
 
+}
+
+//
+// Start server listening
+//
+int server_listen(int listen_port, const char *prefix) {
+  struct sockaddr_in listen_sa;
+
+  char s_err[ERR_STR_BUFSIZE];
+
+  int sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (sock == -1) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s: error creating socket, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
+    return 0;
+  }
+
+  int bOptVal = TRUE;
+  socklen_t bOptLen = sizeof(int);
+  if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&bOptVal, bOptLen) == SOCKET_ERROR) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s: cannot set socket option, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
+    os_closesocket(sock);
+    return 0;
+  }
+
+  listen_sa.sin_addr.s_addr = htonl(INADDR_ANY);
+  listen_sa.sin_port = htons((u_short)listen_port);
+  listen_sa.sin_family = AF_INET;
+
+  if (bind(sock, (struct sockaddr*)&listen_sa, sizeof(listen_sa)) == SOCKET_ERROR) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s: cannot bind, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
+    os_closesocket(sock);
+    return 0;
+  }
+  if (listen(sock, SOMAXCONN) == SOCKET_ERROR) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s: cannot listen, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
+    os_closesocket(sock);
+    return 0;
+  }
+  return sock;
+}
+
+//
+// Have server accept incoming connections
+//
+int server_accept(int listen_sock, struct sockaddr_in* remote_sin, int listen_port, const char* prefix) {
+  socklen_t remote_sin_len;
+
+  char s_err[SMALLSTRSIZE];
+
+  my_logf(LL_VERBOSE, LP_DATETIME, "%s: listening on port %u...", prefix, listen_port);
+  remote_sin_len = sizeof(*remote_sin);
+  int sock = accept(listen_sock, (struct sockaddr *)remote_sin, &remote_sin_len);
+  if (sock == -1) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s: cannot accept, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
+    os_closesocket(listen_sock);
+    return 0;
+  }
+  my_logf(LL_VERBOSE, LP_DATETIME, "%s: connection accepted from %s", prefix, inet_ntoa(remote_sin->sin_addr));
+  return sock;
+}
+
+//
+// Send error page over HTTP connection
+//
+void http_send_error_page(int sock, const char *e, const char *t) {
+  my_logf(LL_DEBUG, LP_DATETIME, "Sending HTTP error %s / %s", e, t);
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "HTTP/1.1 %s", e);
+  socket_line_sendf(&sock, g_trace_network_traffic, "Connection: close");
+  socket_line_sendf(&sock, g_trace_network_traffic, "Content-type: text/html");
+  socket_line_sendf(&sock, g_trace_network_traffic, "");
+  socket_line_sendf(&sock, g_trace_network_traffic, "<html><head><title>Not Found</title></head>");
+  socket_line_sendf(&sock, g_trace_network_traffic, "<body><p><b>%s</b></p></body></html>", t);
+
+  my_logf(LL_DEBUG, LP_DATETIME, "Finished sending HTTP error %s / %s", e, t);
+}
+
+//
+// Answers web connections
+//
+int manage_web_transaction(int sock, const struct sockaddr_in *remote_sin) {
+
+  my_logf(LL_DEBUG, LP_DATETIME, "Entering web transaction...");
+
+  char *received = NULL;
+  int size;
+  int read_res = 0;
+  if ((read_res = socket_read_line_alloc(sock, &received, g_trace_network_traffic, &size)) < 0) {
+    free(received);
+    return -1;
+  }
+
+  my_logf(LL_DEBUG, LP_DATETIME, "Received request '%s'", received);
+
+  char *p = received;
+  if (strncmp(p, "GET", 3)) {
+    free(received);
+    http_send_error_page(sock, "400 Bad Request", "Could not understand request");
+    return -1;
+  }
+  p += 3;
+  while (*p == ' ')
+    ++p;
+  if (strncmp(p, "http://", 7) == 0)
+    p += 7;
+  if (*p == '/')
+    ++p;
+
+  char *tmpurl = p;
+
+  while (*p != '\0' && *p != ' ')
+    ++p;
+  if (p != '\0') {
+    *p = '\0';
+    ++p;
+  }
+
+  while (*p == ' ')
+    ++p;
+  if (strncmp(p, "HTTP/1.1", 8)) {
+    free(received);
+    http_send_error_page(sock, "400 Bad Request", "Could not understand request");
+    return -1;
+  }
+
+  char *t = strrchr(tmpurl, '/');
+  if (t != NULL)
+    tmpurl = t + 1;
+  if (strstr(received, "..") != 0) {
+    free(received);
+    http_send_error_page(sock, "401 Unauthorized", "Not allowed to go up in directory tree");
+    return -1;
+  }
+
+  char url[BIGSTRSIZE];
+  strncpy(url, tmpurl, sizeof(url));
+
+  int keep_alive = TRUE;
+  while (strlen(received) != 0) {
+    if ((read_res = socket_read_line_alloc(sock, &received, g_trace_network_traffic, &size)) < 0) {
+      free(received);
+      return -1;
+    }
+
+    if (strncasecmp(received, "connection:", 11) == 0 && strstr(received, "close") != NULL) {
+      my_logf(LL_DEBUG, LP_DATETIME, "Connection will be closed afterwards");
+      keep_alive = FALSE;
+    }
+  }
+
+  free(received);
+
+  my_logf(LL_DEBUG, LP_DATETIME, WEBSERVER_LOG_PREFIX ": client requested '%s'", url);
+
+  char path[BIGSTRSIZE];
+  strncpy(path, g_html_directory, sizeof(path));
+  fs_concatene(path, strlen(url) == 0 ? g_html_file : url, sizeof(path));
+
+  my_logf(LL_DEBUG, LP_DATETIME, "Will stat file '%s'", path);
+
+  struct stat s;
+  if (stat(path, &s)) {
+    char s_err[SMALLSTRSIZE];
+    errno_error(s_err, sizeof(s_err));
+    my_logf(LL_ERROR, LP_DATETIME, "%s", s_err);
+    http_send_error_page(sock, "404 Not found", s_err);
+    return -1;
+  }
+
+  char dt_fileupdate[50];
+  char dt_now[50];
+  struct timeval tv;
+  if (my_ctime_r(&s.st_mtime, dt_fileupdate, sizeof(dt_fileupdate)) == 0 ||
+      gettimeofday(&tv, NULL) != 0 ||
+      my_ctime_r(&tv.tv_sec, dt_now, sizeof(dt_now)) == 0) {
+    http_send_error_page(sock, "500 Server error", "Internal server error");
+    return -1;
+  }
+
+  FILE *F = fopen(path, "rb");
+  if (F == NULL) {
+    http_send_error_page(sock, "404 Not found", "File not found");
+    return -1;
+  }
+  char *pos;
+  char *content_type = "application/octet-stream";
+  if ((pos = strrchr(path, '.')) != NULL) {
+    ++pos;
+    if (strcasecmp(pos, "png") == 0)
+      content_type = "image/png";
+    else if (strcasecmp(pos, "htm") == 0 || strcasecmp(pos, "html") == 0)
+      content_type = "text/html";
+    else if (strcasecmp(pos, "ini") == 0 || strcasecmp(pos, "log") == 0)
+      content_type = "text/ascii";
+  }
+ 
+    // No way to work with binary files and kep-alive? I don't find...
+  keep_alive = FALSE;
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "HTTP/1.1 200 OK");
+  socket_line_sendf(&sock, g_trace_network_traffic, "Connection: %s", keep_alive ? "keep-alive" : "close");
+  socket_line_sendf(&sock, g_trace_network_traffic, "Content-length: %li", (long int)s.st_size);
+  socket_line_sendf(&sock, g_trace_network_traffic, "Content-type: %s", content_type);
+  socket_line_sendf(&sock, g_trace_network_traffic, "Date: %s", dt_now);
+  socket_line_sendf(&sock, g_trace_network_traffic, "Last-modified: %s", dt_fileupdate);
+  socket_line_sendf(&sock, g_trace_network_traffic, "");
+
+  char *buffer = (char *)malloc(g_buffer_size);
+  size_t n;
+  ssize_t e;
+  while (feof(F) == 0) {
+
+    if ((n = fread(buffer, 1, sizeof(buffer), F)) == 0) {
+      if (feof(F) == 0) {
+        my_logf(LL_ERROR, LP_DATETIME, "Error reading file %s", path);
+        keep_alive = FALSE;
+        break;
+      }
+    }
+
+    e = send(sock, buffer, n, 0);
+    if (e == SOCKET_ERROR) {
+      my_logf(LL_ERROR, LP_DATETIME, "Socket error");
+        keep_alive = FALSE;
+      break;
+    }
+  }
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "");
+
+  free(buffer);
+  fclose(F);
+
+  return keep_alive ? 0 : -1;
+}
+
+//
+// Manages web server
+//
+void *webserver(void *p) {
+  (void *)p;
+
+  int listen_sock = server_listen(g_webserver_port, WEBSERVER_LOG_PREFIX);
+  if (listen_sock == 0) {
+    return NULL;
+  }
+
+  my_logf(LL_NORMAL, LP_DATETIME, WEBSERVER_LOG_PREFIX ": start");
+
+  struct sockaddr_in remote_sin;
+  int sock;
+  while (TRUE) {
+    sock = server_accept(listen_sock, &remote_sin, g_webserver_port, WEBSERVER_LOG_PREFIX);
+    while (sock != -1) {
+      if (manage_web_transaction(sock, &remote_sin) != 0) {
+        os_closesocket(sock);
+        sock = -1;
+        my_logf(LL_VERBOSE, LP_DATETIME, WEBSERVER_LOG_PREFIX ": terminated connection with client");
+      } else {
+        my_logf(LL_VERBOSE, LP_DATETIME, WEBSERVER_LOG_PREFIX ": continuing connection with client");
+      }
+    }
+  }
+  return NULL;
 }
 
 int main(int argc, char *argv[]) {
@@ -1571,10 +1967,20 @@ int main(int argc, char *argv[]) {
   if (c != nb_valid_checks)
     internal_error("main", __FILE__, __LINE__);
 
+  my_logf(LL_VERBOSE, LP_DATETIME, "Run web server: %s", g_webserver_on ? "yes" : "no");
+  if (g_webserver_on)
+    my_logf(LL_VERBOSE, LP_DATETIME, "Web server listen port: %lu", g_webserver_port);
+
   create_img_files();
 
     // Just to call WSAStartup, yes!
   os_init_network();
+
+  if (g_webserver_on) {
+    pthread_t id;
+    if (pthread_create(&id, NULL, webserver, NULL) != 0)
+      fatal_error("main(): pthread_create() error");
+  }
 
   almost_neverending_loop();
 
