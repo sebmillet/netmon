@@ -5,41 +5,79 @@ Configuration file 'netmon.ini', line 3: variable check_interval not allowed in 
 Configuration file 'netmon.ini', line 4: variable display_name not allowed in this section
 Configuration file 'netmon.ini', line 6: variable port not allowed in this section
 Configuration file 'netmon.ini', line 7: unknown variable bla
-Entering section 'General'
 Configuration file 'netmon.ini', line 13: empty value not allowed
 Configuration file 'netmon.ini', line 15: unknown variable oui
 Configuration file 'netmon.ini', line 16: variable port not allowed in this section
 Configuration file 'netmon.ini', line 17: syntax error
-Entering section 'tcp-probe'
 Configuration file 'netmon.ini', line 22: empty value not allowed
 Configuration file 'netmon.ini', line 23: unknown variable alert
 Configuration file 'netmon.ini', line 24: syntax error
-Entering section 'tcp-probe'
 Configuration file 'netmon.ini', section of line 19: no host name defined, discarding check
 Configuration file 'netmon.ini', section of line 19: no port defined, discarding check
 Configuration file 'netmon.ini', line 30: variable port already defined
 Configuration file 'netmon.ini', line 31: variable port already defined
 Configuration file 'netmon.ini', line 32: variable check_interval not allowed in this section
 Configuration file 'netmon.ini', line 33: unknown variable alert
-Entering section 'tcp-probe'
-Entering section 'tcp-probe'
 Configuration file 'netmon.ini', section of line 35: no host name defined, discarding check
 Configuration file 'netmon.ini', section of line 35: no port defined, discarding check
-Entering section 'tcp-probe'
 Configuration file 'netmon.ini', line 45: empty value not allowed
 Configuration file 'netmon.ini', line 46: null value not allowed
-Entering section 'abc'
-Configuration file 'netmon.ini', line 48: unknown section name 'abc'
-Entering section 'tcp-prob'
-Configuration file 'netmon.ini', line 49: unknown section name 'tcp-prob'
-Entering section 'tcp-probes'
-Configuration file 'netmon.ini', line 50: unknown section name 'tcp-probes'
-Entering section 'tcp-probe'
 Configuration file 'netmon.ini', section of line 42: no port defined, discarding check
+Configuration file 'netmon.ini', line 48: unknown section name 'abc'
+Configuration file 'netmon.ini', line 49: unknown section name 'tcp-prob'
+Configuration file 'netmon.ini', line 50: unknown section name 'tcp-probes'
 Configuration file 'netmon.ini', line 52: null value not allowed
 Configuration file 'netmon.ini', line 54: empty value not allowed
 Configuration file 'netmon.ini', section of line 51: no port defined, discarding check
 keep_last_status not defined, taking default = 20
+!! check #0 (will be ignored)
+   is_valid     = No
+   display_name = Office PC SMTP
+   host_name    = <unset>
+   port         = <unset>
+   expect       = <unset>
+   alerts       = <unset>
+   nb alerts    = 0
+== CHECK #1
+   is_valid     = Yes
+   display_name = my Localhost
+   host_name    = localhost
+   port         = 21219
+   expect       = <unset>
+   alerts       = <unset>
+   nb alerts    = 0
+!! check #2 (will be ignored)
+   is_valid     = No
+   display_name = <unset>
+   host_name    = <unset>
+   port         = <unset>
+   expect       = <unset>
+   alerts       = <unset>
+   nb alerts    = 0
+== CHECK #3
+   is_valid     = Yes
+   display_name = ab544abcbcbczc31415911
+   host_name    = ab544abcbcbczc31415911
+   port         = 18
+   expect       = <unset>
+   alerts       = <unset>
+   nb alerts    = 0
+!! check #4 (will be ignored)
+   is_valid     = No
+   display_name = <unset>
+   host_name    = bla r
+   port         = <unset>
+   expect       = <unset>
+   alerts       = <unset>
+   nb alerts    = 0
+!! check #5 (will be ignored)
+   is_valid     = No
+   display_name = <unset>
+   host_name    = bla y
+   port         = <unset>
+   expect       = <unset>
+   alerts       = <unset>
+   nb alerts    = 0
 check_interval = 0
 keep_last_status = 20
 display_name_width = 20
@@ -48,48 +86,9 @@ html_file = netmon.html
 html_title = netmon 1.0
 html_refresh_interval = 20
 Valid check(s) defined: 2
-!! check #0 (will be ignored)
-   is_valid     = No
-   display_name = Office PC SMTP
-   host_name    = <unset>
-   port         = <unset>
-   expect       = <unset>
-   alert        = No
-== CHECK #1
-   is_valid     = Yes
-   display_name = my Localhost
-   host_name    = localhost
-   port         = 21219
-   expect       = <unset>
-   alert        = No
-!! check #2 (will be ignored)
-   is_valid     = No
-   display_name = <unset>
-   host_name    = <unset>
-   port         = <unset>
-   expect       = <unset>
-   alert        = No
-== CHECK #3
-   is_valid     = Yes
-   display_name = ab544abcbcbczc31415911
-   host_name    = ab544abcbcbczc31415911
-   port         = 18
-   expect       = <unset>
-   alert        = No
-!! check #4 (will be ignored)
-   is_valid     = No
-   display_name = <unset>
-   host_name    = bla r
-   port         = <unset>
-   expect       = <unset>
-   alert        = No
-!! check #5 (will be ignored)
-   is_valid     = No
-   display_name = <unset>
-   host_name    = bla y
-   port         = <unset>
-   expect       = <unset>
-   alert        = No
+Run web server: no
+To check: 'my Localhost' [localhost:21219], no expect, no alert
+To check: 'ab544abcbcbczc31415911' [ab544abcbcbczc31415911:18], no expect, no alert
 Will create image files in html directory
 
 Starting check...

@@ -11,33 +11,55 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <sys/types.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <pthread.h>
 
-extern char const st_undef[];
-extern size_t const st_undef_len;
-extern char const st_unknown[];
-extern size_t const st_unknown_len;
-extern char const st_ok[];
-extern size_t const st_ok_len;
-extern char const st_fail[];
-extern size_t const st_fail_len;
-
-#define DEBUG
+/*#define DEBUG*/
 
 loglevel_t g_current_log_level = LL_NORMAL;
-int g_trace_network_traffic;
+
+#define DEFAULT_CHECK_INTERVAL 180
+#define DEFAULT_NB_KEEP_LAST_STATUS 20
+#define DEFAULT_DISPLAY_NAME_WIDTH 20
+#define DEFAULT_SENDER  (PACKAGE_TARNAME "@localhost")
+#define DEFAULT_ALERT_THRESHOLD 3
+#define DEFAULT_CONNECT_TIMEOUT 5
+
+const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
+const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
+
+#define DEFAULT_HTML_REFRESH_PERIOD 20
+#define DEFAULT_HTML_NB_COLUMNS 2
+
+#define WEBSERVER_LOG_PREFIX  "WEBSERVER"
+#if defined(_WIN32) || defined(_WIN64)
+#define DEFAULT_WEBSERVER_ON TRUE
+#define DEFAULT_WEBSERVER_PORT 80
+#else
+#define DEFAULT_WEBSERVER_ON FALSE
+#define DEFAULT_WEBSERVER_PORT 8080
+#endif
+
+#define PREFIX_RECEIVED "<<< "
+#define PREFIX_SENT ">>> "
 
 #if defined(_WIN32) || defined(_WIN64)
 
   // WINDOWS
+
+#define DEFAULT_HTML_DIRECTORY (".")
+#define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
+
 #include <winsock2.h>
 
 #else
 
   // NOT WINDOWS
+
+#define DEFAULT_HTML_DIRECTORY (".")
+#define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -52,6 +74,17 @@ int g_trace_network_traffic;
 
 #define SMALLSTRSIZE  200
 #define BIGSTRSIZE    1000
+
+#define REGULAR_STR_STRBUFSIZE 2000
+#define ERR_STR_BUFSIZE 200
+#define DEFAULT_BUFFER_SIZE 10000
+  // Maximum size of an input line in the TCP connection
+#define MAX_READLINE_SIZE 10000
+
+
+//
+// Status
+//
 
 enum {ST_UNDEF = 0, ST_UNKNOWN = 1, ST_OK = 2, ST_FAIL = 3, ST_LAST = 3};
 const char ST_TO_CHAR[] = {
@@ -91,12 +124,6 @@ struct img_file_t img_files[] = {
   {"st-fail.png", NULL, 0}      // ST_FAIL
 };
 
-/*const char *ST_TO_IMAGENAME_FORHTML[] = {*/
-/*  "st-undef.png",   // ST_UNDEF*/
-/*  "st-unknown.png", // ST_UNKNOWN*/
-/*  "st-ok.png",      // ST_OK*/
-/*  "st-fail.png"     // ST_FAIL*/
-/*};*/
 const char *ST_TO_BGCOLOR_FORHTML[] = {
   "#FFFFFF", // ST_UNDEF
   "#B0B0B0", // ST_UNKNOWN
@@ -104,54 +131,57 @@ const char *ST_TO_BGCOLOR_FORHTML[] = {
   "#FF0000"  // ST_FAIL
 };
 
+
+//
+// HTML & WEB SERVER
+//
+
 char g_html_title[SMALLSTRSIZE] = PACKAGE_STRING;
 int g_html_title_set = FALSE;
 
-#define MAX_CHECKS 2000
-struct check_t checks[MAX_CHECKS];
-int g_nb_checks = 0;
-int nb_valid_checks = 0;
-
-#define PREFIX_RECEIVED "<<< "
-#define PREFIX_SENT ">>> "
-
-const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
-char g_log_file[SMALLSTRSIZE];
-
-const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
-char g_cfg_file[SMALLSTRSIZE];
-
-#define DEFAULT_CHECK_INTERVAL 180
-long int g_check_interval;
-int g_check_interval_set = FALSE;
-#define DEFAULT_NB_KEEP_LAST_STATUS 20
-long int g_nb_keep_last_status = -1;
-int g_nb_keep_last_status_set = FALSE;
-
-#define DEFAULT_DISPLAY_NAME_WIDTH 20
-long int g_display_name_width = DEFAULT_DISPLAY_NAME_WIDTH;
-int g_display_name_width_set = FALSE;
-
-#define DEFAULT_HTML_REFRESH_PERIOD 20
 long int g_html_refresh_interval = DEFAULT_HTML_REFRESH_PERIOD;
 int g_html_refresh_interval_set = FALSE;
 
-#define DEFAULT_HTML_NB_COLUMNS 2
 long int g_html_nb_columns = DEFAULT_HTML_NB_COLUMNS;
 int g_html_nb_columns_set = FALSE;
 
-#if defined(_WIN32) || defined(_WIN64)
-#define DEFAULT_WEBSERVER_ON TRUE
-#define DEFAULT_WEBSERVER_PORT 80
-#else
-#define DEFAULT_WEBSERVER_ON FALSE
-#define DEFAULT_WEBSERVER_PORT 8080
-#endif
 long int g_webserver_on = DEFAULT_WEBSERVER_ON;
 int g_webserver_on_set = FALSE;
 long int g_webserver_port = DEFAULT_WEBSERVER_PORT;
 int g_webserver_port_set = FALSE;
-#define WEBSERVER_LOG_PREFIX  "WEBSERVER"
+
+extern char const st_undef[];
+extern size_t const st_undef_len;
+extern char const st_unknown[];
+extern size_t const st_unknown_len;
+extern char const st_ok[];
+extern size_t const st_ok_len;
+extern char const st_fail[];
+extern size_t const st_fail_len;
+
+
+//
+// CONFIG
+//
+
+struct check_t checks[2000];
+int g_nb_checks = 0;
+int g_nb_valid_checks = 0;
+
+struct alert_t alerts[100];
+int g_nb_alerts = 0;
+int g_nb_valid_alerts = 0;
+
+char g_log_file[SMALLSTRSIZE];
+char g_cfg_file[SMALLSTRSIZE];
+
+long int g_check_interval;
+int g_check_interval_set = FALSE;
+long int g_nb_keep_last_status = -1;
+int g_nb_keep_last_status_set = FALSE;
+
+long int g_display_name_width = DEFAULT_DISPLAY_NAME_WIDTH;
+int g_display_name_width_set = FALSE;
 
 long int g_buffer_size = DEFAULT_BUFFER_SIZE;
 int g_buffer_size_set = FALSE;
@@ -162,37 +192,65 @@ int g_print_log = FALSE;
 int g_print_status = FALSE;
 int g_test_mode = FALSE;
 
+char g_html_directory[BIGSTRSIZE] = DEFAULT_HTML_DIRECTORY;
+int g_html_directory_set = FALSE;
+char g_html_file[SMALLSTRSIZE] = DEFAULT_HTML_FILE;
+int g_html_file_set = FALSE;
+char g_html_complete_file_name[BIGSTRSIZE];
+
+#define CFGK_LIST_SEPARATOR ','
+#define CFGK_COMMENT_CHAR ';'
+const char *CS_GENERAL_STR  = "general";
+const char *CS_TCPCHECK_STR = "tcp-probe";
+const char *CS_ALERT_STR = "alert";
+
+const char *AM_SMTP_STR = "smtp";
+
+const char *V_YESNO_STRYES = "yes";
+const char *V_YESNO_STRNO = "no";
+
+struct check_t chk00;
+struct alert_t alrt00;
+const struct readcfg_var_t readcfg_vars[] = {
+  {"display_name", V_STR, CS_TCPPROBE, NULL, &(chk00.display_name), NULL, 0, &(chk00.display_name_set), FALSE},
+  {"host_name", V_STR, CS_TCPPROBE, NULL, &(chk00.host_name), NULL, 0, &(chk00.host_name_set), FALSE},
+  {"port", V_INT, CS_TCPPROBE, &(chk00.port), NULL, NULL, 0, &(chk00.port_set), FALSE},
+  {"expect", V_STR, CS_TCPPROBE, NULL, &(chk00.expect), NULL, 0, &(chk00.expect_set), FALSE},
+  {"alerts", V_STR, CS_TCPPROBE, NULL, &(chk00.alerts), NULL, 0, &(chk00.alerts_set), FALSE},
+  {"alert_threshold", V_INT, CS_TCPPROBE, &(chk00.alert_threshold), NULL, NULL, 0, &(chk00.alert_threshold_set), FALSE},
+  {"check_interval", V_INT, CS_GENERAL, &g_check_interval, NULL, NULL, 0, &g_check_interval_set, TRUE},
+  {"buffer_size", V_INT, CS_GENERAL, &g_buffer_size, NULL, NULL, 0, &g_buffer_size_set, FALSE},
+  {"connect_timeout", V_INT, CS_GENERAL, &g_connect_timeout, NULL, NULL, 0, &g_connect_timeout_set, FALSE},
+  {"keep_last_status", V_INT, CS_GENERAL, &g_nb_keep_last_status, NULL, NULL, 0, &g_nb_keep_last_status_set, TRUE},
+  {"display_name_width", V_INT, CS_GENERAL, &g_display_name_width, NULL, NULL, 0, &g_display_name_width_set, FALSE},
+  {"html_refresh_interval", V_INT, CS_GENERAL, &g_html_refresh_interval, NULL, NULL, 0, &g_html_refresh_interval_set, FALSE},
+  {"html_title", V_STR, CS_GENERAL, NULL, NULL, g_html_title, sizeof(g_html_title), &g_html_title_set, FALSE},
+  {"html_directory", V_STR, CS_GENERAL, NULL, NULL, g_html_directory, sizeof(g_html_directory), &g_html_directory_set, FALSE},
+  {"html_file", V_STR, CS_GENERAL, NULL, NULL, g_html_file, sizeof(g_html_file), &g_html_file_set, FALSE},
+  {"html_nb_columns", V_INT, CS_GENERAL, &g_html_nb_columns, NULL, NULL, 0, &g_html_nb_columns_set, FALSE},
+  {"webserver_on", V_YESNO, CS_GENERAL, &g_webserver_on, NULL, NULL, 0, &g_webserver_on_set, FALSE},
+  {"webserver_port", V_INT, CS_GENERAL, &g_webserver_port, NULL, NULL, 0, &g_webserver_port_set, FALSE},
+  {"name", V_STR, CS_ALERT, NULL, &alrt00.name, NULL, 0, &alrt00.name_set, FALSE},
+  {"method", V_STR, CS_ALERT, NULL, &alrt00.method_name, NULL, 0, &alrt00.method_name_set, FALSE},
+  {"smtp_smart_host", V_STR, CS_ALERT, NULL, &alrt00.smtp_smarthost, NULL, 0, &alrt00.smtp_smarthost_set, FALSE},
+  {"smtp_port", V_INT, CS_ALERT, &alrt00.smtp_port, NULL, NULL, 0, &alrt00.smtp_port_set, FALSE},
+  {"smtp_self", V_STR, CS_ALERT, NULL, &alrt00.smtp_self, NULL, 0, &alrt00.smtp_self_set, FALSE},
+  {"smtp_sender", V_STR, CS_ALERT, NULL, &alrt00.smtp_sender, NULL, 0, &alrt00.smtp_sender_set, TRUE},
+  {"smtp_recipients", V_STR, CS_ALERT, NULL, &alrt00.smtp_recipients, NULL, 0, &alrt00.smtp_recipients_set, FALSE}
+};
+
+
+//
+// GENERAL
+//
+
 FILE *log_fd;
+int g_trace_network_traffic;
 
 int flag_interrupted = FALSE;
 int quitting = FALSE;
 
 pthread_mutex_t mutex;
-
-void my_pthread_mutex_lock(pthread_mutex_t *m) {
-  char s_err[SMALLSTRSIZE];
-  if ((errno = pthread_mutex_lock(m)) != 0)
-    fatal_error("pthread_mutex_lock(): %s", errno_error(s_err, sizeof(s_err)));
-}
-
-void my_pthread_mutex_unlock(pthread_mutex_t *m) {
-  char s_err[SMALLSTRSIZE];
-  if ((errno = pthread_mutex_unlock(m)) != 0)
-    fatal_error("pthread_mutex_unlock(): %s", errno_error(s_err, sizeof(s_err)));
-}
-
-#ifdef DEBUG
-void dbg_write(const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  vprintf(fmt, args);
-  va_end(args);
-}
-#else
-#define dbg_write(...)
-#endif
-
-const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
 
 #if defined(_WIN32) || defined(_WIN64)
 
@@ -202,8 +260,6 @@ const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
   // * ******* *
 
 const char FS_SEPARATOR = '\\';
-#define DEFAULT_HTML_DIRECTORY (".")
-#define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
 
 void os_sleep(long int seconds) {
   unsigned long int msecs = (unsigned long int)seconds * 1000;
@@ -280,8 +336,6 @@ int add_reader_access_right(const char *f) {
   // * *********** *
 
 const char FS_SEPARATOR = '/';
-#define DEFAULT_HTML_DIRECTORY (".")
-#define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
 
 void os_sleep(long int seconds) {
   sleep(seconds);
@@ -341,52 +395,28 @@ int add_reader_access_right(const char *f) {
   // * ALL *
   // * *** *
 
-char g_html_directory[BIGSTRSIZE] = DEFAULT_HTML_DIRECTORY;
-int g_html_directory_set = FALSE;
-char g_html_file[SMALLSTRSIZE] = DEFAULT_HTML_FILE;
-int g_html_file_set = FALSE;
-char g_html_complete_file_name[BIGSTRSIZE];
+#ifdef DEBUG
+void dbg_write(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+}
+#else
+#define dbg_write(...)
+#endif
 
-#define CFGK_COMMENT_CHAR ';'
-const char *CS_GENERAL_STR  = "general";
-const char *CS_TCPCHECK_STR = "tcp-probe";
+void my_pthread_mutex_lock(pthread_mutex_t *m) {
+  char s_err[SMALLSTRSIZE];
+  if ((errno = pthread_mutex_lock(m)) != 0)
+    fatal_error("pthread_mutex_lock(): %s", errno_error(s_err, sizeof(s_err)));
+}
 
-const char *V_YESNO_STRYES = "yes";
-const char *V_YESNO_STRNO = "no";
-
-enum {CS_NONE, CS_GENERAL, CS_TCPPROBE};
-enum {V_STR, V_INT, V_YESNO};
-struct readcfg_var_t {
-  const char *name;
-  int var_type;
-  int section;
-  long int *plint_target;
-  char **p_pchar_target;
-  char *pchar_target;
-  size_t char_target_len;
-  int *pint_var_set;
-  int allow_null;
-};
-
-struct check_t chk00;
-const struct readcfg_var_t readcfg_vars[] = {
-  {"display_name", V_STR, CS_TCPPROBE, NULL, &(chk00.display_name), NULL, 0, &(chk00.display_name_set), FALSE},
-  {"host_name", V_STR, CS_TCPPROBE, NULL, &(chk00.host_name), NULL, 0, &(chk00.host_name_set), FALSE},
-  {"port", V_INT, CS_TCPPROBE, &(chk00.port), NULL, NULL, 0, &(chk00.port_set), FALSE},
-  {"expect", V_STR, CS_TCPPROBE, NULL, &(chk00.expect), NULL, 0, &(chk00.expect_set), FALSE},
-  {"check_interval", V_INT, CS_GENERAL, &g_check_interval, NULL, NULL, 0, &g_check_interval_set, TRUE},
-  {"buffer_size", V_INT, CS_GENERAL, &g_buffer_size, NULL, NULL, 0, &g_buffer_size_set, FALSE},
-  {"connect_timeout", V_INT, CS_GENERAL, &g_connect_timeout, NULL, NULL, 0, &g_connect_timeout_set, FALSE},
-  {"keep_last_status", V_INT, CS_GENERAL, &g_nb_keep_last_status, NULL, NULL, 0, &g_nb_keep_last_status_set, TRUE},
-  {"display_name_width", V_INT, CS_GENERAL, &g_display_name_width, NULL, NULL, 0, &g_display_name_width_set, FALSE},
-  {"html_refresh_interval", V_INT, CS_GENERAL, &g_html_refresh_interval, NULL, NULL, 0, &g_html_refresh_interval_set, FALSE},
-  {"html_title", V_STR, CS_GENERAL, NULL, NULL, g_html_title, sizeof(g_html_title), &g_html_title_set, FALSE},
-  {"html_directory", V_STR, CS_GENERAL, NULL, NULL, g_html_directory, sizeof(g_html_directory), &g_html_directory_set, FALSE},
-  {"html_file", V_STR, CS_GENERAL, NULL, NULL, g_html_file, sizeof(g_html_file), &g_html_file_set, FALSE},
-  {"html_nb_columns", V_INT, CS_GENERAL, &g_html_nb_columns, NULL, NULL, 0, &g_html_nb_columns_set, FALSE},
-  {"webserver_on", V_YESNO, CS_GENERAL, &g_webserver_on, NULL, NULL, 0, &g_webserver_on_set, FALSE},
-  {"webserver_port", V_INT, CS_GENERAL, &g_webserver_port, NULL, NULL, 0, &g_webserver_port_set, FALSE}
-};
+void my_pthread_mutex_unlock(pthread_mutex_t *m) {
+  char s_err[SMALLSTRSIZE];
+  if ((errno = pthread_mutex_unlock(m)) != 0)
+    fatal_error("pthread_mutex_unlock(): %s", errno_error(s_err, sizeof(s_err)));
+}
 
 //
 // Converts errno into a readable string
@@ -425,7 +455,9 @@ ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
         increase = MY_GETLINE_MIN_INCREASE;
         (*n) += increase;
 
+      char *old_lineptr = *lineptr;
       *lineptr = (char *)realloc(*lineptr, *n);
+      write_head += (*lineptr - old_lineptr);
 
       if (*lineptr == NULL) {
         errno = ENOMEM;
@@ -435,6 +467,8 @@ ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
 
       // Now read one character from stream
     c = getc(stream);
+
+/*    dbg_write("Char: %i (%c) [*n = %lu]\n", c, c, *n);*/
 
       // Deal with /IO error
     if (ferror(stream) != 0)
@@ -482,8 +516,12 @@ void check_t_destroy(struct check_t *chk) {
     free(chk->host_name);
   if (chk->expect != NULL)
     free(chk->expect);
+  if (chk->alerts != NULL)
+    free(chk->alerts);
   if (chk->str_prev_status != NULL)
     free(chk->str_prev_status);
+  if (chk->alerts_idx != NULL)
+    free(chk->alerts_idx);
 }
 
 //
@@ -513,6 +551,13 @@ void check_t_create(struct check_t *chk) {
   chk->expect = NULL;
 
   chk->port_set = FALSE;
+
+  chk->alerts = NULL;
+  chk->alerts_set = FALSE;
+  chk->nb_alerts = 0;
+  chk->alerts_idx = NULL;
+  chk->alert_threshold = 0;
+  chk->alert_threshold_set = FALSE;
 
   chk->status = ST_UNDEF;
   chk->prev_status = ST_UNDEF;
@@ -544,6 +589,37 @@ void clean_checks() {
   for (i = 0; i < g_nb_checks; ++i) {
     check_t_destroy(&checks[i]);
   }
+}
+
+//
+// Create an alert struct
+//
+void alert_t_create(struct alert_t *alrt) {
+  dbg_write("Creating alert...\n");
+
+  alrt->is_valid = FALSE;
+
+  alrt->name_set = FALSE;
+  alrt->name = NULL;
+
+  alrt->method_name_set = FALSE;
+  alrt->method_name = NULL;
+
+  alrt->method = AM_UNDEF;
+
+  alrt->smtp_smarthost_set = FALSE;
+  alrt->smtp_smarthost = NULL;
+
+  alrt->smtp_port_set = FALSE;
+
+  alrt->smtp_self_set = FALSE;
+  alrt->smtp_self = NULL;
+
+  alrt->smtp_sender_set = FALSE;
+  alrt->smtp_sender = NULL;
+
+  alrt->smtp_recipients_set = FALSE;
+  alrt->smtp_recipients = NULL;
 }
 
 //
@@ -972,9 +1048,11 @@ int perform_a_check(struct check_t *chk) {
 
 }
 
+
 //
 // Main loop
 //
+const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
 void almost_neverending_loop() {
 
   do {
@@ -1151,7 +1229,7 @@ void almost_neverending_loop() {
           }
           fprintf(H, "</td>\n");
         }
-        if (counter % g_html_nb_columns == g_html_nb_columns - 1 || counter == nb_valid_checks - 1) {
+        if (counter % g_html_nb_columns == g_html_nb_columns - 1 || counter == g_nb_valid_checks - 1) {
           int k;
           for (k = counter; k % g_html_nb_columns != g_html_nb_columns - 1; ++k) {
             fputs("<td></td><td></td><td></td>", H);
@@ -1377,14 +1455,67 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number) {
   }
 
   chk->is_valid = is_valid;
-  if (chk->is_valid)
-    ++nb_valid_checks;
+  if (!chk->is_valid)
+    return;
 
-  if (!chk->display_name_set && chk->is_valid) {
+  ++g_nb_valid_checks;
+
+  if (!chk->display_name_set) {
     size_t n = strlen(chk->host_name) + 1;
     chk->display_name = (char *)malloc(n);
     strncpy(chk->display_name, chk->host_name, n);
     chk->display_name_set = TRUE;
+  }
+
+  if (!chk->alert_threshold_set) {
+    chk->alert_threshold = DEFAULT_ALERT_THRESHOLD;
+    chk->alert_threshold_set = TRUE;
+  }
+}
+
+//
+// Check an alert variable
+//
+void alert_t_check(struct alert_t *alrt, const char *cf, int line_number) {
+  g_nb_alerts++;
+
+  int is_valid = TRUE;
+
+  if (!alrt->name_set) {
+    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no name defined, discarding alert", cf, line_number);
+    is_valid = FALSE;
+  }
+  if (!alrt->method_name_set) {
+    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no method defined, discarding alert", cf, line_number);
+    is_valid = FALSE;
+  } else if (strcasecmp(alrt->method_name, AM_SMTP_STR) == 0)
+    alrt->method = AM_SMTP;
+  else {
+    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: unknown method '%s', discarding alert", cf, line_number, alrt->method_name);
+    is_valid = FALSE;
+  }
+
+  if (alrt->method == AM_SMTP) {
+    if (!alrt->smtp_smarthost_set) {
+      my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no smart host defined, discarding alert", cf, line_number);
+      is_valid = FALSE;
+    }
+    if (!alrt->smtp_recipients_set) {
+      my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no recipients defined, discarding alert", cf, line_number);
+      is_valid = FALSE;
+    }
+  }
+
+  alrt->is_valid = is_valid;
+
+  if (alrt->is_valid) {
+    if (!alrt->smtp_sender_set) {
+      size_t n = strlen(DEFAULT_SENDER) + 1;
+      alrt->smtp_sender = (char *)malloc(n);
+      strncpy(alrt->smtp_sender, DEFAULT_SENDER, n);
+      alrt->smtp_sender_set = TRUE;
+    }
+    ++g_nb_valid_alerts;
   }
 }
 
@@ -1395,20 +1526,24 @@ void read_configuration_file(const char *cf) {
   }
   my_logf(LL_VERBOSE, LP_DATETIME, "Reading configuration from '%s'", cf);
 
+  int save_g_print_log = g_print_log;
+  g_print_log = TRUE;
+
   ssize_t nb_bytes;
   char *line = NULL;
   size_t len = 0;
   int line_number = 0;
-  int check_line_number = -1;
+  int section_start_line_number = -1;
   int read_status = CS_NONE;
 
   int cur_check = -1;
+  int cur_alert = -1;
 
   while ((nb_bytes = my_getline(&line, &len, FCFG)) != -1) {
     line[nb_bytes - 1] = '\0';
     ++line_number;
 
-    dbg_write("Line %i: '%s'\n", line_number, line);
+/*    dbg_write("Line %i: '%s'\n", line_number, line);*/
 
     char *b = line;
     while (isspace(*b)) b++;
@@ -1433,40 +1568,56 @@ void read_configuration_file(const char *cf) {
           char section_name[SMALLSTRSIZE + 1];
           strncpy(section_name, b + 1, SMALLSTRSIZE);
           section_name[slen] = '\0';
-          my_logf(LL_DEBUG, LP_DATETIME, "Entering section '%s'", section_name);
+
+          if (read_status == CS_TCPPROBE) {
+            if (section_start_line_number < 1 || cur_check < 0)
+              internal_error("read_configuration_file", __FILE__, __LINE__);
+            checks[cur_check] = chk00;
+            check_t_check(&checks[cur_check], cf, section_start_line_number);
+          } else if (read_status == CS_ALERT) {
+            if (section_start_line_number < 1 || cur_alert < 0)
+              internal_error("read_configuration_file", __FILE__, __LINE__);
+            alerts[cur_alert] = alrt00;
+            alert_t_check(&alerts[cur_alert], cf, section_start_line_number);
+          }
 
           if (strcasecmp(section_name, CS_GENERAL_STR) == 0) {
             read_status = CS_GENERAL;
-          } else if (strcasecmp(section_name, CS_TCPCHECK_STR) == 0) {
-            if (check_line_number >= 1) {
-              if (cur_check < 0) {
-                internal_error("read_configuration_file", __FILE__, __LINE__);
-              }
-              checks[cur_check] = chk00;
-              check_t_check(&checks[cur_check], cf, check_line_number);
-            } else if (cur_check >= 0) {
-              internal_error("read_configuration_file", __FILE__, __LINE__);
-            }
-            ++cur_check;
-
-            dbg_write("New check: %i\n", cur_check);
-
-            check_line_number = line_number;
-            if (cur_check >= MAX_CHECKS) {
-              --cur_check;
-              my_logf(LL_ERROR, LP_DATETIME,
-                "Configuration file '%s', line %i: reached max number of checks (%i)",
-                cf, line_number, MAX_CHECKS);
-              read_status = CS_NONE;
-            } else {
-              read_status = CS_TCPPROBE;
-              check_t_create(&chk00);
-            }
           } else {
-            my_logf(LL_ERROR, LP_DATETIME,
-              "Configuration file '%s', line %i: unknown section name '%s'",
-              cf, line_number, section_name);
+            section_start_line_number = line_number;
+            read_status = CS_NONE;
+
+            if (strcasecmp(section_name, CS_TCPCHECK_STR) == 0) {
+              ++cur_check;
+/*              dbg_write("New check: %i\n", cur_check);*/
+              if (cur_check >= sizeof(checks) / sizeof(*checks)) {
+                --cur_check;
+                my_logf(LL_ERROR, LP_DATETIME,
+                  "Configuration file '%s', line %i: reached max number of checks (%i)",
+                  cf, line_number, sizeof(checks) / sizeof(*checks));
+              } else {
+                read_status = CS_TCPPROBE;
+                check_t_create(&chk00);
+              }
+            } else if (strcasecmp(section_name, CS_ALERT_STR) == 0) {
+              ++cur_alert;
+/*              dbg_write("New alert: %i\n", cur_alert);*/
+              if (cur_alert >= sizeof(alerts) / sizeof(*alerts)) {
+                --cur_alert;
+                my_logf(LL_ERROR, LP_DATETIME,
+                  "Configuration file '%s', line %i: reached max number of alerts (%i)",
+                  cf, line_number, sizeof(alerts) / sizeof(*alerts));
+              } else {
+                read_status = CS_ALERT;
+                alert_t_create(&alrt00);
+              }
+            } else {
+              my_logf(LL_ERROR, LP_DATETIME,
+                "Configuration file '%s', line %i: unknown section name '%s'",
+                cf, line_number, section_name);
+            }
           }
+          section_start_line_number = line_number;
         }
         break;
       default:
@@ -1479,9 +1630,6 @@ void read_configuration_file(const char *cf) {
         if (*e == '\0') {
           my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: syntax error", cf, line_number);
         } else {
-
-          dbg_write("mark x\n");
-
           if (slen >= SMALLSTRSIZE)
             slen = SMALLSTRSIZE;
 
@@ -1493,8 +1641,6 @@ void read_configuration_file(const char *cf) {
           strncpy(key, b, n);
           key[n - 1] = '\0';
           key = trim(key);
-
-          dbg_write("mark y\n");
 
           n = blen - slen + 1;
           char orig_value[BIGSTRSIZE];
@@ -1512,9 +1658,6 @@ void read_configuration_file(const char *cf) {
             value[l - 1] = '\0';
             ++value;
           }
-
-          dbg_write("mark z\n");
-
           if (strlen(key) == 0) {
             my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: syntax error", cf, line_number);
           } else {
@@ -1549,9 +1692,6 @@ void read_configuration_file(const char *cf) {
                   } else if (cfg.plint_target != NULL) {
 
                     if (cfg.var_type == V_INT) {
-
-                      dbg_write("mark a\n");
-
                         // Variable of type long int
                       *cfg.plint_target = n;
                       *cfg.pint_var_set = TRUE;
@@ -1573,14 +1713,12 @@ void read_configuration_file(const char *cf) {
                   } else if (cfg.p_pchar_target != NULL) {
 
                       // Variable of type string, need to malloc
-                    dbg_write("mark a\n");
                     if (*cfg.p_pchar_target != NULL)
                       internal_error("read_configuration_file", __FILE__, __LINE__);
                     size_t nn = strlen(value) + 1;
                     *cfg.p_pchar_target = (char *)malloc(nn);
                     strncpy(*cfg.p_pchar_target, value, nn);
                     *cfg.pint_var_set = TRUE;
-                    dbg_write("mark b\n");
 
                   } else if (cfg.pchar_target != NULL) {
 
@@ -1604,16 +1742,25 @@ void read_configuration_file(const char *cf) {
       break;
     }
   }
-  if (cur_check >= 0) {
-    if (check_line_number < 0)
+  if (cur_check >= 0 && read_status == CS_TCPPROBE) {
+    if (section_start_line_number < 0)
       internal_error("read_configuration_file", __FILE__, __LINE__);
     checks[cur_check] = chk00;
-    check_t_check(&checks[cur_check], cf, check_line_number);
+    check_t_check(&checks[cur_check], cf, section_start_line_number);
   }
 
-  if (g_nb_checks != cur_check + 1) {
-    internal_error("read_configuration_file", __FILE__, __LINE__);
+  if (cur_alert >= 0 && read_status == CS_ALERT) {
+    if (section_start_line_number < 0)
+      internal_error("read_configuration_file", __FILE__, __LINE__);
+    alerts[cur_alert] = alrt00;
+    alert_t_check(&alerts[cur_alert], cf, section_start_line_number);
   }
+
+  if (g_nb_checks != cur_check + 1)
+    internal_error("read_configuration_file", __FILE__, __LINE__);
+
+  if (g_nb_alerts != cur_alert + 1)
+    internal_error("read_configuration_file", __FILE__, __LINE__);
 
   if (line != NULL)
     free(line);
@@ -1634,6 +1781,7 @@ void read_configuration_file(const char *cf) {
 
 /*  dbg_write("Output HTML file = %s\n", g_html_complete_file_name);*/
 
+  g_print_log = save_g_print_log;
 }
 
 //
@@ -1943,14 +2091,77 @@ void *webserver(void *p) {
   return NULL;
 }
 
+//
+// Identify alerts configured in checks
+//
+void identify_alerts() {
+  int i; int j; int k;
+
+  int save_g_print_log = g_print_log;
+  g_print_log = TRUE;
+
+  for (i = 0; i < g_nb_checks; ++i) {
+    struct check_t *chk = &checks[i];
+    if (!chk->is_valid)
+      continue;
+    if (!chk->alerts_set)
+      continue;
+    char *p = chk->alerts;
+    int n = 1;
+    for (j = 0; p[j] != '\0'; ++j) {
+      if (p[j] == CFGK_LIST_SEPARATOR)
+        ++n;
+    }
+    chk->nb_alerts = n;
+    chk->alerts_idx = (int *)malloc(sizeof(int) * n);
+    size_t b = strlen(chk->alerts) + 2;
+
+    char *t = (char *)malloc(b);
+    strncpy(t, chk->alerts, b);
+
+    dbg_write("Will analyze '%s' (nb = %i)\n", t, chk->nb_alerts);
+
+    char *next_curs = t;
+    int index = 0;
+    while (next_curs != NULL) {
+      char *curs = next_curs;
+      char *fc = curs;
+      for (; (*fc) != CFGK_LIST_SEPARATOR && (*fc) != '\0'; ++fc)
+        ;
+      if ((*fc) == CFGK_LIST_SEPARATOR) {
+        (*fc) = '\0';
+        next_curs = fc + 1;
+      } else {
+        next_curs = NULL;
+      }
+      curs = trim(curs);
+      for (k = 0; k < g_nb_alerts; ++k) {
+        if (alerts[k].is_valid) {
+          if (strcasecmp(alerts[k].name, curs) == 0) {
+            break;
+          }
+        }
+      }
+      chk->alerts_idx[index] = (k >= g_nb_alerts ? -1 : k);
+      if (chk->alerts_idx[index] < 0)
+        my_logf(LL_ERROR, LP_DATETIME, "Check '%s': unknown alert '%s'", chk->display_name, curs);
+      ++index;
+    }
+    free(t);
+  }
+
+  g_print_log = save_g_print_log;
+
+}
+
 int main(int argc, char *argv[]) {
 
   parse_options(argc, argv);
 
-/*  atexit(atexit_handler);*/
-/*  signal(SIGTERM, sigterm_handler);*/
-/*  signal(SIGABRT, sigabrt_handler);*/
-/*  signal(SIGINT, sigint_handler);*/
+  atexit(atexit_handler);
+  signal(SIGTERM, sigterm_handler);
+  signal(SIGABRT, sigabrt_handler);
+  signal(SIGINT, sigint_handler);
 
   if ((errno = pthread_mutex_init(&mutex, NULL)) != 0) {
     char s_err[SMALLSTRSIZE];
@@ -1961,12 +2172,85 @@ int main(int argc, char *argv[]) {
   my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_STRING " start");
 
   read_configuration_file(g_cfg_file);
+  identify_alerts();
 
   int ii;
   for (ii = 0; ii < g_nb_checks; ++ii) {
     struct check_t *chk = &checks[ii];
     check_t_getready(chk);
   }
+
+
+//
+// CHECKS
+//
+
+  int i;
+  int c = 0;
+  for (i = 0; i < g_nb_checks; ++i) {
+    struct check_t *chk = &checks[i];
+    if (chk->is_valid) {
+      ++c;
+      my_logf(LL_DEBUG, LP_INDENT, "== CHECK #%i", i);
+    } else {
+      my_logf(LL_DEBUG, LP_INDENT, "!! check #%i (will be ignored)", i);
+    }
+    my_logf(LL_DEBUG, LP_INDENT, "   is_valid     = %s", chk->is_valid ? "Yes" : "No");
+    my_logf(LL_DEBUG, LP_INDENT, "   display_name = %s", chk->display_name_set ? chk->display_name : "<unset>");
+    my_logf(LL_DEBUG, LP_INDENT, "   host_name    = %s", chk->host_name_set ? chk->host_name : "<unset>");
+
+    if (chk->port_set)
+      my_logf(LL_DEBUG, LP_INDENT, "   port         = %i", chk->port);
+    else
+      my_logf(LL_DEBUG, LP_INDENT, "   port         = <unset>");
+
+    my_logf(LL_DEBUG, LP_INDENT, "   expect       = %s", chk->expect_set ? chk->expect : "<unset>");
+    my_logf(LL_DEBUG, LP_INDENT, "   alerts       = %s", chk->alerts_set ? chk->alerts : "<unset>");
+    my_logf(LL_DEBUG, LP_INDENT, "   nb alerts    = %i", chk->nb_alerts);
+    int j;
+    for (j = 0; j < chk->nb_alerts; ++j) {
+      my_logf(LL_DEBUG, LP_INDENT, "     alert:     = #%i -> %s",
+        j, chk->alerts_idx[j] >= 0 ? alerts[chk->alerts_idx[j]].name : "<unknown>");
+    }
+  }
+  if (c != g_nb_valid_checks)
+    internal_error("main", __FILE__, __LINE__);
+
+
+//
+// ALERTS
+//
+
+  c = 0;
+  for (i = 0; i < g_nb_alerts; ++i) {
+    struct alert_t *alrt = &alerts[i];
+    if (alrt->is_valid) {
+      ++c;
+      my_logf(LL_DEBUG, LP_INDENT, "== ALERT #%i", i);
+    } else {
+      my_logf(LL_DEBUG, LP_INDENT, "!! alert #%i (will be ignored)", i);
+    }
+    my_logf(LL_DEBUG, LP_INDENT, "   is_valid          = %s", alrt->is_valid ? "Yes" : "No");
+    my_logf(LL_DEBUG, LP_INDENT, "   name              = %s", alrt->name_set ? alrt->name : "<unset>");
+    my_logf(LL_DEBUG, LP_INDENT, "   method            = %s", alrt->method_name_set ? alrt->method_name : "<unset>");
+    if (alrt->method == AM_SMTP) {
+      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/smart host = %s", alrt->smtp_smarthost_set ? alrt->smtp_smarthost : "<unset>");
+      if (alrt->smtp_port_set)
+        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/port       = %i", alrt->smtp_port);
+      else
+        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/port       = <unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/self       = %s", alrt->smtp_self_set ? alrt->smtp_self : "<unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/sender     = %s", alrt->smtp_sender_set ? alrt->smtp_sender : "<unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/recipients = %s", alrt->smtp_recipients_set ? alrt->smtp_recipients : "<unset>");
+    }
+  }
+  if (c != g_nb_valid_alerts)
+    internal_error("main", __FILE__, __LINE__);
+
+
+//
+// CONFIG
+//
 
   my_logf(LL_VERBOSE, LP_DATETIME, "check_interval = %li", g_check_interval);
   my_logf(LL_VERBOSE, LP_DATETIME, "keep_last_status = %li", g_nb_keep_last_status);
@@ -1975,35 +2259,33 @@ int main(int argc, char *argv[]) {
   my_logf(LL_VERBOSE, LP_DATETIME, "html_file = %s", g_html_file);
   my_logf(LL_VERBOSE, LP_DATETIME, "html_title = %s", g_html_title);
   my_logf(LL_VERBOSE, LP_DATETIME, "html_refresh_interval = %li", g_html_refresh_interval);
-  my_logf(LL_NORMAL, LP_DATETIME, "Valid check(s) defined: %i", nb_valid_checks);
-  int i;
-  int c = 0;
-  for (i = 0; i < g_nb_checks; ++i) {
-    struct check_t *chk = &checks[i];
-    if (chk->is_valid) {
-      ++c;
-      my_logf(LL_DEBUG, LP_DATETIME, "== CHECK #%i", i);
-    } else {
-      my_logf(LL_DEBUG, LP_DATETIME, "!! check #%i (will be ignored)", i);
-    }
-    my_logf(LL_DEBUG, LP_DATETIME, "   is_valid     = %s", chk->is_valid ? "Yes" : "No");
-    my_logf(LL_DEBUG, LP_DATETIME, "   display_name = %s", chk->display_name_set ? chk->display_name : "<unset>");
-    my_logf(LL_DEBUG, LP_DATETIME, "   host_name    = %s", chk->host_name_set ? chk->host_name : "<unset>");
-
-    if (chk->port_set)
-      my_logf(LL_DEBUG, LP_DATETIME, "   port         = %i", chk->port);
-    else
-      my_logf(LL_DEBUG, LP_DATETIME, "   port         = <unset>");
-
-    my_logf(LL_DEBUG, LP_DATETIME, "   expect       = %s", chk->expect_set ? chk->expect : "<unset>");
-    my_logf(LL_DEBUG, LP_DATETIME, "   alert        = %s", chk->alert ? "Yes" : "No");
-  }
-  if (c != nb_valid_checks)
-    internal_error("main", __FILE__, __LINE__);
+  my_logf(LL_NORMAL, LP_DATETIME, "Valid check(s) defined: %i", g_nb_valid_checks);
 
   my_logf(LL_VERBOSE, LP_DATETIME, "Run web server: %s", g_webserver_on ? "yes" : "no");
   if (g_webserver_on)
     my_logf(LL_VERBOSE, LP_DATETIME, "Web server listen port: %lu", g_webserver_port);
+
+  for (i = 0; i < g_nb_checks; ++i) {
+    struct check_t *chk = &checks[i];
+    if (!chk->is_valid)
+      continue;
+
+    char t[BIGSTRSIZE];
+    strncpy(t, "", sizeof(t));
+    int II;
+    for (II = 0; II < chk->nb_alerts; ++II) {
+      if (chk->alerts_idx[II] >= 0) {
+        if (strlen(t) >= 1)
+          strncat(t, ", ", sizeof(t));
+        strncat(t, alerts[chk->alerts_idx[II]].name, sizeof(t));
+      }
+    }
+    t[sizeof(t) - 1] = '\0';
+
+    my_logf(LL_NORMAL, LP_DATETIME, "To check: '%s' [%s:%i], %s%s%s, %s%s", chk->display_name, chk->host_name, chk->port,
+      chk->expect_set ? "expect \"" : "no expect", chk->expect_set ? chk->expect : "", chk->expect_set ? "\"" : "",
+      chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? t : "");
+  }
 
   create_img_files();
 

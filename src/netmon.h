@@ -21,15 +21,6 @@ typedef int socklen_t;
 #define FALSE 0
 #define TRUE  1
 
-#define DEFAULT_CONNECT_TIMEOUT 5
-
-#define REGULAR_STR_STRBUFSIZE 2000
-#define ERR_STR_BUFSIZE 200
-#define DEFAULT_BUFFER_SIZE 10000
-
-  // Maximum size of an input line in the TCP connection
-#define MAX_READLINE_SIZE 10000
-
 #define BIND_ERROR -1
 #define LISTEN_ERROR -1
 #define ACCEPT_ERROR -1
@@ -57,7 +48,6 @@ void fatal_error(const char *format, ...);
 void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *format, ...);
 char *errno_error(char *s, size_t s_len);
 
-#define STRNOW_SHORT_WIDTH 5
 struct check_t {
   int is_valid;
 
@@ -65,18 +55,63 @@ struct check_t {
   char *host_name;
   char *expect;
   long int port;
-  int alert;
+
+  char *alerts;
+  long int alert_threshold;
+  int nb_alerts;
+  int *alerts_idx;
 
   int display_name_set;
   int host_name_set;
   int expect_set;
   int port_set;
+  int alerts_set;
+  int alert_threshold_set;
 
   int status;
   int prev_status;
-  char time_last_status_change[STRNOW_SHORT_WIDTH + 1];
+    // Format is hh:mm
+  char time_last_status_change[6];
   int h_time_last_status_change;
   int m_time_last_status_change;
   char *str_prev_status;
+};
+
+enum {AM_UNDEF, AM_SMTP};
+struct alert_t {
+  int is_valid;
+
+  char *name;
+  char *method_name;
+  int method;
+
+  char *smtp_smarthost;
+  long int smtp_port;
+  char *smtp_self;
+  char *smtp_sender;
+  char *smtp_recipients;
+
+  int name_set;
+  int method_name_set;
+
+  int smtp_smarthost_set;
+  int smtp_port_set;
+  int smtp_self_set;
+  int smtp_sender_set;
+  int smtp_recipients_set;
+};
+
+enum {CS_NONE, CS_GENERAL, CS_TCPPROBE, CS_ALERT};
+enum {V_STR, V_INT, V_YESNO};
+struct readcfg_var_t {
+  const char *name;
+  int var_type;
+  int section;
+  long int *plint_target;
+  char **p_pchar_target;
+  char *pchar_target;
+  size_t char_target_len;
+  int *pint_var_set;
+  int allow_null;
 };
 
