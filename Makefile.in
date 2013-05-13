@@ -235,7 +235,7 @@ top_srcdir = @top_srcdir@
 SUBDIRS = src
 ACLOCAL_AMFLAGS = -I admin
 dist_doc_DATA = README
-EXTRA_DIST = extracfg.h
+EXTRA_DIST = netmon.bkl gen-win-makefile.cmd makefile.gcc extracfg.h
 appsdir = $(datadir)/applications
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive

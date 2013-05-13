@@ -162,7 +162,12 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-netmon_SOURCES = netmon.c netmon.h img/st-undef.c img/st-unknown.c img/st-ok.c img/st-fail.c
+netmon_SOURCES = netmon.c netmon.h \
+	img/st-undef.png img/st-undef.c \
+	img/st-unknown.png img/st-unknown.c \
+	img/st-ok.png img/st-ok.c \
+	img/st-fail.png img/st-fail.c
+
 netmon_LDFLAGS = -lpthread
 all: all-am
 

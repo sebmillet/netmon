@@ -1,7 +1,12 @@
 # src/Makefile.am
 
 bin_PROGRAMS=netmon
-netmon_SOURCES=netmon.c netmon.h img/st-undef.c img/st-unknown.c img/st-ok.c img/st-fail.c
+netmon_SOURCES=netmon.c netmon.h \
+	img/st-undef.png img/st-undef.c \
+	img/st-unknown.png img/st-unknown.c \
+	img/st-ok.png img/st-ok.c \
+	img/st-fail.png img/st-fail.c
+
 netmon_LDFLAGS=-lpthread
 
 img/st-undef.c: img/st-undef.png
