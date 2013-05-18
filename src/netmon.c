@@ -19,11 +19,14 @@
 
 loglevel_t g_current_log_level = LL_NORMAL;
 
-#define DEFAULT_CHECK_INTERVAL 180
-#define DEFAULT_NB_KEEP_LAST_STATUS 20
+#define DEFAULT_CHECK_INTERVAL 120
+#define DEFAULT_NB_KEEP_LAST_STATUS 15
 #define DEFAULT_DISPLAY_NAME_WIDTH 20
-#define DEFAULT_SENDER  (PACKAGE_TARNAME "@localhost")
 #define DEFAULT_ALERT_THRESHOLD 3
+#define DEFAULT_ALERT_SMTP_SENDER  (PACKAGE_TARNAME "@localhost")
+#define DEFAULT_ALERT_RESEND_EVERY 30
+#define DEFAULT_ALERT_SMTP_PORT 25
+#define DEFAULT_ALERT_SMTP_SELF PACKAGE_TARNAME
 #define DEFAULT_CONNECT_TIMEOUT 5
 
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
@@ -175,6 +178,8 @@ int g_nb_valid_alerts = 0;
 char g_log_file[SMALLSTRSIZE];
 char g_cfg_file[SMALLSTRSIZE];
 
+char g_test_alert[SMALLSTRSIZE];
+
 long int g_check_interval;
 int g_check_interval_set = FALSE;
 long int g_nb_keep_last_status = -1;
@@ -215,9 +220,11 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"display_name", V_STR, CS_TCPPROBE, NULL, &(chk00.display_name), NULL, 0, &(chk00.display_name_set), FALSE},
   {"host_name", V_STR, CS_TCPPROBE, NULL, &(chk00.host_name), NULL, 0, &(chk00.host_name_set), FALSE},
   {"port", V_INT, CS_TCPPROBE, &(chk00.port), NULL, NULL, 0, &(chk00.port_set), FALSE},
+  {"connect_timeout", V_INT, CS_TCPPROBE, &(chk00.connect_timeout), NULL, NULL, 0, &(chk00.connect_timeout_set), FALSE},
   {"expect", V_STR, CS_TCPPROBE, NULL, &(chk00.expect), NULL, 0, &(chk00.expect_set), FALSE},
   {"alerts", V_STR, CS_TCPPROBE, NULL, &(chk00.alerts), NULL, 0, &(chk00.alerts_set), FALSE},
   {"alert_threshold", V_INT, CS_TCPPROBE, &(chk00.alert_threshold), NULL, NULL, 0, &(chk00.alert_threshold_set), FALSE},
+  {"alert_resend_every", V_INT, CS_TCPPROBE, &(chk00.alert_resend_every), NULL, NULL, 0, &(chk00.alert_resend_every_set), FALSE},
   {"check_interval", V_INT, CS_GENERAL, &g_check_interval, NULL, NULL, 0, &g_check_interval_set, TRUE},
   {"buffer_size", V_INT, CS_GENERAL, &g_buffer_size, NULL, NULL, 0, &g_buffer_size_set, FALSE},
   {"connect_timeout", V_INT, CS_GENERAL, &g_connect_timeout, NULL, NULL, 0, &g_connect_timeout_set, FALSE},
@@ -232,11 +239,14 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"webserver_port", V_INT, CS_GENERAL, &g_webserver_port, NULL, NULL, 0, &g_webserver_port_set, FALSE},
   {"name", V_STR, CS_ALERT, NULL, &alrt00.name, NULL, 0, &alrt00.name_set, FALSE},
   {"method", V_STR, CS_ALERT, NULL, &alrt00.method_name, NULL, 0, &alrt00.method_name_set, FALSE},
+  {"alert_threshold", V_INT, CS_ALERT, &(alrt00.alert_threshold), NULL, NULL, 0, &(alrt00.alert_threshold_set), FALSE},
+  {"alert_resend_every", V_INT, CS_ALERT, &(alrt00.alert_resend_every), NULL, NULL, 0, &(alrt00.alert_resend_every_set), FALSE},
   {"smtp_smart_host", V_STR, CS_ALERT, NULL, &alrt00.smtp_smarthost, NULL, 0, &alrt00.smtp_smarthost_set, FALSE},
   {"smtp_port", V_INT, CS_ALERT, &alrt00.smtp_port, NULL, NULL, 0, &alrt00.smtp_port_set, FALSE},
   {"smtp_self", V_STR, CS_ALERT, NULL, &alrt00.smtp_self, NULL, 0, &alrt00.smtp_self_set, FALSE},
   {"smtp_sender", V_STR, CS_ALERT, NULL, &alrt00.smtp_sender, NULL, 0, &alrt00.smtp_sender_set, TRUE},
-  {"smtp_recipients", V_STR, CS_ALERT, NULL, &alrt00.smtp_recipients, NULL, 0, &alrt00.smtp_recipients_set, FALSE}
+  {"smtp_recipients", V_STR, CS_ALERT, NULL, &alrt00.smtp_recipients, NULL, 0, &alrt00.smtp_recipients_set, FALSE},
+  {"smtp_connect_timeout", V_INT, CS_ALERT, &alrt00.smtp_connect_timeout, NULL, NULL, 0, &alrt00.smtp_connect_timeout_set, FALSE}
 };
 
 
@@ -551,6 +561,7 @@ void check_t_create(struct check_t *chk) {
   chk->expect = NULL;
 
   chk->port_set = FALSE;
+  chk->connect_timeout_set = FALSE;
 
   chk->alerts = NULL;
   chk->alerts_set = FALSE;
@@ -558,6 +569,8 @@ void check_t_create(struct check_t *chk) {
   chk->alerts_idx = NULL;
   chk->alert_threshold = 0;
   chk->alert_threshold_set = FALSE;
+  chk->alert_resend_every = 0;
+  chk->alert_resend_every_set = FALSE;
 
   chk->status = ST_UNDEF;
   chk->prev_status = ST_UNDEF;
@@ -572,6 +585,7 @@ void check_t_create(struct check_t *chk) {
 void check_t_getready(struct check_t *chk) {
   if (!chk->is_valid)
     return;
+  chk->nb_consecutive_notok = 0;
   if (chk->str_prev_status != NULL)
     return;
   if (g_nb_keep_last_status >= 1) {
@@ -607,6 +621,13 @@ void alert_t_create(struct alert_t *alrt) {
 
   alrt->method = AM_UNDEF;
 
+  alrt->alert_threshold = 0;
+  alrt->alert_threshold_set = FALSE;
+  alrt->alert_resend_every = 0;
+  alrt->alert_resend_every_set = FALSE;
+
+    // SMTP
+
   alrt->smtp_smarthost_set = FALSE;
   alrt->smtp_smarthost = NULL;
 
@@ -620,6 +641,8 @@ void alert_t_create(struct alert_t *alrt) {
 
   alrt->smtp_recipients_set = FALSE;
   alrt->smtp_recipients = NULL;
+
+  alrt->smtp_connect_timeout_set = FALSE;
 }
 
 //
@@ -939,6 +962,7 @@ int socket_line_sendf(int *s, int trace, const char *fmt, ...) {
   int e = send(*s, tmp, strlen(tmp), 0);
 
   free(tmp);
+
   if (e == SOCKET_ERROR) {
     char s_err[ERR_STR_BUFSIZE];
     my_logf(LL_ERROR, LP_DATETIME, "Error sending to socket, error %s", os_last_err_desc(s_err, sizeof(s_err)));
@@ -946,7 +970,43 @@ int socket_line_sendf(int *s, int trace, const char *fmt, ...) {
     *s = -1;
     return -1;
   }
+
   return 0;
+}
+
+//
+//
+//
+int socket_round_trip(int sock, const char *expect, const char *fmt, ...) {
+
+  int l = strlen(fmt) + 100;
+  char *tmp;
+  tmp = (char *)malloc(l + 1);
+
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(tmp, l, fmt, args);
+  va_end(args);
+
+  int e = socket_line_sendf(&sock, g_trace_network_traffic, tmp);
+  free(tmp);
+  if (e)
+    return SRT_SOCKET_ERROR;
+
+  char *response = NULL;
+  int response_size;
+  if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0) {
+    free(response);
+    return SRT_SOCKET_ERROR;
+  }
+
+  if (s_begins_with(response, expect)) {
+    free(response);
+    return SRT_SUCCESS;
+  }
+
+  free(response);
+  return SRT_UNEXPECTED_ANSWER;
 }
 
 //
@@ -982,72 +1042,226 @@ void get_strnow_short_width(char *s, size_t s_len) {
 }
 
 //
+// Fill a string with current date and time, format is
+//    dd/mm hh:mm
 //
-//
-int perform_a_check(struct check_t *chk) {
-  char server_desc[SMALLSTRSIZE];
+void get_strnow_medium_width(char *s, size_t s_len) {
+  int year; int month; int day;
+  int hour; int minute; int second; long unsigned int usec;
+  get_datetime_of_day(&year, &month, &day, &hour, &minute, &second, &usec);
 
-    // String to store error descriptions
+  snprintf(s, s_len, "%02i/%02i %02i:%02i", day, month, hour, minute);
+}
+
+//
+//
+//
+int establish_connection(const char *host_name, int port, const char *expect, int timeout, int *sock) {
+  char server_desc[SMALLSTRSIZE];
   char s_err[ERR_STR_BUFSIZE];
 
-  struct timeval tv;
-
-  snprintf(server_desc, sizeof(server_desc), "%s:%li", chk->host_name, chk->port);
+  snprintf(server_desc, sizeof(server_desc), "%s:%i", host_name, port);
 
     // Resolving server name
   struct sockaddr_in server;
   struct hostent *hostinfo = NULL;
-  my_logf(LL_DEBUG, LP_DATETIME, "Running gethosbyname() on %s", chk->host_name);
-  hostinfo = gethostbyname(chk->host_name);
+  my_logf(LL_DEBUG, LP_DATETIME, "Running gethosbyname() on %s", host_name);
+  hostinfo = gethostbyname(host_name);
   if (hostinfo == NULL) {
-    my_logf(LL_ERROR, LP_DATETIME, "Unknown host %s, %s", chk->host_name, os_last_err_desc(s_err, sizeof(s_err)));
-    return ST_UNKNOWN;
+    my_logf(LL_ERROR, LP_DATETIME, "Unknown host %s, %s", host_name, os_last_err_desc(s_err, sizeof(s_err)));
+    return EC_RESOLVE_ERROR;
   }
 
-  int status = ST_FAIL;
+  int ret = EC_CONNECTION_ERROR;
 
-  int connection_sock;
-  if ((connection_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == SOCKET_ERROR) {
+  if ((*sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == SOCKET_ERROR) {
     fatal_error("socket() error to create connection socket, %s", os_last_err_desc(s_err, sizeof(s_err)));
   }
   server.sin_family = AF_INET;
-  server.sin_port = htons((uint16_t)chk->port);
+  server.sin_port = htons((uint16_t)port);
   server.sin_addr = *(struct in_addr *)hostinfo->h_addr;
-  my_logf(LL_DEBUG, LP_DATETIME, "Connecting to %s (%s)...", chk->display_name, server_desc);
     // tv value is undefined after call to connect() as per documentation, so
     // it is to be re-set every time.
-  tv.tv_sec = g_connect_timeout;
+  struct timeval tv;
+  tv.tv_sec = timeout;
   tv.tv_usec = 0;
-  if (connect_with_timeout(&server, &connection_sock, &tv, server_desc) == 0) {
+
+  my_logf(LL_VERBOSE, LP_DATETIME, "Will connect to %s:%i, timeout = %i", host_name, port, timeout);
+
+  if (connect_with_timeout(&server, sock, &tv, server_desc) == 0) {
     my_logf(LL_VERBOSE, LP_DATETIME, "Connected to %s", server_desc);
 
-    if (chk->expect_set && strlen(chk->expect) >= 1) {
-
+    if (expect != NULL && strlen(expect) >= 1) {
       char *response = NULL;
       int response_size;
-      int read_res = 0;
-      if ((read_res = socket_read_line_alloc(connection_sock, &response, g_trace_network_traffic, &response_size)) < 0) {
-        os_closesocket(connection_sock);
-      } else if (s_begins_with(response, chk->expect)) {
+      if (socket_read_line_alloc(*sock, &response, g_trace_network_traffic, &response_size) < 0) {
+        ;
+      } else if (s_begins_with(response, expect)) {
         my_logf(LL_DEBUG, LP_DATETIME, "Expected answer: '%s'", response);
-        status = ST_OK;
+        ret = EC_OK;
       } else {
-        my_logf(LL_DEBUG, LP_DATETIME, "Unexpected answer: '%s' (expected '%s')", response, chk->expect);
+        my_logf(LL_DEBUG, LP_DATETIME, "Unexpected answer: '%s' (expected '%s')", response, expect);
+        ret = EC_UNEXPECTED_ANSWER;
       }
       free(response);
-
     } else {
-      status = ST_OK;
+      ret = EC_OK;
     }
 
-    os_closesocket(connection_sock);
-    my_logf(LL_VERBOSE, LP_DATETIME, "Disconnected from %s", server_desc);
   }
 
-  return status;
-
+  return ret;
 }
 
+//
+//
+//
+int perform_a_check(struct check_t *chk) {
+  int sock;
+  my_logf(LL_DEBUG, LP_DATETIME, "Connecting to %s (%s:%i)...", chk->display_name, chk->host_name, chk->port);
+  int ec = establish_connection(chk->host_name, chk->port, chk->expect_set ? chk->expect : NULL,
+    chk->connect_timeout_set ? chk->connect_timeout : g_connect_timeout, &sock);
+  os_closesocket(sock);
+  my_logf(LL_VERBOSE, LP_DATETIME, "Disconnected from %s:%i", chk->host_name, chk->port);
+  if (ec == EC_OK)
+    return ST_OK;
+  if (ec == EC_RESOLVE_ERROR)
+    return ST_UNKNOWN;
+  return ST_FAIL;
+}
+
+//
+// Extract SMTP address from string, example ->
+// smtp_address("abc <x@c> def") will return "x@c"
+// smtp_address("  dd  x@c o@t d,d") will return "x@c o@t"
+// smtp_address("  dd  < a x@c d> zz ") will return "a x@c d"
+//
+char *smtp_address(char *a) {
+  char *p1 = strchr(a, '<');
+  char *p2 = strrchr(a, '>');
+  if (p1 != NULL && p2 != NULL && p2 > p1) {
+    *p2 = '\0';
+    return trim(p1 + 1);
+  }
+  char *p = strchr(a, '@');
+  if (p != NULL) {
+    char *f = strrchr(a, '@');;
+    for (; p > a; --p) {
+      if (isspace(*p)) {
+        ++p;
+        break;
+      }
+    }
+    for (; *f != '\0'; ++f) {
+      if (isspace(*f)) {
+        *f = '\0';
+        break;
+      }
+    }
+    return trim(p);
+  }
+  return trim(a);
+}
+
+//
+// Do one alert using the provided description
+//
+int execute_alert(struct alert_t *alrt, const char *desc) {
+  char prefix[SMALLSTRSIZE];
+  snprintf(prefix, sizeof(prefix), "Alert(%s):", alrt->name);
+
+  int sock;
+  char *h = alrt->smtp_smarthost;
+  int p = alrt->smtp_port_set ? alrt->smtp_port : DEFAULT_ALERT_SMTP_PORT;
+  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, h, p);
+  int ec = establish_connection(h, p, "220 ",
+    alrt->smtp_connect_timeout_set ? alrt->smtp_connect_timeout : g_connect_timeout, &sock);
+
+  if (socket_line_sendf(&sock, g_trace_network_traffic, "EHLO %s",
+      alrt->smtp_self_set ? alrt->smtp_self : DEFAULT_ALERT_SMTP_SELF)) {
+    return -1;
+  }
+
+  char *response = NULL;
+  int response_size;
+  do {
+    if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0)
+      return -1;
+  } while (s_begins_with(response, "250-"));
+  if (!s_begins_with(response, "250 ")) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s unexpected answer from server '%s'", prefix, response);
+    return -1;
+  }
+  char from_buf[SMALLSTRSIZE];
+  char *from_orig = alrt->smtp_sender_set ? alrt->smtp_sender : DEFAULT_ALERT_SMTP_SENDER;
+  strncpy(from_buf, from_orig, sizeof(from_buf));
+  char *from = from_buf;
+  from = smtp_address(from);
+  if (socket_round_trip(sock, "250 ", "MAIL FROM: <%s>", from) != SRT_SUCCESS) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s sender not accepted, closing connection", prefix);
+    return -1;
+  }
+
+  int nb_ok_recipients = 0;
+  char recipients[BIGSTRSIZE];
+  strncpy(recipients, alrt->smtp_recipients, sizeof(recipients));
+  char *r = recipients;
+  char *next = NULL;
+  while (*r != '\0') {
+    if ((next = strchr(r, CFGK_LIST_SEPARATOR)) != NULL) {
+      *next = '\0';
+      ++next;
+    }
+    r = smtp_address(r);
+    if (strlen(r) >= 1) {
+      int res = socket_round_trip(sock, "250 ", "RCPT TO: <%s>", r);
+      if (res == SRT_SUCCESS)
+        ++nb_ok_recipients;
+      else if (res != SRT_SUCCESS && res != SRT_UNEXPECTED_ANSWER)
+        return -1;
+    }
+
+    r = (next == NULL ? &r[strlen(r)] : next);
+  }
+
+  if (nb_ok_recipients == 0) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s no recipient accepted, closing connection", prefix);
+    socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
+    os_closesocket(sock);
+    return -1;
+  }
+
+  if (socket_round_trip(sock, "354 ", "DATA") != SRT_SUCCESS) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s DATA command not accepted, closing connection", prefix);
+    return -1;
+  }
+  my_logf(LL_DEBUG, LP_DATETIME, "%s will now send email content", prefix);
+
+// Email headers
+
+  if (strlen(from) >= 1) {
+    socket_line_sendf(&sock, g_trace_network_traffic, "return-path: %s", from);
+    socket_line_sendf(&sock, g_trace_network_traffic, "sender: %s", from);
+    socket_line_sendf(&sock, g_trace_network_traffic, "from: %s", from_orig);
+  }
+  socket_line_sendf(&sock, g_trace_network_traffic, "to: %s", alrt->smtp_recipients);
+  socket_line_sendf(&sock, g_trace_network_traffic, "x-mailer: %s", PACKAGE_STRING);
+  socket_line_sendf(&sock, g_trace_network_traffic, "subject: %s", desc);
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "", desc);
+
+// Email body
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "%s", desc);
+
+// End
+
+  socket_line_sendf(&sock, g_trace_network_traffic, ".", alrt->smtp_recipients);
+  socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
+
+  os_closesocket(sock);
+  my_logf(LL_VERBOSE, LP_DATETIME, "Disconnected from %s:%i", h, p);
+}
 
 //
 // Main loop
@@ -1058,7 +1272,7 @@ void almost_neverending_loop() {
   do {
     int II;
 
-    my_logs(LL_NORMAL, LP_NOTHING, "");
+/*    my_logs(LL_NORMAL, LP_NOTHING, "");*/
     my_logs(LL_NORMAL, LP_DATETIME, "Starting check...");
 
     int year0; int month0; int day0;
@@ -1082,6 +1296,13 @@ void almost_neverending_loop() {
         chk->h_time_last_status_change = hour0;
         chk->m_time_last_status_change = minute0;
       }
+      if (chk->status != ST_OK || chk->prev_status != ST_OK && chk->status != chk->prev_status)
+        get_strnow_medium_width(chk->datetime_alert_info, sizeof(chk->datetime_alert_info));
+
+      if (chk->status != ST_OK)
+        chk->nb_consecutive_notok++;
+      else
+        chk->nb_consecutive_notok = 0;
 
         // The whole code below is used to erase the information "last status change"
         // 23 hours after, so that there is no confusion in the day.
@@ -1105,8 +1326,13 @@ void almost_neverending_loop() {
         }
       }
 
+#ifdef DEBUG
+      my_logf(LL_NORMAL, LP_DATETIME, "%s -> %s (%i)", chk->display_name, ST_TO_LONGSTR[chk->status], chk->nb_consecutive_notok);
+#else
       my_logf(LL_NORMAL, LP_DATETIME, "%s -> %s", chk->display_name, ST_TO_LONGSTR[chk->status]);
+#endif
 
+        // Update status history
       if (g_nb_keep_last_status >= 1) {
         char *buf = (char *)malloc(g_nb_keep_last_status + 1);
         strncpy(buf, chk->str_prev_status + 1, g_nb_keep_last_status + 1);
@@ -1115,6 +1341,47 @@ void almost_neverending_loop() {
         t[0] = ST_TO_CHAR[chk->status];
         strncat(chk->str_prev_status, t, g_nb_keep_last_status + 1);
         free(buf);
+      }
+
+        // Manage alert
+      int trigger_alert = FALSE;
+      if (chk->alert_threshold_set && chk->alert_threshold == chk->nb_consecutive_notok)
+        trigger_alert = TRUE;
+      int threshold = chk->alert_threshold_set ? chk->alert_threshold : DEFAULT_ALERT_THRESHOLD;
+      if (chk->alert_resend_every_set) {
+        if (chk->nb_consecutive_notok - threshold >= chk->alert_resend_every &&
+              (chk->nb_consecutive_notok - threshold + chk->alert_resend_every) % chk->alert_resend_every == 0)
+          trigger_alert = TRUE;
+      }
+      int i;
+      for (i = 0; i < chk->nb_alerts; ++i) {
+        int trigger_alert_by_alert = trigger_alert;
+        struct alert_t *alrt = &alerts[chk->alerts_idx[i]];
+
+        if (!chk->alert_threshold_set) {
+          threshold = alrt->alert_threshold_set ? alrt->alert_threshold : DEFAULT_ALERT_THRESHOLD;
+          if (threshold == chk->nb_consecutive_notok)
+            trigger_alert_by_alert = TRUE;
+        }
+
+        if (!chk->alert_resend_every_set) {
+          threshold = chk->alert_threshold_set ? chk->alert_threshold : DEFAULT_ALERT_THRESHOLD;
+          int resend_every = alrt->alert_resend_every_set ? alrt->alert_resend_every : DEFAULT_ALERT_RESEND_EVERY;
+          if (chk->nb_consecutive_notok - threshold >= resend_every &&
+                (chk->nb_consecutive_notok - threshold + resend_every) % resend_every == 0)
+            trigger_alert_by_alert = TRUE;
+        }
+
+          // Here we go! W have to trigger the alert, whatever the reason is (check
+          // config or alert config or default config or any combination)
+        if (trigger_alert_by_alert) {
+          char ad[SMALLSTRSIZE];
+          snprintf(ad, sizeof(ad), "%s [%s] in status %s since %s", chk->display_name, chk->host_name,
+            ST_TO_LONGSTR_FORHTML[chk->status], chk->datetime_alert_info);
+          my_logf(LL_NORMAL, LP_DATETIME, "Alert(%s) -> %s", alrt->name, ad);
+          execute_alert(alrt, ad);
+        }
+
       }
     }
 
@@ -1259,7 +1526,7 @@ void almost_neverending_loop() {
         delay = 1;
       if (delay > g_check_interval)
         delay = g_check_interval;
-      my_logf(LL_VERBOSE, LP_DATETIME, "Now sleeping for %li second(s) (interval = %li)", delay, g_check_interval);
+      my_logf(LL_NORMAL, LP_DATETIME, "Now sleeping for %li second(s) (interval = %li)", delay, g_check_interval);
       os_sleep(delay);
     } else {
       break;
@@ -1337,6 +1604,7 @@ void printhelp() {
   printf("  -p  --print-log     Print the log on the screen\n");
   printf("  -C  --stdout        Print status on stdout\n");
   printf("  -t  --test          Test mode\n");
+  printf("  -a  --alert         Test the alert name written after the option and quit\n");
 }
 
 //
@@ -1366,6 +1634,7 @@ void parse_options(int argc, char *argv[]) {
     {"print-log", no_argument, NULL, 'p'},
     {"stdout", no_argument, NULL, 'C'},
     {"test", no_argument, NULL, 't'},
+    {"alert", no_argument, NULL, 'a'},
     {0, 0, 0, 0}
   };
 
@@ -1374,10 +1643,11 @@ void parse_options(int argc, char *argv[]) {
 
   strncpy(g_log_file, DEFAULT_LOGFILE, sizeof(g_log_file));
   strncpy(g_cfg_file, DEFAULT_CFGFILE, sizeof(g_cfg_file));
+  strncpy(g_test_alert, "", sizeof(g_test_alert));
 
   while (1) {
 
-    c = getopt_long(argc, argv, "hvCtl:c:pVq", long_options, &option_index);
+    c = getopt_long(argc, argv, "hvCtl:c:a:pVq", long_options, &option_index);
 
     if (c == -1) {
       break;
@@ -1395,6 +1665,10 @@ void parse_options(int argc, char *argv[]) {
 
       case 'c':
         strncpy(g_cfg_file, optarg, sizeof(g_cfg_file));
+        break;
+
+      case 'a':
+        strncpy(g_test_alert, optarg, sizeof(g_test_alert));
         break;
 
       case 'C':
@@ -1446,11 +1720,13 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number) {
 
   int is_valid = TRUE;
   if (!chk->host_name_set) {
-    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no host name defined, discarding check", cf, line_number);
+    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no host name defined, discarding check",
+      cf, line_number);
     is_valid = FALSE;
   }
   if (!chk->port_set) {
-    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no port defined, discarding check", cf, line_number);
+    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no port defined, discarding check",
+      cf, line_number);
     is_valid = FALSE;
   }
 
@@ -1466,11 +1742,6 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number) {
     strncpy(chk->display_name, chk->host_name, n);
     chk->display_name_set = TRUE;
   }
-
-  if (!chk->alert_threshold_set) {
-    chk->alert_threshold = DEFAULT_ALERT_THRESHOLD;
-    chk->alert_threshold_set = TRUE;
-  }
 }
 
 //
@@ -1482,26 +1753,31 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number) {
   int is_valid = TRUE;
 
   if (!alrt->name_set) {
-    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no name defined, discarding alert", cf, line_number);
+    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no name defined, discarding alert",
+      cf, line_number);
     is_valid = FALSE;
   }
   if (!alrt->method_name_set) {
-    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no method defined, discarding alert", cf, line_number);
+    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no method defined, discarding alert",
+      cf, line_number);
     is_valid = FALSE;
   } else if (strcasecmp(alrt->method_name, AM_SMTP_STR) == 0)
     alrt->method = AM_SMTP;
   else {
-    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: unknown method '%s', discarding alert", cf, line_number, alrt->method_name);
+    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: unknown method '%s', discarding alert",
+      cf, line_number, alrt->method_name);
     is_valid = FALSE;
   }
 
   if (alrt->method == AM_SMTP) {
     if (!alrt->smtp_smarthost_set) {
-      my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no smart host defined, discarding alert", cf, line_number);
+      my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no smart host defined, discarding alert",
+        cf, line_number);
       is_valid = FALSE;
     }
     if (!alrt->smtp_recipients_set) {
-      my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no recipients defined, discarding alert", cf, line_number);
+      my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no recipients defined, discarding alert",
+        cf, line_number);
       is_valid = FALSE;
     }
   }
@@ -1510,9 +1786,9 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number) {
 
   if (alrt->is_valid) {
     if (!alrt->smtp_sender_set) {
-      size_t n = strlen(DEFAULT_SENDER) + 1;
+      size_t n = strlen(DEFAULT_ALERT_SMTP_SENDER) + 1;
       alrt->smtp_sender = (char *)malloc(n);
-      strncpy(alrt->smtp_sender, DEFAULT_SENDER, n);
+      strncpy(alrt->smtp_sender, DEFAULT_ALERT_SMTP_SENDER, n);
       alrt->smtp_sender_set = TRUE;
     }
     ++g_nb_valid_alerts;
@@ -1664,78 +1940,84 @@ void read_configuration_file(const char *cf) {
             int i;
             int match = FALSE;
             for (i = 0; (unsigned int)i < sizeof(readcfg_vars) / sizeof(*readcfg_vars); ++i) {
-              if (strcasecmp(key, readcfg_vars[i].name) == 0) {
+              if (strcasecmp(key, readcfg_vars[i].name) == 0 && read_status == readcfg_vars[i].section) {
                 match = TRUE;
                 struct readcfg_var_t cfg = readcfg_vars[i];
 
-                if (read_status != cfg.section) {
-                  my_logf(LL_ERROR, LP_DATETIME,
-                    "Configuration file '%s', line %i: variable %s not allowed in this section",
+                long int n = 0;
+                if (cfg.plint_target != NULL && cfg.var_type == V_INT)
+                  n = atoi(value);
+                if (cfg.plint_target != NULL && strlen(value) == 0) {
+                  my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed",
+                    cf, line_number);
+                } else if (cfg.plint_target != NULL && cfg.var_type == V_INT && n == 0 && !cfg.allow_null) {
+                  my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: null value not allowed",
+                    cf, line_number);
+                } else if ((cfg.p_pchar_target != NULL || cfg.pchar_target != NULL) &&
+                              strlen(value) == 0 && !cfg.allow_null) {
+                  my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed",
+                    cf, line_number);
+                } else if (*cfg.pint_var_set) {
+                  my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s already defined",
                     cf, line_number, key);
-                } else {
-                  long int n = 0;
-                  if (cfg.plint_target != NULL && cfg.var_type == V_INT)
-                    n = atoi(value);
-                  if (cfg.plint_target != NULL && strlen(value) == 0) {
-                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed",
-                      cf, line_number);
-                  } else if (cfg.plint_target != NULL && cfg.var_type == V_INT && n == 0 && !cfg.allow_null) {
-                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: null value not allowed",
-                      cf, line_number);
-                  } else if ((cfg.p_pchar_target != NULL || cfg.pchar_target != NULL) &&
-                                strlen(value) == 0 && !cfg.allow_null) {
-                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed",
-                      cf, line_number);
-                  } else if (*cfg.pint_var_set) {
-                    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s already defined",
-                      cf, line_number, key);
-                  } else if (cfg.plint_target != NULL) {
+                } else if (cfg.plint_target != NULL) {
 
-                    if (cfg.var_type == V_INT) {
-                        // Variable of type long int
-                      *cfg.plint_target = n;
-                      *cfg.pint_var_set = TRUE;
+                  if (cfg.var_type == V_INT) {
+                      // Variable of type long int
+                    *cfg.plint_target = n;
+                    *cfg.pint_var_set = TRUE;
+                  } else {
+
+                      // Variable of type long int with yes/no input
+                    if (strcasecmp(value, V_YESNO_STRYES) == 0) {
+                      *cfg.plint_target = TRUE;
+                    } else if (strcasecmp(value, V_YESNO_STRNO) == 0) {
+                      *cfg.plint_target = FALSE;
                     } else {
-
-                        // Variable of type long int with yes/no input
-                      if (strcasecmp(value, V_YESNO_STRYES) == 0) {
-                        *cfg.plint_target = TRUE;
-                      } else if (strcasecmp(value, V_YESNO_STRNO) == 0) {
-                        *cfg.plint_target = FALSE;
-                      } else {
-                        my_logf(LL_ERROR, LP_DATETIME,
-                          "Configuration file '%s', line %i: variable %s must be set to yes or no",
-                          cf, line_number, key);
-                      }
-
+                      my_logf(LL_ERROR, LP_DATETIME,
+                        "Configuration file '%s', line %i: variable %s must be set to yes or no",
+                        cf, line_number, key);
                     }
 
-                  } else if (cfg.p_pchar_target != NULL) {
-
-                      // Variable of type string, need to malloc
-                    if (*cfg.p_pchar_target != NULL)
-                      internal_error("read_configuration_file", __FILE__, __LINE__);
-                    size_t nn = strlen(value) + 1;
-                    *cfg.p_pchar_target = (char *)malloc(nn);
-                    strncpy(*cfg.p_pchar_target, value, nn);
-                    *cfg.pint_var_set = TRUE;
-
-                  } else if (cfg.pchar_target != NULL) {
-
-                      // Variable of type string, no need to malloc
-                    strncpy(cfg.pchar_target, value, cfg.char_target_len);
-                    *cfg.pint_var_set = TRUE;
-
-                  } else {
-                    internal_error("read_configuration_file", __FILE__, __LINE__);
                   }
+
+                } else if (cfg.p_pchar_target != NULL) {
+
+                    // Variable of type string, need to malloc
+                  if (*cfg.p_pchar_target != NULL)
+                    internal_error("read_configuration_file", __FILE__, __LINE__);
+                  size_t nn = strlen(value) + 1;
+                  *cfg.p_pchar_target = (char *)malloc(nn);
+                  strncpy(*cfg.p_pchar_target, value, nn);
+                  *cfg.pint_var_set = TRUE;
+
+                } else if (cfg.pchar_target != NULL) {
+
+                    // Variable of type string, no need to malloc
+                  strncpy(cfg.pchar_target, value, cfg.char_target_len);
+                  *cfg.pint_var_set = TRUE;
+
+                } else {
+                  internal_error("read_configuration_file", __FILE__, __LINE__);
                 }
                 break;
               }
             }
             if (!match) {
-              my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: unknown variable %s",
-                cf, line_number, key);
+              for (i = 0; (unsigned int)i < sizeof(readcfg_vars) / sizeof(*readcfg_vars); ++i) {
+                if (strcasecmp(key, readcfg_vars[i].name) == 0) {
+                  match = TRUE;
+                  break;
+                }
+              }
+              if (match) {
+                my_logf(LL_ERROR, LP_DATETIME,
+                  "Configuration file '%s', line %i: variable %s not allowed in this section",
+                  cf, line_number, key);
+              } else {
+                my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: unknown variable %s",
+                  cf, line_number, key);
+              }
             }
           }
         }
@@ -2076,7 +2358,7 @@ void *webserver(void *p) {
 
   struct sockaddr_in remote_sin;
   int sock;
-  while (TRUE) {
+  while (1) {
     sock = server_accept(listen_sock, &remote_sin, g_webserver_port, WEBSERVER_LOG_PREFIX);
     while (sock != -1) {
       if (manage_web_transaction(sock, &remote_sin) != 0) {
@@ -2089,6 +2371,21 @@ void *webserver(void *p) {
     }
   }
   return NULL;
+}
+
+//
+// Identify an alert by its name
+// Returns -1 if the alert is not found
+//
+int find_alert(const char *alert_name) {
+  int i;
+  for (i = 0; i < g_nb_alerts; ++i) {
+    if (alerts[i].is_valid) {
+      if (strcasecmp(alerts[i].name, alert_name) == 0)
+        break;
+    }
+  }
+  return (i < g_nb_alerts ? i : -1);
 }
 
 //
@@ -2119,8 +2416,6 @@ void identify_alerts() {
     char *t = (char *)malloc(b);
     strncpy(t, chk->alerts, b);
 
-    dbg_write("Will analyze '%s' (nb = %i)\n", t, chk->nb_alerts);
-
     char *next_curs = t;
     int index = 0;
     while (next_curs != NULL) {
@@ -2135,18 +2430,14 @@ void identify_alerts() {
         next_curs = NULL;
       }
       curs = trim(curs);
-      for (k = 0; k < g_nb_alerts; ++k) {
-        if (alerts[k].is_valid) {
-          if (strcasecmp(alerts[k].name, curs) == 0) {
-            break;
-          }
-        }
-      }
-      chk->alerts_idx[index] = (k >= g_nb_alerts ? -1 : k);
-      if (chk->alerts_idx[index] < 0)
+      if ((k = find_alert(curs)) < 0) {
         my_logf(LL_ERROR, LP_DATETIME, "Check '%s': unknown alert '%s'", chk->display_name, curs);
-      ++index;
+      } else {
+        chk->alerts_idx[index] = k;
+        ++index;
+      }
     }
+    chk->nb_alerts = index;
     free(t);
   }
 
@@ -2158,17 +2449,13 @@ int main(int argc, char *argv[]) {
 
   parse_options(argc, argv);
 
-  atexit(atexit_handler);
-  signal(SIGTERM, sigterm_handler);
-  signal(SIGABRT, sigabrt_handler);
-  signal(SIGINT, sigint_handler);
-
   if ((errno = pthread_mutex_init(&mutex, NULL)) != 0) {
     char s_err[SMALLSTRSIZE];
     fatal_error("pthread_mutex_init(): %s", errno_error(s_err, sizeof(s_err)));
   }
 
   my_log_open();
+  my_logs(LL_NORMAL, LP_NOTHING, "");
   my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_STRING " start");
 
   read_configuration_file(g_cfg_file);
@@ -2178,6 +2465,19 @@ int main(int argc, char *argv[]) {
   for (ii = 0; ii < g_nb_checks; ++ii) {
     struct check_t *chk = &checks[ii];
     check_t_getready(chk);
+  }
+
+  if (strlen(g_test_alert) >= 1) {
+    int a = find_alert(g_test_alert);
+    if (a < 0) {
+      printf("Unknown alert '%s'\n", g_test_alert);
+      exit(EXIT_FAILURE);
+    }
+    char s[SMALLSTRSIZE];
+    snprintf(s, sizeof(s), "[TEST] alert %s", alerts[a].name);
+    execute_alert(&alerts[a], s);
+    my_log_close();
+    exit(EXIT_SUCCESS);
   }
 
 
@@ -2210,7 +2510,7 @@ int main(int argc, char *argv[]) {
     int j;
     for (j = 0; j < chk->nb_alerts; ++j) {
       my_logf(LL_DEBUG, LP_INDENT, "     alert:     = #%i -> %s",
-        j, chk->alerts_idx[j] >= 0 ? alerts[chk->alerts_idx[j]].name : "<unknown>");
+        j, alerts[chk->alerts_idx[j]].name);
     }
   }
   if (c != g_nb_valid_checks)
@@ -2274,11 +2574,9 @@ int main(int argc, char *argv[]) {
     strncpy(t, "", sizeof(t));
     int II;
     for (II = 0; II < chk->nb_alerts; ++II) {
-      if (chk->alerts_idx[II] >= 0) {
-        if (strlen(t) >= 1)
-          strncat(t, ", ", sizeof(t));
-        strncat(t, alerts[chk->alerts_idx[II]].name, sizeof(t));
-      }
+      if (strlen(t) >= 1)
+        strncat(t, ", ", sizeof(t));
+      strncat(t, alerts[chk->alerts_idx[II]].name, sizeof(t));
     }
     t[sizeof(t) - 1] = '\0';
 
@@ -2298,6 +2596,11 @@ int main(int argc, char *argv[]) {
       fatal_error("main(): pthread_create() error");
   }
 
+  atexit(atexit_handler);
+  signal(SIGTERM, sigterm_handler);
+  signal(SIGABRT, sigabrt_handler);
+  signal(SIGINT, sigint_handler);
+
   almost_neverending_loop();
 
   if (quitting) {
@@ -2306,7 +2609,6 @@ int main(int argc, char *argv[]) {
   quitting = TRUE;
 
   my_logs(LL_VERBOSE, LP_DATETIME, PACKAGE_NAME " end");
-  my_logs(LL_NORMAL, LP_NOTHING, "");
   my_log_close();
 
   return EXIT_SUCCESS;

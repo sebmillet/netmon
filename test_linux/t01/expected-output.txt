@@ -1,3 +1,4 @@
+
 netmon 1.0 start
 Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 2: variable display_name not allowed in this section
@@ -29,7 +30,7 @@ Configuration file 'netmon.ini', line 50: unknown section name 'tcp-probes'
 Configuration file 'netmon.ini', line 52: null value not allowed
 Configuration file 'netmon.ini', line 54: empty value not allowed
 Configuration file 'netmon.ini', section of line 51: no port defined, discarding check
-keep_last_status not defined, taking default = 20
+keep_last_status not defined, taking default = 15
 !! check #0 (will be ignored)
    is_valid     = No
    display_name = Office PC SMTP
@@ -79,7 +80,7 @@ keep_last_status not defined, taking default = 20
    alerts       = <unset>
    nb alerts    = 0
 check_interval = 0
-keep_last_status = 20
+keep_last_status = 15
 display_name_width = 20
 html_directory = ../www
 html_file = netmon.html
@@ -90,15 +91,17 @@ Run web server: no
 To check: 'my Localhost' [localhost:21219], no expect, no alert
 To check: 'ab544abcbcbczc31415911' [ab544abcbcbczc31415911:18], no expect, no alert
 Will create image files in html directory
-
 Starting check...
-Running gethosbyname() on localhost
 Connecting to my Localhost (localhost:21219)...
+Running gethosbyname() on localhost
+Will connect to localhost:21219, timeout = 5
 Socket error connecting to localhost:21219, code=111 (Connection refused)
+Disconnected from localhost:21219
 my Localhost -> ** KO **
+Connecting to ab544abcbcbczc31415911 (ab544abcbcbczc31415911:18)...
 Running gethosbyname() on ab544abcbcbczc31415911
 Unknown host ab544abcbcbczc31415911, code=110 (Connection timed out)
+Disconnected from ab544abcbcbczc31415911:18
 ab544abcbcbczc31415911 -> ** ?? **
 Check done in 0.123450s
 netmon end
-

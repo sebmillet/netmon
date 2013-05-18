@@ -1,3 +1,4 @@
+
 netmon 1.0 start
 Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 3: variable name not allowed in this section
@@ -19,7 +20,7 @@ Configuration file 'netmon.ini', line 52: variable method not allowed in this se
 Configuration file 'netmon.ini', section of line 58: no name defined, discarding alert
 Configuration file 'netmon.ini', section of line 58: unknown method 'bla', discarding alert
 Configuration file 'netmon.ini', section of line 60: no method defined, discarding alert
-keep_last_status not defined, taking default = 20
+keep_last_status not defined, taking default = 15
 Check 'Local FTP': unknown alert 'email'
 Check 'Local FTP': unknown alert ''
 Check 'Local FTP': unknown alert ''
@@ -34,16 +35,10 @@ Check 'Test avec nom inconnu': unknown alert 'youpi'
    port         = 21
    expect       = 221 
    alerts       = main,	email 	,,  ,  ,  , critical , sms,sms2
-   nb alerts    = 9
+   nb alerts    = 3
      alert:     = #0 -> main
-     alert:     = #1 -> <unknown>
-     alert:     = #2 -> <unknown>
-     alert:     = #3 -> <unknown>
-     alert:     = #4 -> <unknown>
-     alert:     = #5 -> <unknown>
-     alert:     = #6 -> critical
-     alert:     = #7 -> sms
-     alert:     = #8 -> <unknown>
+     alert:     = #1 -> critical
+     alert:     = #2 -> sms
 == CHECK #1
    is_valid     = Yes
    display_name = Local HTTP
@@ -75,8 +70,7 @@ Check 'Test avec nom inconnu': unknown alert 'youpi'
    port         = 25
    expect       = <unset>
    alerts       = youpi
-   nb alerts    = 1
-     alert:     = #0 -> <unknown>
+   nb alerts    = 0
 == ALERT #0
    is_valid          = Yes
    name              = main
@@ -113,7 +107,7 @@ Check 'Test avec nom inconnu': unknown alert 'youpi'
    SMTP/sender     = 
    SMTP/recipients = root@localhost
 check_interval = 0
-keep_last_status = 20
+keep_last_status = 15
 display_name_width = 20
 html_directory = ../www
 html_file = netmon.html
@@ -127,30 +121,36 @@ To check: 'Local SMTP' [My SMTP:25], expect "220 ", no alert
 To check: 'My POP3' [maison-pclin:110], expect "+OK ", no alert
 To check: 'Test avec nom inconnu' [a.b.c:25], no expect, alerts: 
 Will create image files in html directory
-
 Starting check...
-Running gethosbyname() on Localhost
 Connecting to Local FTP (Localhost:21)...
+Running gethosbyname() on Localhost
+Will connect to Localhost:21, timeout = 5
 Connected to Localhost:21
 <<< 220 (vsFTPd 2.3.5)
 Unexpected answer: '220 (vsFTPd 2.3.5)' (expected '221 ')
 Disconnected from Localhost:21
 Local FTP -> ** KO **
-Running gethosbyname() on 127.0.0.1
 Connecting to Local HTTP (127.0.0.1:80)...
+Running gethosbyname() on 127.0.0.1
+Will connect to 127.0.0.1:80, timeout = 5
 Connected to 127.0.0.1:80
 Disconnected from 127.0.0.1:80
 Local HTTP -> ok
+Connecting to Local SMTP (My SMTP:25)...
 Running gethosbyname() on My SMTP
 Unknown host My SMTP, code=110 (Connection timed out)
+Disconnected from My SMTP:25
 Local SMTP -> ** ?? **
-Running gethosbyname() on maison-pclin
 Connecting to My POP3 (maison-pclin:110)...
+Running gethosbyname() on maison-pclin
+Will connect to maison-pclin:110, timeout = 5
 Socket error connecting to maison-pclin:110, code=113 (No route to host)
+Disconnected from maison-pclin:110
 My POP3 -> ** KO **
+Connecting to Test avec nom inconnu (a.b.c:25)...
 Running gethosbyname() on a.b.c
 Unknown host a.b.c, code=110 (Connection timed out)
+Disconnected from a.b.c:25
 Test avec nom inconnu -> ** ?? **
 Check done in 0.123450s
 netmon end
-

@@ -48,6 +48,9 @@ void fatal_error(const char *format, ...);
 void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *format, ...);
 char *errno_error(char *s, size_t s_len);
 
+enum {EC_OK, EC_RESOLVE_ERROR, EC_CONNECTION_ERROR, EC_UNEXPECTED_ANSWER};
+enum {SRT_SUCCESS, SRT_SOCKET_ERROR, SRT_UNEXPECTED_ANSWER};
+
 struct check_t {
   int is_valid;
 
@@ -55,9 +58,12 @@ struct check_t {
   char *host_name;
   char *expect;
   long int port;
+  long int connect_timeout;
 
   char *alerts;
   long int alert_threshold;
+  long int alert_resend_every;
+  int nb_consecutive_notok;
   int nb_alerts;
   int *alerts_idx;
 
@@ -65,13 +71,17 @@ struct check_t {
   int host_name_set;
   int expect_set;
   int port_set;
+  int connect_timeout_set;
   int alerts_set;
   int alert_threshold_set;
+  int alert_resend_every_set;
 
   int status;
   int prev_status;
     // Format is hh:mm
   char time_last_status_change[6];
+    // Format is dd/mm hh:mm
+  char datetime_alert_info[12];
   int h_time_last_status_change;
   int m_time_last_status_change;
   char *str_prev_status;
@@ -85,20 +95,27 @@ struct alert_t {
   char *method_name;
   int method;
 
+  int name_set;
+  int method_name_set;
+
+  long int alert_threshold;
+  long int alert_resend_every;
+  int alert_threshold_set;
+  int alert_resend_every_set;
+
+    // SMTP method
   char *smtp_smarthost;
   long int smtp_port;
   char *smtp_self;
   char *smtp_sender;
   char *smtp_recipients;
-
-  int name_set;
-  int method_name_set;
-
+  long int smtp_connect_timeout;
   int smtp_smarthost_set;
   int smtp_port_set;
   int smtp_self_set;
   int smtp_sender_set;
   int smtp_recipients_set;
+  int smtp_connect_timeout_set;
 };
 
 enum {CS_NONE, CS_GENERAL, CS_TCPPROBE, CS_ALERT};
