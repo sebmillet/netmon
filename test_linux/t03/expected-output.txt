@@ -4,23 +4,29 @@ Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 3: variable name not allowed in this section
 Configuration file 'netmon.ini', line 4: syntax error
 Configuration file 'netmon.ini', line 5: variable name not allowed in this section
-Configuration file 'netmon.ini', line 6: syntax error
-Configuration file 'netmon.ini', line 13: variable method not allowed in this section
-Configuration file 'netmon.ini', line 14: syntax error
-Configuration file 'netmon.ini', line 15: variable method not allowed in this section
+Configuration file 'netmon.ini', line 6: variable program_command not allowed in this section
+Configuration file 'netmon.ini', line 7: syntax error
+Configuration file 'netmon.ini', line 14: variable method not allowed in this section
+Configuration file 'netmon.ini', line 15: syntax error
 Configuration file 'netmon.ini', line 16: variable method not allowed in this section
-Configuration file 'netmon.ini', line 24: empty value not allowed
-Configuration file 'netmon.ini', line 26: variable method not allowed in this section
-Configuration file 'netmon.ini', line 47: unknown section name 'xalert'
-Configuration file 'netmon.ini', line 48: unknown section name 'alert1'
-Configuration file 'netmon.ini', line 49: variable name not allowed in this section
-Configuration file 'netmon.ini', line 50: variable method not allowed in this section
-Configuration file 'netmon.ini', line 51: variable method not allowed in this section
-Configuration file 'netmon.ini', line 52: variable method not allowed in this section
-Configuration file 'netmon.ini', line 59: unknown value 'bla' for variable method
-Configuration file 'netmon.ini', section of line 58: no name defined, discarding alert
-Configuration file 'netmon.ini', section of line 58: unknown method, discarding alert
-Configuration file 'netmon.ini', section of line 60: no method defined, discarding alert
+Configuration file 'netmon.ini', line 17: variable method not allowed in this section
+Configuration file 'netmon.ini', line 25: empty value not allowed
+Configuration file 'netmon.ini', line 27: variable method not allowed in this section
+Configuration file 'netmon.ini', line 55: empty value not allowed
+Configuration file 'netmon.ini', section of line 52: no command defined, discarding alert
+Configuration file 'netmon.ini', section of line 56: no command defined, discarding alert
+Configuration file 'netmon.ini', line 62: unknown variable command
+Configuration file 'netmon.ini', section of line 59: no command defined, discarding alert
+Configuration file 'netmon.ini', line 63: unknown section name 'xalert'
+Configuration file 'netmon.ini', line 64: unknown section name 'alert1'
+Configuration file 'netmon.ini', line 65: variable name not allowed in this section
+Configuration file 'netmon.ini', line 66: variable method not allowed in this section
+Configuration file 'netmon.ini', line 67: variable method not allowed in this section
+Configuration file 'netmon.ini', line 68: variable method not allowed in this section
+Configuration file 'netmon.ini', line 75: unknown value 'bla' for variable method
+Configuration file 'netmon.ini', section of line 74: no name defined, discarding alert
+Configuration file 'netmon.ini', section of line 74: unknown method, discarding alert
+Configuration file 'netmon.ini', section of line 76: no method defined, discarding alert
 keep_last_status not defined, taking default = 15
 Check 'Local FTP': unknown alert 'email'
 Check 'Local FTP': unknown alert ''
@@ -90,15 +96,35 @@ Check 'Test avec nom inconnu': unknown alert 'youpi'
    SMTP/self       = <unset>
    SMTP/sender     = <unset>
    SMTP/recipients = root
-!! alert #2 (will be ignored)
+== ALERT #2
+   is_valid          = Yes
+   name              = prgtest1
+   method            = program
+   program/command   = allo
+!! alert #3 (will be ignored)
+   is_valid          = No
+   name              = prgtest2
+   method            = program
+   program/command   = <unset>
+!! alert #4 (will be ignored)
+   is_valid          = No
+   name              = prgtest3
+   method            = program
+   program/command   = <unset>
+!! alert #5 (will be ignored)
+   is_valid          = No
+   name              = prgtest4
+   method            = program
+   program/command   = <unset>
+!! alert #6 (will be ignored)
    is_valid          = No
    name              = <unset>
    method            = <unset>
-!! alert #3 (will be ignored)
+!! alert #7 (will be ignored)
    is_valid          = No
    name              = fake
    method            = <unset>
-== ALERT #4
+== ALERT #8
    is_valid          = Yes
    name              = sms
    method            = smtp

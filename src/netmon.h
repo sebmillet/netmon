@@ -87,23 +87,23 @@ struct check_t {
   char *str_prev_status;
 };
 
-enum {AM_UNDEF, AM_SMTP};
 struct alert_t {
   int is_valid;
 
   char *name;
-  char *method_name;
-  int method;
+//  char *method_name;
+  long int method;
 
   int name_set;
-  int method_name_set;
+//  int method_name_set;
+  int method_set;
 
   long int alert_threshold;
   long int alert_resend_every;
   int alert_threshold_set;
   int alert_resend_every_set;
 
-    // SMTP method
+    // "smtp" method
   char *smtp_smarthost;
   long int smtp_port;
   char *smtp_self;
@@ -116,10 +116,14 @@ struct alert_t {
   int smtp_sender_set;
   int smtp_recipients_set;
   int smtp_connect_timeout_set;
+
+    // "program" method
+  char *prg_command;
+  int prg_command_set;
 };
 
 enum {CS_NONE, CS_GENERAL, CS_TCPPROBE, CS_ALERT};
-enum {V_STR, V_INT, V_YESNO};
+enum {V_STR, V_INT, V_YESNO, V_STRKEY};
 struct readcfg_var_t {
   const char *name;
   int var_type;
@@ -130,5 +134,7 @@ struct readcfg_var_t {
   size_t char_target_len;
   int *pint_var_set;
   int allow_null;
+  const char **table;
+  int table_nb_elems;
 };
 
