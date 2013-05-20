@@ -48,8 +48,15 @@ void fatal_error(const char *format, ...);
 void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *format, ...);
 char *errno_error(char *s, size_t s_len);
 
+struct subst_t {
+  const char *find;
+  const char *replace;
+};
+
 enum {EC_OK, EC_RESOLVE_ERROR, EC_CONNECTION_ERROR, EC_UNEXPECTED_ANSWER};
 enum {SRT_SUCCESS, SRT_SOCKET_ERROR, SRT_UNEXPECTED_ANSWER};
+enum {ERR_SMTP_OK, ERR_SMTP_NETIO, ERR_SMTP_BAD_ANSWER_TO_EHLO, ERR_SMTP_SENDER_REJECTED, ERR_SMTP_NO_RECIPIENT_ACCEPTED,
+  ERR_SMTP_DATA_COMMAND_REJECTED};
 
 struct check_t {
   int is_valid;
@@ -120,6 +127,10 @@ struct alert_t {
     // "program" method
   char *prg_command;
   int prg_command_set;
+
+    // "log" method
+  char *log_file;
+  int log_file_set;
 };
 
 enum {CS_NONE, CS_GENERAL, CS_TCPPROBE, CS_ALERT};
@@ -137,4 +148,11 @@ struct readcfg_var_t {
   const char **table;
   int table_nb_elems;
 };
+
+int execute_alert_smtp(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
+      const char *desc);
+int execute_alert_program(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
+      const char *desc);
+int execute_alert_log(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
+      const char *desc);
 

@@ -6,27 +6,34 @@ Configuration file 'netmon.ini', line 4: syntax error
 Configuration file 'netmon.ini', line 5: variable name not allowed in this section
 Configuration file 'netmon.ini', line 6: variable program_command not allowed in this section
 Configuration file 'netmon.ini', line 7: syntax error
-Configuration file 'netmon.ini', line 14: variable method not allowed in this section
-Configuration file 'netmon.ini', line 15: syntax error
-Configuration file 'netmon.ini', line 16: variable method not allowed in this section
-Configuration file 'netmon.ini', line 17: variable method not allowed in this section
-Configuration file 'netmon.ini', line 25: empty value not allowed
-Configuration file 'netmon.ini', line 27: variable method not allowed in this section
-Configuration file 'netmon.ini', line 55: empty value not allowed
-Configuration file 'netmon.ini', section of line 52: no command defined, discarding alert
+Configuration file 'netmon.ini', line 8: variable log_file not allowed in this section
+Configuration file 'netmon.ini', line 9: variable log_file not allowed in this section
+Configuration file 'netmon.ini', line 10: variable log_file not allowed in this section
+Configuration file 'netmon.ini', line 11: syntax error
+Configuration file 'netmon.ini', line 18: variable method not allowed in this section
+Configuration file 'netmon.ini', line 19: syntax error
+Configuration file 'netmon.ini', line 20: variable method not allowed in this section
+Configuration file 'netmon.ini', line 21: variable method not allowed in this section
+Configuration file 'netmon.ini', line 29: empty value not allowed
+Configuration file 'netmon.ini', line 31: variable method not allowed in this section
+Configuration file 'netmon.ini', line 59: empty value not allowed
 Configuration file 'netmon.ini', section of line 56: no command defined, discarding alert
-Configuration file 'netmon.ini', line 62: unknown variable command
-Configuration file 'netmon.ini', section of line 59: no command defined, discarding alert
-Configuration file 'netmon.ini', line 63: unknown section name 'xalert'
-Configuration file 'netmon.ini', line 64: unknown section name 'alert1'
-Configuration file 'netmon.ini', line 65: variable name not allowed in this section
-Configuration file 'netmon.ini', line 66: variable method not allowed in this section
-Configuration file 'netmon.ini', line 67: variable method not allowed in this section
-Configuration file 'netmon.ini', line 68: variable method not allowed in this section
-Configuration file 'netmon.ini', line 75: unknown value 'bla' for variable method
-Configuration file 'netmon.ini', section of line 74: no name defined, discarding alert
-Configuration file 'netmon.ini', section of line 74: unknown method, discarding alert
-Configuration file 'netmon.ini', section of line 76: no method defined, discarding alert
+Configuration file 'netmon.ini', section of line 60: no command defined, discarding alert
+Configuration file 'netmon.ini', line 66: unknown variable command
+Configuration file 'netmon.ini', section of line 63: no command defined, discarding alert
+Configuration file 'netmon.ini', line 67: unknown section name 'xalert'
+Configuration file 'netmon.ini', line 68: unknown section name 'alert1'
+Configuration file 'netmon.ini', line 69: variable name not allowed in this section
+Configuration file 'netmon.ini', line 70: variable method not allowed in this section
+Configuration file 'netmon.ini', line 71: variable method not allowed in this section
+Configuration file 'netmon.ini', line 72: variable method not allowed in this section
+Configuration file 'netmon.ini', line 79: unknown value 'bla' for variable method
+Configuration file 'netmon.ini', section of line 78: no name defined, discarding alert
+Configuration file 'netmon.ini', section of line 78: unknown method, discarding alert
+Configuration file 'netmon.ini', section of line 80: no method defined, discarding alert
+Configuration file 'netmon.ini', line 90: empty value not allowed
+Configuration file 'netmon.ini', section of line 87: no log file defined, discarding alert
+Configuration file 'netmon.ini', section of line 91: no log file defined, discarding alert
 keep_last_status not defined, taking default = 15
 Check 'Local FTP': unknown alert 'email'
 Check 'Local FTP': unknown alert ''
@@ -125,6 +132,26 @@ Check 'Test avec nom inconnu': unknown alert 'youpi'
    name              = fake
    method            = <unset>
 == ALERT #8
+   is_valid          = Yes
+   name              = log1
+   method            = log
+   log/log_file      = yeslog
+!! alert #9 (will be ignored)
+   is_valid          = No
+   name              = log2
+   method            = log
+   log/log_file      = <unset>
+!! alert #10 (will be ignored)
+   is_valid          = No
+   name              = log3
+   method            = log
+   log/log_file      = <unset>
+== ALERT #11
+   is_valid          = Yes
+   name              = log4
+   method            = log
+   log/log_file      = eslog
+== ALERT #12
    is_valid          = Yes
    name              = sms
    method            = smtp

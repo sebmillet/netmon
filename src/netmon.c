@@ -19,6 +19,8 @@
 
 loglevel_t g_current_log_level = LL_NORMAL;
 
+#define DEFAULT_DATE_FORMAT DF_FRENCH
+#define DEFAULT_LOG_USEC TRUE
 #define DEFAULT_CHECK_INTERVAL 120
 #define DEFAULT_NB_KEEP_LAST_STATUS 15
 #define DEFAULT_DISPLAY_NAME_WIDTH 20
@@ -102,13 +104,13 @@ const char *ST_TO_STR2[] = {
   "ok", // ST_OK
   "KO"  // ST_FAIL
 };
-const char *ST_TO_LONGSTR[] = {
+const char *ST_TO_LONGSTR_FANCY[] = {
   "<undef>",  // ST_UNDEF
   "** ?? **", // ST_UNKNOWN
   "ok",       // ST_OK
   "** KO **"  // ST_FAIL
 };
-const char *ST_TO_LONGSTR_FORHTML[] = {
+const char *ST_TO_LONGSTR_SIMPLE[] = {
   "Undefined",  // ST_UNDEF
   "Unknown",    // ST_UNKNOWN
   "Ok",         // ST_OK
@@ -210,16 +212,33 @@ const char *CS_TCPCHECK_STR = "tcp-probe";
 const char *CS_ALERT_STR = "alert";
 
 #define FIND_WORD_NOT_FOUND -1
-enum {AM_UNDEF = FIND_WORD_NOT_FOUND, AM_SMTP = 0, AM_PROGRAM = 1};
+enum {AM_UNDEF = FIND_WORD_NOT_FOUND, AM_SMTP = 0, AM_PROGRAM = 1, AM_LOG = 2};
 const char *l_alert_methods[] = {
-  "smtp",   // AM_SMTP
-  "program" // AM_PROGRAM
+  "smtp",     // AM_SMTP
+  "program",  // AM_PROGRAM
+  "log"       // AM_LOG
+};
+int (*alert_func[]) (struct alert_t *, const char*, const char*, int, const char*, const char*) = {
+  execute_alert_smtp,
+  execute_alert_program,
+  execute_alert_log,
 };
 
 enum {ID_YES = 0, ID_NO = 1};
 const char *l_yesno[] = {
   "yes",  // ID_YES
   "no"    // ID_NO
+};
+
+long int g_log_usec = DEFAULT_LOG_USEC;
+int g_log_usec_set = FALSE;
+long int g_date_format;
+int g_date_format_set = FALSE;
+enum {DF_FRENCH = 0, DF_ENGLISH = 1};
+int g_date_df = (DEFAULT_DATE_FORMAT == DF_FRENCH);
+const char *l_date_formats[] = {
+  "french", // DF_FENCH
+  "english" // DF_ENGLISH
 };
 
 struct check_t chk00;
@@ -233,6 +252,9 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"alerts", V_STR, CS_TCPPROBE, NULL, &(chk00.alerts), NULL, 0, &(chk00.alerts_set), FALSE, NULL, 0},
   {"alert_threshold", V_INT, CS_TCPPROBE, &(chk00.alert_threshold), NULL, NULL, 0, &(chk00.alert_threshold_set), FALSE, NULL, 0},
   {"alert_resend_every", V_INT, CS_TCPPROBE, &(chk00.alert_resend_every), NULL, NULL, 0, &(chk00.alert_resend_every_set), FALSE, NULL, 0},
+  {"date_format", V_STRKEY, CS_GENERAL, &g_date_format, NULL, NULL, 0, &g_date_format_set, FALSE, l_date_formats,
+    sizeof(l_date_formats) / sizeof(*l_date_formats)},
+  {"log_usec", V_YESNO, CS_GENERAL, &g_log_usec, NULL, NULL, 0, &g_log_usec_set, FALSE, NULL, 0},
   {"check_interval", V_INT, CS_GENERAL, &g_check_interval, NULL, NULL, 0, &g_check_interval_set, TRUE, NULL, 0},
   {"buffer_size", V_INT, CS_GENERAL, &g_buffer_size, NULL, NULL, 0, &g_buffer_size_set, FALSE, NULL, 0},
   {"connect_timeout", V_INT, CS_GENERAL, &g_connect_timeout, NULL, NULL, 0, &g_connect_timeout_set, FALSE, NULL, 0},
@@ -256,7 +278,8 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"smtp_sender", V_STR, CS_ALERT, NULL, &alrt00.smtp_sender, NULL, 0, &alrt00.smtp_sender_set, TRUE, NULL, 0},
   {"smtp_recipients", V_STR, CS_ALERT, NULL, &alrt00.smtp_recipients, NULL, 0, &alrt00.smtp_recipients_set, FALSE, NULL, 0},
   {"smtp_connect_timeout", V_INT, CS_ALERT, &alrt00.smtp_connect_timeout, NULL, NULL, 0, &alrt00.smtp_connect_timeout_set, FALSE, NULL, 0},
-  {"program_command", V_STR, CS_ALERT, NULL, &alrt00.prg_command, NULL, 0, &alrt00.prg_command_set, FALSE, NULL, 0}
+  {"program_command", V_STR, CS_ALERT, NULL, &alrt00.prg_command, NULL, 0, &alrt00.prg_command_set, FALSE, NULL, 0},
+  {"log_file", V_STR, CS_ALERT, NULL, &alrt00.log_file, NULL, 0, &alrt00.log_file_set, FALSE, NULL, 0}
 };
 
 
@@ -656,6 +679,10 @@ void alert_t_create(struct alert_t *alrt) {
 
   alrt->prg_command = NULL;
   alrt->prg_command_set = FALSE;
+
+    // LOG
+  alrt->log_file = NULL;
+  alrt->log_file_set = FALSE;
 }
 
 //
@@ -735,6 +762,51 @@ void my_log_close() {
 }
 
 //
+// Do string substitution
+//
+void dollar_subst(char *s, size_t s_len, struct subst_t *subst, int n) {
+  size_t buf_len = s_len;
+  char *buf = (char *)malloc(buf_len);
+  char var[SMALLSTRSIZE];
+
+  char *p = s;
+  for (; *p != '\0'; ++p) {
+    if (*p == '$' && *(p + 1) == '{') {
+      char *c = p + 2;
+      for (; *c != '}' && *c != '\0'; ++c)
+        ;
+      int l = c - p - 2;
+      if (*c == '}' && l >= 1) {
+        *c = '\0';
+        strncpy(var, p + 2, sizeof(var));
+        var[sizeof(var) - 1] = '\0';
+
+        dbg_write("Found variable '%s'\n", var);
+
+        int i;
+        for (i = 0; i < n; ++i) {
+          if (strcasecmp(subst[i].find, var) == 0) {
+
+dbg_write("=== before: '%s'\n", s);
+
+            strncpy(buf, c + 1, buf_len);
+            *p = '\0';
+            strncat(p, subst[i].replace, s_len - (p - s));
+            strncat(p, buf, s_len - (p - s));
+
+dbg_write("=== after:  '%s'\n", s);
+
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  free(buf);
+}
+
+//
 // Get date/time of day
 //
 void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, int *minute, int *second,
@@ -788,7 +860,13 @@ void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt, size_t dt_bufsiz
   long int gmtoff;
   get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
 
-  snprintf(dt, dt_bufsize, "%02i/%02i/%02i %02i:%02i:%02i.%06lu  ", day, month, year % 100, hour, minute, second, usec);
+  if (g_log_usec) {
+    snprintf(dt, dt_bufsize, "%02i/%02i/%02i %02i:%02i:%02i.%06lu  ", g_date_df ? day : month, g_date_df ? month : day,
+      year % 100, hour, minute, second, usec);
+  } else {
+    snprintf(dt, dt_bufsize, "%02i/%02i/%02i %02i:%02i:%02i  ", g_date_df ? day : month, g_date_df ? month : day,
+      year % 100, hour, minute, second);
+  }
   *dt_len = strlen(dt);
   if (log_disp == LP_NOTHING) {
     strncpy(dt, "", dt_bufsize);
@@ -1057,7 +1135,7 @@ void get_str_now(char *s, size_t s_len) {
   long int gmtoff;
   get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
 
-  snprintf(s, s_len, "%02i/%02i %02i:%02i:%02i", day, month, hour, minute, second);
+  snprintf(s, s_len, "%02i/%02i %02i:%02i:%02i", g_date_df ? day : month, g_date_df ? month : day, hour, minute, second);
 }
 
 //
@@ -1083,7 +1161,7 @@ void get_strnow_medium_width(char *s, size_t s_len) {
   long int gmtoff;
   get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
 
-  snprintf(s, s_len, "%02i/%02i %02i:%02i", day, month, hour, minute);
+  snprintf(s, s_len, "%02i/%02i %02i:%02i", g_date_df ? day : month, g_date_df ? month : day, hour, minute);
 }
 
 //
@@ -1119,10 +1197,10 @@ int establish_connection(const char *host_name, int port, const char *expect, in
   tv.tv_sec = timeout;
   tv.tv_usec = 0;
 
-  my_logf(LL_VERBOSE, LP_DATETIME, "Will connect to %s:%i, timeout = %i", host_name, port, timeout);
+  my_logf(LL_DEBUG, LP_DATETIME, "Will connect to %s:%i, timeout = %i", host_name, port, timeout);
 
   if (connect_with_timeout(&server, sock, &tv, server_desc) == 0) {
-    my_logf(LL_VERBOSE, LP_DATETIME, "Connected to %s", server_desc);
+    my_logf(LL_DEBUG, LP_DATETIME, "Connected to %s", server_desc);
 
     if (expect != NULL && strlen(expect) >= 1) {
       char *response = NULL;
@@ -1226,33 +1304,33 @@ void get_rfc822_header_format_current_date(char *date, size_t date_len) {
 }
 
 //
-// Do one alert using the provided description
+// Used by execute_alert_smtp
 //
-int execute_alert(struct alert_t *alrt, const char *desc, const char *bg_color) {
+int core_execute_alert_smtp_one_host(struct alert_t *alrt, const char *smart_host, int port, const char *display_name, const char *host_name,
+  int status, const char *datetime_alert_info, const char *desc) {
+
   char prefix[SMALLSTRSIZE];
-  snprintf(prefix, sizeof(prefix), "Alert(%s):", alrt->name);
+  snprintf(prefix, sizeof(prefix), "SMTP alert(%s):", alrt->name);
 
   int sock;
-  char *h = alrt->smtp_smarthost;
-  int p = alrt->smtp_port_set ? alrt->smtp_port : DEFAULT_ALERT_SMTP_PORT;
-  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, h, p);
-  int ec = establish_connection(h, p, "220 ",
+  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, smart_host, port);
+  int ec = establish_connection(smart_host, port, "220 ",
     alrt->smtp_connect_timeout_set ? alrt->smtp_connect_timeout : g_connect_timeout, &sock);
 
   if (socket_line_sendf(&sock, g_trace_network_traffic, "EHLO %s",
       alrt->smtp_self_set ? alrt->smtp_self : DEFAULT_ALERT_SMTP_SELF)) {
-    return -1;
+    return ERR_SMTP_NETIO;
   }
 
   char *response = NULL;
   int response_size;
   do {
     if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0)
-      return -1;
+      return ERR_SMTP_NETIO;
   } while (s_begins_with(response, "250-"));
   if (!s_begins_with(response, "250 ")) {
     my_logf(LL_ERROR, LP_DATETIME, "%s unexpected answer from server '%s'", prefix, response);
-    return -1;
+    return ERR_SMTP_BAD_ANSWER_TO_EHLO;
   }
   char from_buf[SMALLSTRSIZE];
   char *from_orig = alrt->smtp_sender_set ? alrt->smtp_sender : DEFAULT_ALERT_SMTP_SENDER;
@@ -1261,7 +1339,7 @@ int execute_alert(struct alert_t *alrt, const char *desc, const char *bg_color) 
   from = smtp_address(from);
   if (socket_round_trip(sock, "250 ", "MAIL FROM: <%s>", from) != SRT_SUCCESS) {
     my_logf(LL_ERROR, LP_DATETIME, "%s sender not accepted, closing connection", prefix);
-    return -1;
+    return ERR_SMTP_SENDER_REJECTED;
   }
 
   int nb_ok_recipients = 0;
@@ -1282,7 +1360,7 @@ int execute_alert(struct alert_t *alrt, const char *desc, const char *bg_color) 
         ++nb_ok_recipients;
       else if (res != SRT_SUCCESS && res != SRT_UNEXPECTED_ANSWER) {
         free(recipients);
-        return -1;
+        return ERR_SMTP_NETIO;
       }
     }
 
@@ -1294,12 +1372,13 @@ int execute_alert(struct alert_t *alrt, const char *desc, const char *bg_color) 
     my_logf(LL_ERROR, LP_DATETIME, "%s no recipient accepted, closing connection", prefix);
     socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
     os_closesocket(sock);
-    return -1;
+    return ERR_SMTP_NO_RECIPIENT_ACCEPTED;
   }
 
-  if (socket_round_trip(sock, "354 ", "DATA") != SRT_SUCCESS) {
+  int res;
+  if ((res = socket_round_trip(sock, "354 ", "DATA")) != SRT_SUCCESS) {
     my_logf(LL_ERROR, LP_DATETIME, "%s DATA command not accepted, closing connection", prefix);
-    return -1;
+    return (res == SRT_SOCKET_ERROR ? ERR_SMTP_NETIO : ERR_SMTP_DATA_COMMAND_REJECTED);
   }
   my_logf(LL_DEBUG, LP_DATETIME, "%s will now send email content", prefix);
 
@@ -1344,11 +1423,7 @@ int execute_alert(struct alert_t *alrt, const char *desc, const char *bg_color) 
   socket_line_sendf(&sock, g_trace_network_traffic, "<body>");
   socket_line_sendf(&sock, g_trace_network_traffic, "<table cellpadding=\"2\" cellspacing=\"1\" border=\"1\">");
  
-  if (bg_color != NULL && strlen(bg_color) >= 1) {
-    socket_line_sendf(&sock, g_trace_network_traffic, "<tr><td bgcolor=\"%s\">", bg_color);
-  } else {
-    socket_line_sendf(&sock, g_trace_network_traffic, "<tr><td>");
-  }
+  socket_line_sendf(&sock, g_trace_network_traffic, "<tr><td bgcolor=\"%s\">", ST_TO_BGCOLOR_FORHTML[status]);
   socket_line_sendf(&sock, g_trace_network_traffic, "%s", desc);
   socket_line_sendf(&sock, g_trace_network_traffic, "</td></tr></table>");
   socket_line_sendf(&sock, g_trace_network_traffic, "</body>");
@@ -1365,7 +1440,91 @@ int execute_alert(struct alert_t *alrt, const char *desc, const char *bg_color) 
   socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
 
   os_closesocket(sock);
-  my_logf(LL_VERBOSE, LP_DATETIME, "Disconnected from %s:%i", h, p);
+  my_logf(LL_DEBUG, LP_DATETIME, "Disconnected from %s:%i", smart_host, port);
+
+  return ERR_SMTP_OK;
+}
+
+//
+// Execute alert when method == AM_SMTP
+//
+int execute_alert_smtp(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
+      const char *desc) {
+  my_logf(LL_DEBUG, LP_DATETIME, "SMTP -> called alert '%s', desc = '%s', status = '%i'", alrt->name, desc, status);
+
+  const char *h = alrt->smtp_smarthost;
+  int port = alrt->smtp_port_set ? alrt->smtp_port : DEFAULT_ALERT_SMTP_PORT;
+
+  int err_smtp = core_execute_alert_smtp_one_host(alrt, h, port, display_name, host_name, status, datetime_alert_info, desc);
+
+  return 0;
+}
+
+//
+// Execute alert when method == AM_PROGRAM
+//
+int execute_alert_program(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
+      const char *desc) {
+  my_logf(LL_DEBUG, LP_DATETIME, "PROGRAM -> called alert '%s', desc = '%s', status = '%i'", alrt->name, desc, status);
+
+  char prefix[SMALLSTRSIZE];
+  snprintf(prefix, sizeof(prefix), "Program alert(%s):", alrt->name);
+
+  char b[BIGSTRSIZE];
+  snprintf(b, sizeof(b), "%s \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"", alrt->prg_command, display_name, host_name, ST_TO_LONGSTR_SIMPLE[status],
+    datetime_alert_info, desc);
+  my_logf(LL_VERBOSE, LP_DATETIME, "%s will execute the command:", prefix);
+  my_logf(LL_VERBOSE, LP_INDENT, "%s", b);
+  int r = system(b);
+  my_logf(LL_VERBOSE, LP_DATETIME, "Return code: %i", r);
+  return r;
+}
+
+//
+// Execute alert when method == AM_LOG
+//
+int execute_alert_log(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
+      const char *desc) {
+  my_logf(LL_DEBUG, LP_DATETIME, "LOG -> called alert '%s', desc = '%s', status = '%i'", alrt->name, desc, status);
+
+  char prefix[SMALLSTRSIZE];
+  snprintf(prefix, sizeof(prefix), "Log alert(%s):", alrt->name);
+
+  int wday; int year; int month; int day;
+  int hour; int minute; int second; long unsigned int usec;
+  long int gmtoff;
+  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
+
+  char d[9];
+  snprintf(d, sizeof(d), "%04d%02d%02d", year, month, day);
+  char s[BIGSTRSIZE];
+  strncpy(s, alrt->log_file, sizeof(s));
+  struct subst_t l_subst[] = {
+    {"DATE", d}
+  };
+  dollar_subst(s, sizeof(s), l_subst, sizeof(l_subst) / sizeof(*l_subst));
+
+  dbg_write("Log file = '%s'\n", s);
+
+  FILE *H = fopen(s, "a+");
+  if (H == NULL) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s unable to open log file '%s'", s);
+    return -1;
+  } else {
+    fprintf(H, "%02i/%02i/%02i %02i:%02i:%02i  %s\n", g_date_df ? day : month, g_date_df ? month : day,
+      year % 100, hour, minute, second, desc);
+    fclose(H);
+  }
+  return 0;
+}
+
+//
+// Execute alert for all methods
+//
+int execute_alert(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
+      const char *desc) {
+  my_logf(LL_NORMAL, LP_DATETIME, "Alert(%s) -> %s", alrt->name, desc);
+  return alert_func[alrt->method](alrt, display_name, host_name, status, datetime_alert_info, desc);
 }
 
 //
@@ -1433,9 +1592,9 @@ void almost_neverending_loop() {
       }
 
 #ifdef DEBUG
-      my_logf(LL_NORMAL, LP_DATETIME, "%s -> %s (%i)", chk->display_name, ST_TO_LONGSTR[chk->status], chk->nb_consecutive_notok);
+      my_logf(LL_NORMAL, LP_DATETIME, "%s -> %s (%i)", chk->display_name, ST_TO_LONGSTR_FANCY[chk->status], chk->nb_consecutive_notok);
 #else
-      my_logf(LL_NORMAL, LP_DATETIME, "%s -> %s", chk->display_name, ST_TO_LONGSTR[chk->status]);
+      my_logf(LL_NORMAL, LP_DATETIME, "%s -> %s", chk->display_name, ST_TO_LONGSTR_FANCY[chk->status]);
 #endif
 
         // Update status history
@@ -1483,9 +1642,8 @@ void almost_neverending_loop() {
         if (trigger_alert_by_alert) {
           char ad[SMALLSTRSIZE];
           snprintf(ad, sizeof(ad), "%s [%s] in status %s since %s", chk->display_name, chk->host_name,
-            ST_TO_LONGSTR_FORHTML[chk->status], chk->datetime_alert_info);
-          my_logf(LL_NORMAL, LP_DATETIME, "Alert(%s) -> %s", alrt->name, ad);
-          execute_alert(alrt, ad, ST_TO_BGCOLOR_FORHTML[chk->status]);
+            ST_TO_LONGSTR_SIMPLE[chk->status], chk->datetime_alert_info);
+          execute_alert(alrt, chk->display_name, chk->host_name, chk->status, chk->datetime_alert_info, ad);
         }
 
       }
@@ -1584,7 +1742,7 @@ void almost_neverending_loop() {
         if (counter % g_html_nb_columns == 0)
           fputs("<tr>\n", H);
         fprintf(H, "<td>%s</td><td bgcolor=\"%s\">%s</td>\n",
-          chk->display_name, ST_TO_BGCOLOR_FORHTML[chk->status], ST_TO_LONGSTR_FORHTML[chk->status]);
+          chk->display_name, ST_TO_BGCOLOR_FORHTML[chk->status], ST_TO_LONGSTR_SIMPLE[chk->status]);
         fprintf(H, "<td>%s</td>", chk->time_last_status_change);
         if (g_nb_keep_last_status >= 1) {
           fputs("<td>", H);
@@ -1890,6 +2048,12 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number) {
         cf, line_number);
       is_valid = FALSE;
     }
+  } else if (alrt->method == AM_LOG) {
+    if (!alrt->log_file_set) {
+      my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no log file defined, discarding alert",
+        cf, line_number);
+      is_valid = FALSE;
+    }
   }
 
   alrt->is_valid = is_valid;
@@ -2174,6 +2338,9 @@ void read_configuration_file(const char *cf) {
     g_nb_keep_last_status = DEFAULT_NB_KEEP_LAST_STATUS;
     my_logf(LL_WARNING, LP_DATETIME, "keep_last_status not defined, taking default = %li", g_nb_keep_last_status);
   }
+  if (!g_date_format_set)
+    g_date_format = (g_date_format == FIND_WORD_NOT_FOUND ? DEFAULT_DATE_FORMAT : g_date_format);
+  g_date_df = (g_date_format == DF_FRENCH);
 
   strncpy(g_html_complete_file_name, g_html_directory, sizeof(g_html_complete_file_name));
   fs_concatene(g_html_complete_file_name, g_html_file, sizeof(g_html_complete_file_name));
@@ -2627,6 +2794,8 @@ void alerts_display() {
       my_logf(LL_DEBUG, LP_INDENT, "   SMTP/recipients = %s", alrt->smtp_recipients_set ? alrt->smtp_recipients : "<unset>");
     } else if (alrt->method == AM_PROGRAM) {
       my_logf(LL_DEBUG, LP_INDENT, "   program/command   = %s", alrt->prg_command_set ? alrt->prg_command : "<unset>");
+    } else if (alrt->method == AM_LOG) {
+      my_logf(LL_DEBUG, LP_INDENT, "   log/log_file      = %s", alrt->log_file_set ? alrt->log_file : "<unset>");
     }
   }
   if (c != g_nb_valid_alerts)
@@ -2673,6 +2842,7 @@ void config_display() {
 
 int main(int argc, char *argv[]) {
 
+    // rand() function used by get_unique_mime_boundary()
   srand(time(NULL));
 
   parse_options(argc, argv);
@@ -2702,8 +2872,10 @@ int main(int argc, char *argv[]) {
       exit(EXIT_FAILURE);
     }
     char s[SMALLSTRSIZE];
-    snprintf(s, sizeof(s), "[TEST] alert %s", alerts[a].name);
-    execute_alert(&alerts[a], s, "#6666FF");
+    snprintf(s, sizeof(s), "[TEST] alert for alert %s", alerts[a].name);
+    char d[12];
+    get_strnow_medium_width(d, sizeof(d));
+    execute_alert(&alerts[a], "Test check", "Test hostname", ST_UNDEF, d, s);
     my_log_close();
     exit(EXIT_SUCCESS);
   }
