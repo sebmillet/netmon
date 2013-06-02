@@ -32,53 +32,71 @@ Configuration file 'netmon.ini', line 54: empty value not allowed
 Configuration file 'netmon.ini', section of line 51: no port defined, discarding check
 keep_last_status not defined, taking default = 15
 !! check #0 (will be ignored)
-   is_valid     = No
-   display_name = Office PC SMTP
-   host_name    = <unset>
-   port         = <unset>
-   expect       = <unset>
-   alerts       = <unset>
-   nb alerts    = 0
+   is_valid       = No
+   display_name   = Office PC SMTP
+   host_name      = <unset>
+   port           = <unset>
+   expect         = <unset>
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
 == CHECK #1
-   is_valid     = Yes
-   display_name = my Localhost
-   host_name    = localhost
-   port         = 21219
-   expect       = <unset>
-   alerts       = <unset>
-   nb alerts    = 0
+   is_valid       = Yes
+   display_name   = my Localhost
+   host_name      = localhost
+   port           = 21219
+   expect         = <unset>
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
 !! check #2 (will be ignored)
-   is_valid     = No
-   display_name = <unset>
-   host_name    = <unset>
-   port         = <unset>
-   expect       = <unset>
-   alerts       = <unset>
-   nb alerts    = 0
+   is_valid       = No
+   display_name   = <unset>
+   host_name      = <unset>
+   port           = <unset>
+   expect         = <unset>
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
 == CHECK #3
-   is_valid     = Yes
-   display_name = ab544abcbcbczc31415911
-   host_name    = ab544abcbcbczc31415911
-   port         = 18
-   expect       = <unset>
-   alerts       = <unset>
-   nb alerts    = 0
+   is_valid       = Yes
+   display_name   = ab544abcbcbczc31415911
+   host_name      = ab544abcbcbczc31415911
+   port           = 18
+   expect         = <unset>
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
 !! check #4 (will be ignored)
-   is_valid     = No
-   display_name = <unset>
-   host_name    = bla r
-   port         = <unset>
-   expect       = <unset>
-   alerts       = <unset>
-   nb alerts    = 0
+   is_valid       = No
+   display_name   = <unset>
+   host_name      = bla r
+   port           = <unset>
+   expect         = <unset>
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
 !! check #5 (will be ignored)
-   is_valid     = No
-   display_name = <unset>
-   host_name    = bla y
-   port         = <unset>
-   expect       = <unset>
-   alerts       = <unset>
-   nb alerts    = 0
+   is_valid       = No
+   display_name   = <unset>
+   host_name      = bla y
+   port           = <unset>
+   expect         = <unset>
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
 check_interval = 0
 keep_last_status = 15
 display_name_width = 20
@@ -98,10 +116,16 @@ Will connect to localhost:21219, timeout = 5
 Socket error connecting to localhost:21219, code=111 (Connection refused)
 Disconnected from localhost:21219
 my Localhost -> ** KO **
+as = 1, chk->trigger_sequence = 0
+chk->nb_consecutive_notok = 1
+trigger_alert = 0
 Connecting to ab544abcbcbczc31415911 (ab544abcbcbczc31415911:18)...
 Running gethosbyname() on ab544abcbcbczc31415911
 Unknown host ab544abcbcbczc31415911, code=110 (Connection timed out)
 Disconnected from ab544abcbcbczc31415911:18
 ab544abcbcbczc31415911 -> ** ?? **
+as = 1, chk->trigger_sequence = 0
+chk->nb_consecutive_notok = 1
+trigger_alert = 0
 Check done in 0.123450s
 netmon end

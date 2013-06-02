@@ -9,6 +9,7 @@
 #endif
 
 #include <sys/types.h>
+#include <time.h>
 
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
@@ -55,8 +56,15 @@ struct subst_t {
 
 enum {EC_OK, EC_RESOLVE_ERROR, EC_CONNECTION_ERROR, EC_UNEXPECTED_ANSWER};
 enum {SRT_SUCCESS, SRT_SOCKET_ERROR, SRT_UNEXPECTED_ANSWER};
-enum {ERR_SMTP_OK, ERR_SMTP_NETIO, ERR_SMTP_BAD_ANSWER_TO_EHLO, ERR_SMTP_SENDER_REJECTED, ERR_SMTP_NO_RECIPIENT_ACCEPTED,
+enum {ERR_SMTP_OK = 0, ERR_SMTP_RESOLVE_ERROR, ERR_SMTP_NETIO, ERR_SMTP_BAD_ANSWER_TO_EHLO, ERR_SMTP_SENDER_REJECTED, ERR_SMTP_NO_RECIPIENT_ACCEPTED,
   ERR_SMTP_DATA_COMMAND_REJECTED};
+
+struct alert_ctrl_t {
+  int idx;
+  int alert_status;
+  int trigger_sequence;
+  int nb_failures;
+};
 
 struct check_t {
   int is_valid;
@@ -69,10 +77,12 @@ struct check_t {
 
   char *alerts;
   long int alert_threshold;
-  long int alert_resend_every;
+  long int alert_repeat_every;
+  long int alert_repeat_max;
+  long int alert_recovery;
   int nb_consecutive_notok;
   int nb_alerts;
-  int *alerts_idx;
+  struct alert_ctrl_t *alert_ctrl;
 
   int display_name_set;
   int host_name_set;
@@ -81,17 +91,25 @@ struct check_t {
   int connect_timeout_set;
   int alerts_set;
   int alert_threshold_set;
-  int alert_resend_every_set;
+  int alert_repeat_every_set;
+  int alert_repeat_max_set;
+  int alert_recovery_set;
 
   int status;
   int prev_status;
     // Format is hh:mm
-  char time_last_status_change[6];
+//  char time_last_status_change[6];
     // Format is dd/mm hh:mm
-  char datetime_alert_info[12];
-  int h_time_last_status_change;
-  int m_time_last_status_change;
+//  char datetime_alert_info[12];
+  int last_status_change_flag;
+  struct tm last_status_change;
+  struct tm alert_info;
+//  int h_time_last_status_change;
+//  int m_time_last_status_change;
+
   char *str_prev_status;
+
+  int trigger_sequence;
 };
 
 struct alert_t {
@@ -105,10 +123,16 @@ struct alert_t {
 //  int method_name_set;
   int method_set;
 
-  long int alert_threshold;
-  long int alert_resend_every;
-  int alert_threshold_set;
-  int alert_resend_every_set;
+  long int threshold;
+  long int repeat_every;
+  long int repeat_max;
+  long int recovery;
+  long int retries;
+  int threshold_set;
+  int repeat_every_set;
+  int repeat_max_set;
+  int recovery_set;
+  int retries_set;
 
     // "smtp" method
   char *smtp_smarthost;
@@ -130,7 +154,9 @@ struct alert_t {
 
     // "log" method
   char *log_file;
+  char *log_string;
   int log_file_set;
+  int log_string_set;
 };
 
 enum {CS_NONE, CS_GENERAL, CS_TCPPROBE, CS_ALERT};
@@ -149,10 +175,29 @@ struct readcfg_var_t {
   int table_nb_elems;
 };
 
-int execute_alert_smtp(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
-      const char *desc);
-int execute_alert_program(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
-      const char *desc);
-int execute_alert_log(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
-      const char *desc);
+struct exec_alert_t {
+  int status;
+  int alert_status;
+  struct alert_t *alrt;
+  struct alert_ctrl_t *alert_ctrl;
+  int loop_count;
+  struct tm *my_now;
+
+    // Most often, taken from the check_t that raised the alert.
+    // I do not put a struct check_t * here as sometimes
+    // there is associated check_t with alert.
+  struct tm *alert_info;
+  struct tm *last_status_change;
+  int nb_consecutive_notok;
+  char *display_name;
+  char *host_name;
+
+  struct subst_t *subst;
+  int subst_len;
+  char *desc;
+};
+
+int execute_alert_smtp(const struct exec_alert_t *exec_alert);
+int execute_alert_program(const struct exec_alert_t *exec_alert);
+int execute_alert_log(const struct exec_alert_t *exec_alert);
 

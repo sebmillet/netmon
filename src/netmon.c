@@ -26,10 +26,17 @@ loglevel_t g_current_log_level = LL_NORMAL;
 #define DEFAULT_DISPLAY_NAME_WIDTH 20
 #define DEFAULT_ALERT_THRESHOLD 3
 #define DEFAULT_ALERT_SMTP_SENDER  (PACKAGE_TARNAME "@localhost")
-#define DEFAULT_ALERT_RESEND_EVERY 30
+#define DEFAULT_ALERT_REPEAT_EVERY 30
+#define DEFAULT_ALERT_REPEAT_MAX 5
+#define DEFAULT_ALERT_RECOVERY TRUE
+#define DEFAULT_ALERT_RETRIES 2
 #define DEFAULT_ALERT_SMTP_PORT 25
 #define DEFAULT_ALERT_SMTP_SELF PACKAGE_TARNAME
+#define DEFAULT_ALERT_LOG_STRING "${NOW_TIMESTAMP}  ${DESCRIPTION}"
 #define DEFAULT_CONNECT_TIMEOUT 5
+#define DEFAULT_PRINT_SUBST_ERROR FALSE
+#define SUBST_ERROR_PREFIX  "?"
+#define SUBST_ERROR_POSTFIX "?"
 
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
 const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
@@ -46,6 +53,7 @@ const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
 #define DEFAULT_WEBSERVER_PORT 8080
 #endif
 
+#define LOG_AFTER_TIMESTAMP "  "
 #define PREFIX_RECEIVED "<<< "
 #define PREFIX_SENT ">>> "
 
@@ -90,6 +98,13 @@ const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
 //
 // Status
 //
+
+enum {AS_NOTHING, AS_FAIL, AS_RECOVERY};
+const char *alert_status_names[] = {
+  "Nothing",  // AS_NOTHING
+  "Fail",     // AS_FAIL
+  "Recovery"  // AS_RECOVERY
+};
 
 enum {ST_UNDEF = 0, ST_UNKNOWN = 1, ST_OK = 2, ST_FAIL = 3, ST_LAST = 3};
 const char ST_TO_CHAR[] = {
@@ -187,6 +202,9 @@ int g_check_interval_set = FALSE;
 long int g_nb_keep_last_status = -1;
 int g_nb_keep_last_status_set = FALSE;
 
+long int g_print_subst_error = DEFAULT_PRINT_SUBST_ERROR;
+int g_print_subst_error_set = FALSE;
+
 long int g_display_name_width = DEFAULT_DISPLAY_NAME_WIDTH;
 int g_display_name_width_set = FALSE;
 
@@ -197,7 +215,7 @@ int g_connect_timeout_set = FALSE;
 int telnet_log = FALSE;
 int g_print_log = FALSE;
 int g_print_status = FALSE;
-int g_test_mode = FALSE;
+int g_test_mode = 0;
 
 char g_html_directory[BIGSTRSIZE] = DEFAULT_HTML_DIRECTORY;
 int g_html_directory_set = FALSE;
@@ -218,7 +236,7 @@ const char *l_alert_methods[] = {
   "program",  // AM_PROGRAM
   "log"       // AM_LOG
 };
-int (*alert_func[]) (struct alert_t *, const char*, const char*, int, const char*, const char*) = {
+int (*alert_func[]) (const struct exec_alert_t *) = {
   execute_alert_smtp,
   execute_alert_program,
   execute_alert_log,
@@ -251,9 +269,12 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"expect", V_STR, CS_TCPPROBE, NULL, &(chk00.expect), NULL, 0, &(chk00.expect_set), FALSE, NULL, 0},
   {"alerts", V_STR, CS_TCPPROBE, NULL, &(chk00.alerts), NULL, 0, &(chk00.alerts_set), FALSE, NULL, 0},
   {"alert_threshold", V_INT, CS_TCPPROBE, &(chk00.alert_threshold), NULL, NULL, 0, &(chk00.alert_threshold_set), FALSE, NULL, 0},
-  {"alert_resend_every", V_INT, CS_TCPPROBE, &(chk00.alert_resend_every), NULL, NULL, 0, &(chk00.alert_resend_every_set), FALSE, NULL, 0},
+  {"alert_repeat_every", V_INT, CS_TCPPROBE, &(chk00.alert_repeat_every), NULL, NULL, 0, &(chk00.alert_repeat_every_set), FALSE, NULL, 0},
+  {"alert_repeat_max", V_INT, CS_TCPPROBE, &(chk00.alert_repeat_max), NULL, NULL, 0, &(chk00.alert_repeat_max_set), TRUE, NULL, 0},
+  {"alert_recovery", V_YESNO, CS_ALERT, &(chk00.alert_recovery), NULL, NULL, 0, &(chk00.alert_recovery_set), FALSE, NULL, 0},
   {"date_format", V_STRKEY, CS_GENERAL, &g_date_format, NULL, NULL, 0, &g_date_format_set, FALSE, l_date_formats,
     sizeof(l_date_formats) / sizeof(*l_date_formats)},
+  {"print_subst_error", V_YESNO, CS_GENERAL, &g_print_subst_error, NULL, NULL, 0, &g_print_subst_error_set, FALSE, NULL, 0},
   {"log_usec", V_YESNO, CS_GENERAL, &g_log_usec, NULL, NULL, 0, &g_log_usec_set, FALSE, NULL, 0},
   {"check_interval", V_INT, CS_GENERAL, &g_check_interval, NULL, NULL, 0, &g_check_interval_set, TRUE, NULL, 0},
   {"buffer_size", V_INT, CS_GENERAL, &g_buffer_size, NULL, NULL, 0, &g_buffer_size_set, FALSE, NULL, 0},
@@ -270,8 +291,11 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"name", V_STR, CS_ALERT, NULL, &alrt00.name, NULL, 0, &alrt00.name_set, FALSE, NULL, 0},
   {"method", V_STRKEY, CS_ALERT, &alrt00.method, NULL, NULL, 0, &alrt00.method_set, FALSE, l_alert_methods,
     sizeof(l_alert_methods) / sizeof(*l_alert_methods)},
-  {"alert_threshold", V_INT, CS_ALERT, &(alrt00.alert_threshold), NULL, NULL, 0, &(alrt00.alert_threshold_set), FALSE, NULL, 0},
-  {"alert_resend_every", V_INT, CS_ALERT, &(alrt00.alert_resend_every), NULL, NULL, 0, &(alrt00.alert_resend_every_set), FALSE, NULL, 0},
+  {"threshold", V_INT, CS_ALERT, &(alrt00.threshold), NULL, NULL, 0, &(alrt00.threshold_set), FALSE, NULL, 0},
+  {"repeat_every", V_INT, CS_ALERT, &(alrt00.repeat_every), NULL, NULL, 0, &(alrt00.repeat_every_set), FALSE, NULL, 0},
+  {"repeat_max", V_INT, CS_TCPPROBE, &(alrt00.repeat_max), NULL, NULL, 0, &(alrt00.repeat_max_set), FALSE, NULL, 0},
+  {"recovery", V_YESNO, CS_ALERT, &(alrt00.recovery), NULL, NULL, 0, &(alrt00.recovery_set), FALSE, NULL, 0},
+  {"retries", V_YESNO, CS_ALERT, &(alrt00.retries), NULL, NULL, 0, &(alrt00.retries_set), FALSE, NULL, 0},
   {"smtp_smart_host", V_STR, CS_ALERT, NULL, &alrt00.smtp_smarthost, NULL, 0, &alrt00.smtp_smarthost_set, FALSE, NULL, 0},
   {"smtp_port", V_INT, CS_ALERT, &alrt00.smtp_port, NULL, NULL, 0, &alrt00.smtp_port_set, FALSE, NULL, 0},
   {"smtp_self", V_STR, CS_ALERT, NULL, &alrt00.smtp_self, NULL, 0, &alrt00.smtp_self_set, FALSE, NULL, 0},
@@ -279,7 +303,8 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"smtp_recipients", V_STR, CS_ALERT, NULL, &alrt00.smtp_recipients, NULL, 0, &alrt00.smtp_recipients_set, FALSE, NULL, 0},
   {"smtp_connect_timeout", V_INT, CS_ALERT, &alrt00.smtp_connect_timeout, NULL, NULL, 0, &alrt00.smtp_connect_timeout_set, FALSE, NULL, 0},
   {"program_command", V_STR, CS_ALERT, NULL, &alrt00.prg_command, NULL, 0, &alrt00.prg_command_set, FALSE, NULL, 0},
-  {"log_file", V_STR, CS_ALERT, NULL, &alrt00.log_file, NULL, 0, &alrt00.log_file_set, FALSE, NULL, 0}
+  {"log_file", V_STR, CS_ALERT, NULL, &alrt00.log_file, NULL, 0, &alrt00.log_file_set, FALSE, NULL, 0},
+  {"log_string", V_STR, CS_ALERT, NULL, &alrt00.log_string, NULL, 0, &alrt00.log_string_set, FALSE, NULL, 0}
 };
 
 
@@ -563,24 +588,15 @@ void check_t_destroy(struct check_t *chk) {
     free(chk->alerts);
   if (chk->str_prev_status != NULL)
     free(chk->str_prev_status);
-  if (chk->alerts_idx != NULL)
-    free(chk->alerts_idx);
-}
-
-//
-//
-//
-void blank_time_last_status_change(struct check_t *chk) {
-  strncpy(chk->time_last_status_change, "", sizeof(chk->time_last_status_change));
-  chk->h_time_last_status_change = -1;
-  chk->m_time_last_status_change = -1;
+  if (chk->alert_ctrl != NULL)
+    free(chk->alert_ctrl);
 }
 
 //
 // Create a check struct
 //
 void check_t_create(struct check_t *chk) {
-  dbg_write("Creating check...\n");
+/*  dbg_write("Creating check...\n");*/
 
   chk->is_valid = FALSE;
 
@@ -599,17 +615,20 @@ void check_t_create(struct check_t *chk) {
   chk->alerts = NULL;
   chk->alerts_set = FALSE;
   chk->nb_alerts = 0;
-  chk->alerts_idx = NULL;
+  chk->alert_ctrl = NULL;
   chk->alert_threshold = 0;
   chk->alert_threshold_set = FALSE;
-  chk->alert_resend_every = 0;
-  chk->alert_resend_every_set = FALSE;
+  chk->alert_repeat_every = 0;
+  chk->alert_repeat_every_set = FALSE;
+  chk->alert_repeat_max = 0;
+  chk->alert_repeat_max_set = FALSE;
+  chk->alert_recovery_set = FALSE;
 
   chk->status = ST_UNDEF;
   chk->prev_status = ST_UNDEF;
   chk->str_prev_status = NULL;
 
-  blank_time_last_status_change(chk);
+
 }
 
 //
@@ -625,6 +644,14 @@ void check_t_getready(struct check_t *chk) {
     chk->str_prev_status = (char *)malloc(g_nb_keep_last_status + 1);
     memset(chk->str_prev_status, ST_TO_CHAR[ST_UNDEF], g_nb_keep_last_status);
     chk->str_prev_status[g_nb_keep_last_status] = '\0';
+  }
+  chk->last_status_change_flag = FALSE;
+  chk->trigger_sequence = 0;
+  int i;
+  for (i = 0; i < chk->nb_alerts; ++i) {
+    chk->alert_ctrl[i].alert_status = AS_NOTHING;
+    chk->alert_ctrl[i].trigger_sequence = 0;
+    chk->alert_ctrl[i].nb_failures = 0;
   }
 }
 
@@ -642,7 +669,7 @@ void clean_checks() {
 // Create an alert struct
 //
 void alert_t_create(struct alert_t *alrt) {
-  dbg_write("Creating alert...\n");
+/*  dbg_write("Creating alert...\n");*/
 
   alrt->is_valid = FALSE;
 
@@ -652,10 +679,15 @@ void alert_t_create(struct alert_t *alrt) {
   alrt->method = AM_UNDEF;
   alrt->method_set = FALSE;
 
-  alrt->alert_threshold = 0;
-  alrt->alert_threshold_set = FALSE;
-  alrt->alert_resend_every = 0;
-  alrt->alert_resend_every_set = FALSE;
+  alrt->threshold = 0;
+  alrt->threshold_set = FALSE;
+  alrt->repeat_every = 0;
+  alrt->repeat_every_set = FALSE;
+  alrt->repeat_max = 0;
+  alrt->repeat_max_set = FALSE;
+  alrt->recovery_set = FALSE;
+  alrt->retries = 0;
+  alrt->retries_set = FALSE;
 
     // SMTP
 
@@ -683,6 +715,8 @@ void alert_t_create(struct alert_t *alrt) {
     // LOG
   alrt->log_file = NULL;
   alrt->log_file_set = FALSE;
+  alrt->log_string = NULL;
+  alrt->log_string_set = FALSE;
 }
 
 //
@@ -763,13 +797,17 @@ void my_log_close() {
 
 //
 // Do string substitution
+// The subst_t array can be NULL (meaning, no substitution to do), in that case n MUST be set to 0
 //
-void dollar_subst(char *s, size_t s_len, struct subst_t *subst, int n) {
-  size_t buf_len = s_len;
-  char *buf = (char *)malloc(buf_len);
-  char var[SMALLSTRSIZE];
+char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
+  size_t sc_len = strlen(s) + 1;
+  char *sc = (char *)malloc(sc_len);
+  strncpy(sc, s, sc_len);
 
-  char *p = s;
+  char var[SMALLSTRSIZE];
+  char var2[SMALLSTRSIZE];
+
+  char *p = sc;
   for (; *p != '\0'; ++p) {
     if (*p == '$' && *(p + 1) == '{') {
       char *c = p + 2;
@@ -781,29 +819,51 @@ void dollar_subst(char *s, size_t s_len, struct subst_t *subst, int n) {
         strncpy(var, p + 2, sizeof(var));
         var[sizeof(var) - 1] = '\0';
 
-        dbg_write("Found variable '%s'\n", var);
+/*        dbg_write("Found variable '%s'\n", var);*/
 
         int i;
+
+        if (g_print_subst_error) {
+          strncpy(var2, SUBST_ERROR_PREFIX, sizeof(var2));
+          strncat(var2, var, sizeof(var2));
+          strncat(var2, SUBST_ERROR_POSTFIX, sizeof(var2));
+        } else {
+          strncpy(var2, "", sizeof(var2));
+        }
+
+        char *rep = var2;
         for (i = 0; i < n; ++i) {
           if (strcasecmp(subst[i].find, var) == 0) {
-
-dbg_write("=== before: '%s'\n", s);
-
-            strncpy(buf, c + 1, buf_len);
-            *p = '\0';
-            strncat(p, subst[i].replace, s_len - (p - s));
-            strncat(p, buf, s_len - (p - s));
-
-dbg_write("=== after:  '%s'\n", s);
-
+            rep = (char *)subst[i].replace;
             break;
           }
         }
+
+/*        dbg_write("=== before: '%s'\n", sc);*/
+
+        size_t buf_len = strlen(c + 1) + 1;
+        char *buf = (char *)malloc(buf_len);
+        strncpy(buf, c + 1, buf_len);
+        *p = '\0';
+        size_t need_len = strlen(sc) + strlen(rep) + strlen(buf) + 1;
+        if (need_len > sc_len) {
+          char *new_sc = (char *)realloc(sc, need_len);
+
+/*          dbg_write("Reallocated from %lu to %lu\n", sc_len, need_len);*/
+
+          sc_len = need_len;
+          p += (new_sc - sc);
+          sc = new_sc;
+        }
+        strncat(sc, rep, sc_len);
+        strncat(sc, buf, sc_len);
+        free(buf);
+
+/*        dbg_write("=== after:  '%s'\n", sc);*/
       }
     }
   }
-
-  free(buf);
+  return sc;
 }
 
 //
@@ -834,6 +894,13 @@ void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, 
 }
 
 //
+// Remplit la structure avec les date/heure actuelles
+void set_current_tm(struct tm *ts) {
+  time_t ltime = time(NULL);
+  *ts = *localtime(&ltime);
+}
+
+//
 // Date & time to str for network HTTP usage
 //
 char *my_ctime_r(const time_t *timep, char *buf, size_t buflen) {
@@ -852,26 +919,37 @@ char *my_ctime_r(const time_t *timep, char *buf, size_t buflen) {
 }
 
 //
+//
+//
+#define STR_LOG_TIMESTAMP 25
+void set_log_timestamp(char *s, size_t s_len,
+                       int year, int month, int day, int hour, int minute, int second, long int usec) {
+  if (g_log_usec && usec >= 0) {
+    snprintf(s, s_len, "%02i/%02i/%02i %02i:%02i:%02i.%06lu", g_date_df ? day : month, g_date_df ? month : day,
+      year % 100, hour, minute, second, usec);
+  } else {
+    snprintf(s, s_len, "%02i/%02i/%02i %02i:%02i:%02i", g_date_df ? day : month, g_date_df ? month : day,
+      year % 100, hour, minute, second);
+  }
+  s[s_len - 1] = '\0';
+}
+
+//
 // Prepare prefix string, used by my_log only
 //
-void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt, size_t dt_bufsize, size_t *dt_len) {
+void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt, size_t dt_len) {
   int wday; int year; int month; int day;
   int hour; int minute; int second; long unsigned int usec;
   long int gmtoff;
   get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
 
-  if (g_log_usec) {
-    snprintf(dt, dt_bufsize, "%02i/%02i/%02i %02i:%02i:%02i.%06lu  ", g_date_df ? day : month, g_date_df ? month : day,
-      year % 100, hour, minute, second, usec);
-  } else {
-    snprintf(dt, dt_bufsize, "%02i/%02i/%02i %02i:%02i:%02i  ", g_date_df ? day : month, g_date_df ? month : day,
-      year % 100, hour, minute, second);
-  }
-  *dt_len = strlen(dt);
+  set_log_timestamp(dt, dt_len, year, month, day, hour, minute, second, usec);
+  size_t l = strlen(dt);
+
   if (log_disp == LP_NOTHING) {
-    strncpy(dt, "", dt_bufsize);
+    strncpy(dt, "", l);
   } else if (log_disp == LP_INDENT) {
-    memset(dt, ' ', *dt_len);
+    memset(dt, ' ', l);
   }
 }
 
@@ -909,9 +987,10 @@ void my_logs(const loglevel_t log_level, const logdisp_t log_disp, const char *s
     return;
 
   char dt[REGULAR_STR_STRBUFSIZE];
-  size_t dt_len;
 
-  my_log_core_get_dt_str(log_disp, dt, sizeof(dt), &dt_len);
+  my_log_core_get_dt_str(log_disp, dt, sizeof(dt));
+  strncat(dt, LOG_AFTER_TIMESTAMP, sizeof(dt));
+  size_t dt_len = strlen(dt);
   strncat(dt, s, sizeof(dt));
   my_log_core_output(dt, dt_len);
 }
@@ -925,13 +1004,14 @@ void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *f
     return;
 
   char dt[REGULAR_STR_STRBUFSIZE];
-  size_t dt_len;
   char str[REGULAR_STR_STRBUFSIZE];
-  my_log_core_get_dt_str(log_disp, dt, sizeof(dt), &dt_len);
+  my_log_core_get_dt_str(log_disp, dt, sizeof(dt));
   va_list args;
   va_start(args, format);
   vsnprintf(str, sizeof(str), format, args);
   va_end(args);
+  strncat(dt, LOG_AFTER_TIMESTAMP, sizeof(dt));
+  size_t dt_len = strlen(dt);
   strncat(dt, str, sizeof(dt));
   my_log_core_output(dt, dt_len);
 }
@@ -1129,39 +1209,30 @@ int s_begins_with(const char *s, const char *begins_with) {
 // Fill a string with current date/time, format is
 //    dd/mm hh:mm:ss
 //
-void get_str_now(char *s, size_t s_len) {
-  int wday, year; int month; int day;
-  int hour; int minute; int second; long unsigned int usec;
-  long int gmtoff;
-  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
-
-  snprintf(s, s_len, "%02i/%02i %02i:%02i:%02i", g_date_df ? day : month, g_date_df ? month : day, hour, minute, second);
+#define STR_NOW 15
+void get_str_now(char *s, size_t s_len, struct tm *ts) {
+  snprintf(s, s_len, "%02i/%02i %02i:%02i:%02i",
+    g_date_df ? ts->tm_mday : ts->tm_mon + 1, g_date_df ? ts->tm_mon + 1 : ts->tm_mday, ts->tm_hour, ts->tm_min, ts->tm_sec);
 }
 
 //
 // Fill a string with current time, format is
 //    hh:mm
 //
-void get_strnow_short_width(char *s, size_t s_len) {
-  int wday; int year; int month; int day;
-  int hour; int minute; int second; long unsigned int usec;
-  long int gmtoff;
-  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
-
-  snprintf(s, s_len, "%02i:%02i", hour, minute);
+#define STR_LASTSTATUS_CHANGE  6
+void get_str_last_status_change(char *s, size_t s_len, const struct tm *ts) {
+  snprintf(s, s_len, "%02i:%02i", ts->tm_hour, ts->tm_min);
+  s[s_len - 1] = '\0';
 }
 
 //
 // Fill a string with current date and time, format is
 //    dd/mm hh:mm
 //
-void get_strnow_medium_width(char *s, size_t s_len) {
-  int wday; int year; int month; int day;
-  int hour; int minute; int second; long unsigned int usec;
-  long int gmtoff;
-  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
-
-  snprintf(s, s_len, "%02i/%02i %02i:%02i", g_date_df ? day : month, g_date_df ? month : day, hour, minute);
+#define STR_ALERT_INFO 12
+void get_str_alert_info(char *s, size_t s_len, const struct tm *ts) {
+  snprintf(s, s_len, "%02i/%02i %02i:%02i",
+    g_date_df ? ts->tm_mday : ts->tm_mon + 1, g_date_df ? ts->tm_mon + 1 : ts->tm_mday, ts->tm_hour, ts->tm_min);
 }
 
 //
@@ -1306,8 +1377,9 @@ void get_rfc822_header_format_current_date(char *date, size_t date_len) {
 //
 // Used by execute_alert_smtp
 //
-int core_execute_alert_smtp_one_host(struct alert_t *alrt, const char *smart_host, int port, const char *display_name, const char *host_name,
-  int status, const char *datetime_alert_info, const char *desc) {
+int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, const char *smart_host, int port) {
+
+  struct alert_t *alrt = exec_alert->alrt;
 
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "SMTP alert(%s):", alrt->name);
@@ -1316,6 +1388,8 @@ int core_execute_alert_smtp_one_host(struct alert_t *alrt, const char *smart_hos
   my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, smart_host, port);
   int ec = establish_connection(smart_host, port, "220 ",
     alrt->smtp_connect_timeout_set ? alrt->smtp_connect_timeout : g_connect_timeout, &sock);
+  if (ec != EC_OK)
+    return (ec == EC_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR : ERR_SMTP_NETIO);
 
   if (socket_line_sendf(&sock, g_trace_network_traffic, "EHLO %s",
       alrt->smtp_self_set ? alrt->smtp_self : DEFAULT_ALERT_SMTP_SELF)) {
@@ -1396,7 +1470,7 @@ int core_execute_alert_smtp_one_host(struct alert_t *alrt, const char *smart_hos
   }
   socket_line_sendf(&sock, g_trace_network_traffic, "to: %s", alrt->smtp_recipients);
   socket_line_sendf(&sock, g_trace_network_traffic, "x-mailer: %s", PACKAGE_STRING);
-  socket_line_sendf(&sock, g_trace_network_traffic, "subject: %s", desc);
+  socket_line_sendf(&sock, g_trace_network_traffic, "subject: %s", exec_alert->desc);
   socket_line_sendf(&sock, g_trace_network_traffic, "date: %s", date);
   socket_line_sendf(&sock, g_trace_network_traffic, "MIME-Version: 1.0");
   socket_line_sendf(&sock, g_trace_network_traffic, "Content-Type: multipart/alternative; boundary=%s", boundary);
@@ -1409,7 +1483,7 @@ int core_execute_alert_smtp_one_host(struct alert_t *alrt, const char *smart_hos
   socket_line_sendf(&sock, g_trace_network_traffic, "Content-Type: text/plain; charset=\"us-ascii\"");
   socket_line_sendf(&sock, g_trace_network_traffic, "Content-Transfer-Encoding: 7bit");
   socket_line_sendf(&sock, g_trace_network_traffic, "");
-  socket_line_sendf(&sock, g_trace_network_traffic, "%s", desc);
+  socket_line_sendf(&sock, g_trace_network_traffic, "%s", exec_alert->desc);
   socket_line_sendf(&sock, g_trace_network_traffic, "");
 
     // Alternative 2: html
@@ -1423,8 +1497,8 @@ int core_execute_alert_smtp_one_host(struct alert_t *alrt, const char *smart_hos
   socket_line_sendf(&sock, g_trace_network_traffic, "<body>");
   socket_line_sendf(&sock, g_trace_network_traffic, "<table cellpadding=\"2\" cellspacing=\"1\" border=\"1\">");
  
-  socket_line_sendf(&sock, g_trace_network_traffic, "<tr><td bgcolor=\"%s\">", ST_TO_BGCOLOR_FORHTML[status]);
-  socket_line_sendf(&sock, g_trace_network_traffic, "%s", desc);
+  socket_line_sendf(&sock, g_trace_network_traffic, "<tr><td bgcolor=\"%s\">", ST_TO_BGCOLOR_FORHTML[exec_alert->status]);
+  socket_line_sendf(&sock, g_trace_network_traffic, "%s", exec_alert->desc);
   socket_line_sendf(&sock, g_trace_network_traffic, "</td></tr></table>");
   socket_line_sendf(&sock, g_trace_network_traffic, "</body>");
   socket_line_sendf(&sock, g_trace_network_traffic, "</html>");
@@ -1448,83 +1522,168 @@ int core_execute_alert_smtp_one_host(struct alert_t *alrt, const char *smart_hos
 //
 // Execute alert when method == AM_SMTP
 //
-int execute_alert_smtp(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
-      const char *desc) {
-  my_logf(LL_DEBUG, LP_DATETIME, "SMTP -> called alert '%s', desc = '%s', status = '%i'", alrt->name, desc, status);
+int execute_alert_smtp(const struct exec_alert_t *exec_alert) {
+  my_logf(LL_DEBUG, LP_DATETIME, "SMTP -> called alert '%s', desc = '%s', status = '%i'",
+    exec_alert->alrt->name, exec_alert->desc, exec_alert->status);
 
-  const char *h = alrt->smtp_smarthost;
-  int port = alrt->smtp_port_set ? alrt->smtp_port : DEFAULT_ALERT_SMTP_PORT;
+  const char *h = exec_alert->alrt->smtp_smarthost;
+  int port = exec_alert->alrt->smtp_port_set ? exec_alert->alrt->smtp_port : DEFAULT_ALERT_SMTP_PORT;
 
-  int err_smtp = core_execute_alert_smtp_one_host(alrt, h, port, display_name, host_name, status, datetime_alert_info, desc);
+  int err_smtp = core_execute_alert_smtp_one_host(exec_alert, h, port);
 
-  return 0;
+  return err_smtp;
 }
 
 //
 // Execute alert when method == AM_PROGRAM
 //
-int execute_alert_program(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
-      const char *desc) {
-  my_logf(LL_DEBUG, LP_DATETIME, "PROGRAM -> called alert '%s', desc = '%s', status = '%i'", alrt->name, desc, status);
+int execute_alert_program(const struct exec_alert_t *exec_alert) {
+  struct alert_t *alrt = exec_alert->alrt;
+
+  my_logf(LL_DEBUG, LP_DATETIME, "PROGRAM -> called alert '%s', desc = '%s', status = '%i'",
+    alrt->name, exec_alert->desc, exec_alert->status);
 
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "Program alert(%s):", alrt->name);
 
-  char b[BIGSTRSIZE];
-  snprintf(b, sizeof(b), "%s \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"", alrt->prg_command, display_name, host_name, ST_TO_LONGSTR_SIMPLE[status],
-    datetime_alert_info, desc);
+/*  char b[BIGSTRSIZE];*/
+/*  char alert_info[STR_ALERT_INFO];*/
+/*  get_str_alert_info(alert_info, sizeof(alert_info), exec_alert->alert_info);*/
+/*  snprintf(b, sizeof(b), "%s \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"",*/
+/*    alrt->prg_command, exec_alert->display_name, exec_alert->host_name,*/
+/*      ST_TO_LONGSTR_SIMPLE[exec_alert->status], alert_info, exec_alert->desc);*/
+
+  char *s_substitued = dollar_subst_alloc(alrt->prg_command, exec_alert->subst, exec_alert->subst_len);
   my_logf(LL_VERBOSE, LP_DATETIME, "%s will execute the command:", prefix);
-  my_logf(LL_VERBOSE, LP_INDENT, "%s", b);
-  int r = system(b);
-  my_logf(LL_VERBOSE, LP_DATETIME, "Return code: %i", r);
+  my_logs(LL_VERBOSE, LP_INDENT, s_substitued);
+  int r = system(s_substitued);
+  my_logf(LL_VERBOSE, LP_DATETIME, "%s return code: %i", prefix, r);
+  free(s_substitued);
   return r;
 }
 
 //
 // Execute alert when method == AM_LOG
 //
-int execute_alert_log(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
-      const char *desc) {
-  my_logf(LL_DEBUG, LP_DATETIME, "LOG -> called alert '%s', desc = '%s', status = '%i'", alrt->name, desc, status);
+int execute_alert_log(const struct exec_alert_t *exec_alert) {
+  struct alert_t *alrt = exec_alert->alrt;
+  struct tm *now = exec_alert->my_now;
+
+  my_logf(LL_DEBUG, LP_DATETIME, "LOG -> called alert '%s', desc = '%s', status = '%i'",
+    alrt->name, exec_alert->desc, exec_alert->status);
 
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "Log alert(%s):", alrt->name);
 
-  int wday; int year; int month; int day;
-  int hour; int minute; int second; long unsigned int usec;
-  long int gmtoff;
-  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
+  char *f_substitued = dollar_subst_alloc(alrt->log_file, exec_alert->subst, exec_alert->subst_len);
 
-  char d[9];
-  snprintf(d, sizeof(d), "%04d%02d%02d", year, month, day);
-  char s[BIGSTRSIZE];
-  strncpy(s, alrt->log_file, sizeof(s));
-  struct subst_t l_subst[] = {
-    {"DATE", d}
-  };
-  dollar_subst(s, sizeof(s), l_subst, sizeof(l_subst) / sizeof(*l_subst));
+  FILE *H = fopen(f_substitued, "a+");
 
-  dbg_write("Log file = '%s'\n", s);
+  int ret = 0;
 
-  FILE *H = fopen(s, "a+");
   if (H == NULL) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s unable to open log file '%s'", s);
-    return -1;
+    my_logf(LL_ERROR, LP_DATETIME, "%s unable to open log file '%s'", prefix);
+    ret = -1;
   } else {
-    fprintf(H, "%02i/%02i/%02i %02i:%02i:%02i  %s\n", g_date_df ? day : month, g_date_df ? month : day,
-      year % 100, hour, minute, second, desc);
+/*    fprintf(H, "%02i/%02i/%02i %02i:%02i:%02i  %s\n",*/
+/*      g_date_df ? now->tm_mday : now->tm_mon + 1, g_date_df ? now->tm_mon + 1 : now->tm_mday,*/
+/*      now->tm_year % 100, now->tm_hour, now->tm_min, now->tm_sec, exec_alert->desc);*/
+    char *s_substitued = dollar_subst_alloc(alrt->log_string, exec_alert->subst, exec_alert->subst_len);
+    fputs(s_substitued, H);
+    fputs("\n", H);
+
+    my_logf(LL_VERBOSE, LP_DATETIME, "%s wrote in log '%s':", prefix, f_substitued);
+    my_logs(LL_VERBOSE, LP_INDENT, s_substitued);
+    free(s_substitued);
+
     fclose(H);
   }
-  return 0;
+
+  free(f_substitued);
+  return ret;
 }
 
 //
 // Execute alert for all methods
 //
-int execute_alert(struct alert_t *alrt, const char *display_name, const char *host_name, int status, const char *datetime_alert_info,
-      const char *desc) {
-  my_logf(LL_NORMAL, LP_DATETIME, "Alert(%s) -> %s", alrt->name, desc);
-  return alert_func[alrt->method](alrt, display_name, host_name, status, datetime_alert_info, desc);
+int execute_alert(struct exec_alert_t *exec_alert) {
+/*  my_logf(LL_NORMAL, LP_DATETIME, "Alert(%s) -> %s", exec_alert->alrt->name, exec_alert->desc);*/
+
+  char desc[SMALLSTRSIZE];
+  char alert_info[STR_ALERT_INFO];
+  get_str_alert_info(alert_info, sizeof(alert_info), exec_alert->alert_info);
+  snprintf(desc, sizeof(desc), "%s [%s] in status %s since %s",
+    exec_alert->display_name, exec_alert->host_name, ST_TO_LONGSTR_SIMPLE[exec_alert->status], alert_info);
+  exec_alert->desc = desc;
+
+    // NOW substitutions
+  struct tm *mn = exec_alert->my_now;
+  char now_ts[STR_LOG_TIMESTAMP]; char now_date[9]; char now_y[5]; char now_m[3]; char now_d[3];
+  char now_h[3]; char now_mi[3]; char now_s[3];
+  set_log_timestamp(now_ts, sizeof(now_ts), mn->tm_year + 1900, mn->tm_mon + 1, mn->tm_mday,
+    mn->tm_hour, mn->tm_min, mn->tm_sec, -1);
+  snprintf(now_date, sizeof(now_date), "%04d%02d%02d", mn->tm_year + 1900, mn->tm_mon + 1, mn->tm_mday);
+  snprintf(now_y, sizeof(now_y), "%04d", mn->tm_year + 1900);
+  snprintf(now_m, sizeof(now_m), "%02d", mn->tm_mon + 1);
+  snprintf(now_d, sizeof(now_d), "%02d", mn->tm_mday);
+  snprintf(now_h, sizeof(now_h), "%02d", mn->tm_hour);
+  snprintf(now_mi, sizeof(now_mi), "%02d", mn->tm_min);
+  snprintf(now_s, sizeof(now_s), "%02d", mn->tm_sec);
+    // ALERT_INFO substitutions
+  struct tm *ai = exec_alert->alert_info;
+  char ai_ts[STR_LOG_TIMESTAMP]; char ai_date[9]; char ai_y[5]; char ai_m[3]; char ai_d[3];
+  char ai_h[3]; char ai_mi[3]; char ai_s[3];
+  set_log_timestamp(ai_ts, sizeof(ai_ts), ai->tm_year + 1900, ai->tm_mon + 1, ai->tm_mday,
+    ai->tm_hour, ai->tm_min, ai->tm_sec, -1);
+  snprintf(ai_date, sizeof(ai_date), "%04d%02d%02d", ai->tm_year + 1900, ai->tm_mon + 1, ai->tm_mday);
+  snprintf(ai_y, sizeof(ai_y), "%04d", ai->tm_year + 1900);
+  snprintf(ai_m, sizeof(ai_m), "%02d", ai->tm_mon + 1);
+  snprintf(ai_d, sizeof(ai_d), "%02d", ai->tm_mday);
+  snprintf(ai_h, sizeof(ai_h), "%02d", ai->tm_hour);
+  snprintf(ai_mi, sizeof(ai_mi), "%02d", ai->tm_min);
+  snprintf(ai_s, sizeof(ai_s), "%02d", ai->tm_sec);
+
+  char nstatus[12]; char nconsec[12]; char nalertst[12]; char seq[12]; char nb_failures[12];
+  snprintf(nstatus, sizeof(nstatus), "%d", exec_alert->status);
+  snprintf(nconsec, sizeof(nconsec), "%d", exec_alert->nb_consecutive_notok);
+  snprintf(nalertst, sizeof(nalertst), "%d", exec_alert->alert_status);
+  snprintf(seq, sizeof(nalertst), "%d", exec_alert->alert_ctrl->trigger_sequence);
+  snprintf(nb_failures, sizeof(nb_failures), "%d", exec_alert->alert_ctrl->nb_failures);
+  struct subst_t subst[] = {
+    {"DESCRIPTION", desc},
+    {"STATUS", ST_TO_LONGSTR_SIMPLE[exec_alert->status]},
+    {"STATUS_NUM", nstatus},
+    {"DISPLAY_NAME", exec_alert->display_name},
+    {"HOST_NAME", exec_alert->host_name},
+    {"CONSECUTIVE_NOTOK", nconsec},
+    {"ALERT_NAME", exec_alert->alrt->name},
+    {"ALERT_METHOD", l_alert_methods[exec_alert->alrt->method]},
+    {"ALERT_STATUS", alert_status_names[exec_alert->alert_status]},
+    {"ALERT_STATUS_NUM", nalertst},
+    {"ALERT_SEQ", seq},
+    {"ALERT_NB_FAILURES", nb_failures},
+    {"ALERT_TIMESTAMP", ai_ts},
+    {"ALERT_YMD", ai_date},
+    {"ALERT_YEAR", ai_y},
+    {"ALERT_MONTH", ai_m},
+    {"ALERT_DAY", ai_d},
+    {"ALERT_HOUR", ai_h},
+    {"ALERT_MINUTE", ai_mi},
+    {"ALERT_SECOND", ai_s},
+    {"NOW_TIMESTAMP", now_ts},
+    {"NOW_YMD", now_date},
+    {"NOW_YEAR", now_y},
+    {"NOW_MONTH", now_m},
+    {"NOW_DAY", now_d},
+    {"NOW_HOUR", now_h},
+    {"NOW_MINUTE", now_mi},
+    {"NOW_SECOND", now_s},
+    {"TAB", "\t"}
+  };
+  exec_alert->subst = subst;
+  exec_alert->subst_len = sizeof(subst) / sizeof(*subst);
+
+  return alert_func[exec_alert->alrt->method](exec_alert);
 }
 
 //
@@ -1533,10 +1692,11 @@ int execute_alert(struct alert_t *alrt, const char *display_name, const char *ho
 const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
 void almost_neverending_loop() {
 
-  do {
+  long int loop_count = 0;
+  while (1) {
+    ++loop_count;
     int II;
 
-/*    my_logs(LL_NORMAL, LP_NOTHING, "");*/
     my_logs(LL_NORMAL, LP_DATETIME, "Starting check...");
 
     int wday0; int year0; int month0; int day0;
@@ -1553,33 +1713,43 @@ void almost_neverending_loop() {
       if (status < 0 || status > ST_LAST)
         internal_error("almost_neverending_loop", __FILE__, __LINE__);
 
+      struct tm my_now;
+      set_current_tm(&my_now);
+
       chk->prev_status = chk->status;
       chk->status = status;
 
+      int reset_nb_failures = FALSE;
       if (chk->prev_status != chk->status && chk->prev_status != ST_UNDEF) {
-        get_strnow_short_width(chk->time_last_status_change, sizeof(chk->time_last_status_change));
-        chk->h_time_last_status_change = hour0;
-        chk->m_time_last_status_change = minute0;
+        chk->last_status_change = my_now;
+        chk->last_status_change_flag = TRUE;
+        reset_nb_failures = TRUE;
       }
-      if (chk->status != ST_OK || chk->prev_status != ST_OK && chk->status != chk->prev_status)
-        get_strnow_medium_width(chk->datetime_alert_info, sizeof(chk->datetime_alert_info));
+      if ((chk->status != ST_OK || chk->prev_status != ST_OK) && chk->status != chk->prev_status) {
+        set_current_tm(&chk->alert_info);
+        reset_nb_failures = TRUE;
+      }
 
-      if (chk->status != ST_OK)
+      int as;
+      if (chk->status != ST_OK) {
+        as = AS_FAIL;
         chk->nb_consecutive_notok++;
-      else
+      } else {
+        as = (chk->prev_status != ST_OK && chk->prev_status != ST_UNDEF ? AS_RECOVERY : AS_NOTHING);
         chk->nb_consecutive_notok = 0;
+      }
 
         // The whole code below is used to erase the information "last status change"
         // 23 hours after, so that there is no confusion in the day.
         // Note that the test would work for any duration from 1 hour to 23 hours,
         // by replacing the 23 below.
-      if (chk->h_time_last_status_change >= 0) {
+      if (chk->last_status_change_flag) {
           // M1 = Mark 1 = time at which the status last changed, minus 1 hour
           // Expressed in minutes since midnight.
-        int M1 = ((chk->h_time_last_status_change + 23) % 24) * 60 + chk->m_time_last_status_change;
+        int M1 = ((chk->last_status_change.tm_hour + 23) % 24) * 60 + chk->last_status_change.tm_min;
           // M2 = Mark 2 = time at which the status last changed
           // Expressed in minutes since midnight.
-        int M2 = chk->h_time_last_status_change * 60 + chk->m_time_last_status_change;
+        int M2 = chk->last_status_change.tm_hour * 60 + chk->last_status_change.tm_min;
           // MN = Mark N = now
           // Expressed in minutes since midnight.
         int MN = hour0 * 60 + minute0;
@@ -1587,7 +1757,7 @@ void almost_neverending_loop() {
           // midnight is in [M1, M2[.
         if ((M1 < M2 && MN >= M1 && MN < M2) ||
           (M1 > M2 && (MN >= M1 || MN < M2))) {
-          blank_time_last_status_change(chk);
+          chk->last_status_change_flag = FALSE;
         }
       }
 
@@ -1608,46 +1778,119 @@ void almost_neverending_loop() {
         free(buf);
       }
 
-        // Manage alert
+// Manage alert
+
       int trigger_alert = FALSE;
-      if (chk->alert_threshold_set && chk->alert_threshold == chk->nb_consecutive_notok)
-        trigger_alert = TRUE;
+      if (as == AS_NOTHING)
+        chk->trigger_sequence = 0;
+
       int threshold = chk->alert_threshold_set ? chk->alert_threshold : DEFAULT_ALERT_THRESHOLD;
-      if (chk->alert_resend_every_set) {
-        if (chk->nb_consecutive_notok - threshold >= chk->alert_resend_every &&
-              (chk->nb_consecutive_notok - threshold + chk->alert_resend_every) % chk->alert_resend_every == 0)
-          trigger_alert = TRUE;
+      int repeat_max = chk->alert_repeat_max_set ? chk->alert_repeat_max : DEFAULT_ALERT_REPEAT_MAX;
+      if (chk->alert_threshold_set && chk->alert_threshold == chk->nb_consecutive_notok) {
+        trigger_alert = TRUE;
+        chk->trigger_sequence++;
+      } else if (chk->alert_repeat_every_set) {
+        if (chk->nb_consecutive_notok - threshold >= chk->alert_repeat_every &&
+              (chk->nb_consecutive_notok - threshold + chk->alert_repeat_every) % chk->alert_repeat_every == 0) {
+          my_logf(LL_DEBUG, LP_DATETIME, "repeat_max = %d", repeat_max);
+          trigger_alert = (repeat_max == 0 ? TRUE : (chk->trigger_sequence <= repeat_max));
+          chk->trigger_sequence++;
+        }
       }
+
+      my_logf(LL_DEBUG, LP_DATETIME, "as = %d, chk->trigger_sequence = %d", as, chk->trigger_sequence);
+      my_logf(LL_DEBUG, LP_DATETIME, "chk->nb_consecutive_notok = %d", chk->nb_consecutive_notok);
+      my_logf(LL_DEBUG, LP_DATETIME, "trigger_alert = %d", trigger_alert);
+
       int i;
       for (i = 0; i < chk->nb_alerts; ++i) {
         int trigger_alert_by_alert = trigger_alert;
-        struct alert_t *alrt = &alerts[chk->alerts_idx[i]];
+        struct alert_t *alrt = &alerts[chk->alert_ctrl[i].idx];
+
+        if (reset_nb_failures)
+          chk->alert_ctrl[i].nb_failures = 0;
 
         if (!chk->alert_threshold_set) {
-          threshold = alrt->alert_threshold_set ? alrt->alert_threshold : DEFAULT_ALERT_THRESHOLD;
+          threshold = alrt->threshold_set ? alrt->threshold : DEFAULT_ALERT_THRESHOLD;
           if (threshold == chk->nb_consecutive_notok)
             trigger_alert_by_alert = TRUE;
         }
 
-        if (!chk->alert_resend_every_set) {
+        if (!chk->alert_repeat_every_set) {
           threshold = chk->alert_threshold_set ? chk->alert_threshold : DEFAULT_ALERT_THRESHOLD;
-          int resend_every = alrt->alert_resend_every_set ? alrt->alert_resend_every : DEFAULT_ALERT_RESEND_EVERY;
+          int resend_every = alrt->repeat_every_set ? alrt->repeat_every : DEFAULT_ALERT_REPEAT_EVERY;
           if (chk->nb_consecutive_notok - threshold >= resend_every &&
-                (chk->nb_consecutive_notok - threshold + resend_every) % resend_every == 0)
-            trigger_alert_by_alert = TRUE;
+                (chk->nb_consecutive_notok - threshold + resend_every) % resend_every == 0) {
+            int repm = alrt->repeat_max_set ? alrt->repeat_max : repeat_max;
+            trigger_alert_by_alert = (repeat_max == 0 ? TRUE : (chk->alert_ctrl[i].trigger_sequence <= repm));
+          }
         }
 
-          // Here we go! W have to trigger the alert, whatever the reason is (check
+        int retries = (alrt->retries_set ? alrt->retries : DEFAULT_ALERT_RETRIES);
+        if (chk->alert_ctrl[i].alert_status == AS_FAIL && as == AS_RECOVERY) {
+          if (chk->alert_recovery_set && chk->alert_recovery) {
+            trigger_alert_by_alert = TRUE;
+          } else if (!chk->alert_recovery_set) {
+            if (alrt->recovery_set && alrt->recovery) {
+              trigger_alert_by_alert = TRUE;
+            } else if (!alrt->recovery_set) {
+              if (!trigger_alert_by_alert)
+                trigger_alert_by_alert = DEFAULT_ALERT_RECOVERY;
+            }
+          }
+        } else if (chk->alert_ctrl[i].alert_status == AS_RECOVERY && chk->alert_ctrl[i].nb_failures <= retries) {
+          trigger_alert_by_alert = TRUE;
+        }
+
+        if (chk->alert_ctrl[i].nb_failures >= 1 && chk->alert_ctrl[i].nb_failures <= retries)
+          trigger_alert_by_alert = TRUE;
+
+          // Here we go! We have to trigger the alert, whatever the reason is (check
           // config or alert config or default config or any combination)
         if (trigger_alert_by_alert) {
-          char ad[SMALLSTRSIZE];
-          snprintf(ad, sizeof(ad), "%s [%s] in status %s since %s", chk->display_name, chk->host_name,
-            ST_TO_LONGSTR_SIMPLE[chk->status], chk->datetime_alert_info);
-          execute_alert(alrt, chk->display_name, chk->host_name, chk->status, chk->datetime_alert_info, ad);
+          chk->alert_ctrl[i].trigger_sequence++;
+
+          struct exec_alert_t exec_alert = {
+            chk->status,
+            as,
+            alrt,
+            &chk->alert_ctrl[i],
+            loop_count,
+            &my_now,
+            &chk->alert_info,
+            &chk->last_status_change,
+            chk->nb_consecutive_notok,
+            chk->display_name,
+            chk->host_name,
+            NULL,
+            0,
+            NULL
+          };
+          int r = execute_alert(&exec_alert);
+
+          if (r != 0) {
+            chk->alert_ctrl[i].nb_failures++;
+            if (as != AS_NOTHING)
+              chk->alert_ctrl[i].alert_status = as;
+            if (chk->alert_ctrl[i].nb_failures > retries) {
+              chk->alert_ctrl[i].nb_failures = 0;
+              if (as == AS_RECOVERY)
+                chk->alert_ctrl[i].alert_status = AS_NOTHING;
+            }
+          } else {
+            chk->alert_ctrl[i].nb_failures = 0;
+            chk->alert_ctrl[i].alert_status = (as == AS_RECOVERY ? AS_NOTHING : as);
+          }
+        } else if (as == AS_NOTHING) {
+          chk->alert_ctrl[i].alert_status = AS_NOTHING;
+          chk->alert_ctrl[i].nb_failures = 0;
         }
 
       }
     }
+
+    struct tm now_done;
+    set_current_tm(&now_done);
 
     int wday1; int year1; int month1; int day1;
     int hour1; int minute1; int second1; long unsigned int usec1;
@@ -1656,13 +1899,13 @@ void almost_neverending_loop() {
       day1 = day0 + 1;
     float elapsed = (day1 - day0) * 86400 + (hour1 - hour0) * 3600 + (minute1 - minute0) * 60 + (second1 - second0);
     elapsed += ((float)usec1 - (float)usec0) / 1000000;
-    if (g_test_mode)
+    if (g_test_mode >= 1)
       elapsed = .12345;
 
     if (g_print_status) {
       const char *LC_PREFIX = "Last check: ";
-      char now[20];
-      get_str_now(now, sizeof(now));
+      char now[STR_NOW];
+      get_str_now(now, sizeof(now), &now_done);
       char duration[50];
       snprintf(duration, sizeof(duration), ", done in %6.3fs", elapsed);
       char sf[50];
@@ -1680,7 +1923,7 @@ void almost_neverending_loop() {
     }
 
     FILE *H = NULL;
-    if (!g_test_mode) {
+    if (g_test_mode == 0) {
       H = fopen(g_html_complete_file_name, "w+");
       if (H == NULL)
         my_logf(LL_ERROR, LP_DATETIME, "Unable to open HTML output file %s", g_html_complete_file_name);
@@ -1688,8 +1931,8 @@ void almost_neverending_loop() {
         my_logf(LL_VERBOSE, LP_DATETIME, "Creating %s", g_html_complete_file_name);
     }
     if (H != NULL) {
-      char now[20];
-      get_str_now(now, sizeof(now));
+      char now[STR_NOW];
+      get_str_now(now, sizeof(now), &now_done);
       fputs("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n", H);
       fputs("<html>\n", H);
       fputs("<head>\n", H);
@@ -1723,6 +1966,11 @@ void almost_neverending_loop() {
       if (!chk->is_valid)
         continue;
 
+      char lsc[STR_LASTSTATUS_CHANGE];
+      strncpy(lsc, "", sizeof(lsc));
+      if (chk->last_status_change_flag)
+        get_str_last_status_change(lsc, sizeof(lsc), &chk->last_status_change);
+
       if (g_print_status) {
         char short_display_name[g_display_name_width + 1];
         strncpy(short_display_name, chk->display_name, g_display_name_width + 1);
@@ -1731,10 +1979,10 @@ void almost_neverending_loop() {
         char f[50];
         if (g_nb_keep_last_status >= 1) {
           snprintf(f, sizeof(f), "%%-%lis %%s |%%s| %%s\n", g_display_name_width);
-          printf(f, short_display_name, ST_TO_STR2[chk->status], chk->str_prev_status, chk->time_last_status_change);
+          printf(f, short_display_name, ST_TO_STR2[chk->status], chk->str_prev_status, lsc);
         } else {
           snprintf(f, sizeof(f), "%%-%lis %%s %%s\n", g_display_name_width);
-          printf(f, short_display_name, ST_TO_STR2[chk->status], chk->time_last_status_change);
+          printf(f, short_display_name, ST_TO_STR2[chk->status], lsc);
         }
       }
 
@@ -1743,7 +1991,7 @@ void almost_neverending_loop() {
           fputs("<tr>\n", H);
         fprintf(H, "<td>%s</td><td bgcolor=\"%s\">%s</td>\n",
           chk->display_name, ST_TO_BGCOLOR_FORHTML[chk->status], ST_TO_LONGSTR_SIMPLE[chk->status]);
-        fprintf(H, "<td>%s</td>", chk->time_last_status_change);
+        fprintf(H, "<td>%s</td>", lsc);
         if (g_nb_keep_last_status >= 1) {
           fputs("<td>", H);
           int i;
@@ -1784,7 +2032,7 @@ void almost_neverending_loop() {
 
     my_logf(LL_NORMAL, LP_DATETIME, "Check done in %fs", elapsed);
 
-    if (g_check_interval && !g_test_mode) {
+    if (g_check_interval && g_test_mode == 0) {
       long int delay = g_check_interval - (long int)elapsed;
       if (delay < 1)
         delay = 1;
@@ -1792,10 +2040,13 @@ void almost_neverending_loop() {
         delay = g_check_interval;
       my_logf(LL_NORMAL, LP_DATETIME, "Now sleeping for %li second(s) (interval = %li)", delay, g_check_interval);
       os_sleep(delay);
-    } else {
-      break;
+    } else if (g_test_mode >=1) {
+      if (g_test_mode == 1)
+        break;
+      else if (g_test_mode == 2 && loop_count == 99)
+        break;
     }
-  } while (1);
+  };
 }
 
 //
@@ -1859,16 +2110,16 @@ void option_error(const char *s) {
 void printhelp() {
   printf("Usage: " PACKAGE_NAME " [options...]\n");
   printf("Do TCP connection tests periodically and output status information\n\n");
-  printf("  -h  --help          Display this help text\n");
-  printf("  -V  --version       Display version information and exit\n");
-  printf("  -v  --verbose       Be more talkative\n");
-  printf("  -q  --quiet         Be less talkative\n");
-  printf("  -l  --log-file      Log file (default: %s)\n", DEFAULT_LOGFILE);
-  printf("  -c  --config-file   Configuration file (default: %s)\n", DEFAULT_CFGFILE);
-  printf("  -p  --print-log     Print the log on the screen\n");
-  printf("  -C  --stdout        Print status on stdout\n");
-  printf("  -t  --test          Test mode\n");
-  printf("  -a  --alert         Test the alert name written after the option and quit\n");
+  printf("  -h --help          Display this help text\n");
+  printf("  -V --version       Display version information and exit\n");
+  printf("  -v --verbose       Be more talkative\n");
+  printf("  -q --quiet         Be less talkative\n");
+  printf("  -l --log-file      Log file (default: %s)\n", DEFAULT_LOGFILE);
+  printf("  -c --config-file   Configuration file (default: %s)\n", DEFAULT_CFGFILE);
+  printf("  -p --print-log     Print the log on the screen\n");
+  printf("  -C --stdout        Print status on stdout\n");
+  printf("  -t --test N        Set test mode to N, 0 (default) = no test mode\n");
+  printf("  -a --alert         Test the alert name written after the option and quit\n");
 }
 
 //
@@ -1897,7 +2148,7 @@ void parse_options(int argc, char *argv[]) {
     {"config-file", required_argument, NULL, 'c'},
     {"print-log", no_argument, NULL, 'p'},
     {"stdout", no_argument, NULL, 'C'},
-    {"test", no_argument, NULL, 't'},
+    {"test", required_argument, NULL, 't'},
     {"alert", no_argument, NULL, 'a'},
     {0, 0, 0, 0}
   };
@@ -1905,13 +2156,15 @@ void parse_options(int argc, char *argv[]) {
   int c;
   int option_index = 0;
 
+  int n;
+
   strncpy(g_log_file, DEFAULT_LOGFILE, sizeof(g_log_file));
   strncpy(g_cfg_file, DEFAULT_CFGFILE, sizeof(g_cfg_file));
   strncpy(g_test_alert, "", sizeof(g_test_alert));
 
   while (1) {
 
-    c = getopt_long(argc, argv, "hvCtl:c:a:pVq", long_options, &option_index);
+    c = getopt_long(argc, argv, "hvCt:l:c:a:pVq", long_options, &option_index);
 
     if (c == -1) {
       break;
@@ -1940,7 +2193,8 @@ void parse_options(int argc, char *argv[]) {
         break;
 
       case 't':
-        g_test_mode = TRUE;
+        n = atoi(optarg);
+        g_test_mode = n;
         break;
 
       case 'l':
@@ -2053,6 +2307,12 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number) {
       my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no log file defined, discarding alert",
         cf, line_number);
       is_valid = FALSE;
+    }
+    if (!alrt->log_string_set) {
+      size_t n = strlen(DEFAULT_ALERT_LOG_STRING) + 1;
+      alrt->log_string = (char *)malloc(n);
+      strncpy(alrt->log_string, DEFAULT_ALERT_LOG_STRING, n);
+      alrt->log_string_set = TRUE;
     }
   }
 
@@ -2694,7 +2954,7 @@ void identify_alerts() {
         ++n;
     }
     chk->nb_alerts = n;
-    chk->alerts_idx = (int *)malloc(sizeof(int) * n);
+    chk->alert_ctrl = (struct alert_ctrl_t *)malloc(sizeof(struct alert_ctrl_t) * n);
     size_t b = strlen(chk->alerts) + 2;
 
     char *t = (char *)malloc(b);
@@ -2717,7 +2977,7 @@ void identify_alerts() {
       if ((k = find_alert(curs)) < 0) {
         my_logf(LL_ERROR, LP_DATETIME, "Check '%s': unknown alert '%s'", chk->display_name, curs);
       } else {
-        chk->alerts_idx[index] = k;
+        chk->alert_ctrl[index].idx = k;
         ++index;
       }
     }
@@ -2743,23 +3003,35 @@ void checks_display() {
     } else {
       my_logf(LL_DEBUG, LP_INDENT, "!! check #%i (will be ignored)", i);
     }
-    my_logf(LL_DEBUG, LP_INDENT, "   is_valid     = %s", chk->is_valid ? "Yes" : "No");
-    my_logf(LL_DEBUG, LP_INDENT, "   display_name = %s", chk->display_name_set ? chk->display_name : "<unset>");
-    my_logf(LL_DEBUG, LP_INDENT, "   host_name    = %s", chk->host_name_set ? chk->host_name : "<unset>");
+    my_logf(LL_DEBUG, LP_INDENT, "   is_valid       = %s", chk->is_valid ? "Yes" : "No");
+    my_logf(LL_DEBUG, LP_INDENT, "   display_name   = %s", chk->display_name_set ? chk->display_name : "<unset>");
+    my_logf(LL_DEBUG, LP_INDENT, "   host_name      = %s", chk->host_name_set ? chk->host_name : "<unset>");
 
     if (chk->port_set)
-      my_logf(LL_DEBUG, LP_INDENT, "   port         = %i", chk->port);
+      my_logf(LL_DEBUG, LP_INDENT, "   port           = %i", chk->port);
     else
-      my_logf(LL_DEBUG, LP_INDENT, "   port         = <unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   port           = <unset>");
 
-    my_logf(LL_DEBUG, LP_INDENT, "   expect       = %s", chk->expect_set ? chk->expect : "<unset>");
-    my_logf(LL_DEBUG, LP_INDENT, "   alerts       = %s", chk->alerts_set ? chk->alerts : "<unset>");
-    my_logf(LL_DEBUG, LP_INDENT, "   nb alerts    = %i", chk->nb_alerts);
+    my_logf(LL_DEBUG, LP_INDENT, "   expect         = %s", chk->expect_set ? chk->expect : "<unset>");
+    my_logf(LL_DEBUG, LP_INDENT, "   alerts         = %s", chk->alerts_set ? chk->alerts : "<unset>");
+    my_logf(LL_DEBUG, LP_INDENT, "   nb alerts      = %i", chk->nb_alerts);
     int j;
     for (j = 0; j < chk->nb_alerts; ++j) {
       my_logf(LL_DEBUG, LP_INDENT, "     alert:     = #%i -> %s",
-        j, alerts[chk->alerts_idx[j]].name);
+        j, alerts[chk->alert_ctrl[j].idx].name);
     }
+    if (chk->alert_threshold_set)
+      my_logf(LL_DEBUG, LP_INDENT, "   alert_threshold    = %d", chk->alert_threshold);
+    else
+      my_logf(LL_DEBUG, LP_INDENT, "   alert_threshold    = <unset>");
+    if (chk->alert_repeat_every_set)
+      my_logf(LL_DEBUG, LP_INDENT, "   alert_repeat_every = %d", chk->alert_repeat_every);
+    else
+      my_logf(LL_DEBUG, LP_INDENT, "   alert_repeat_every = <unset>");
+    if (chk->alert_repeat_max_set)
+      my_logf(LL_DEBUG, LP_INDENT, "   alert_repeat_max   = %d", chk->alert_repeat_max);
+    else
+      my_logf(LL_DEBUG, LP_INDENT, "   alert_repeat_max   = <unset>");
   }
   if (c != g_nb_valid_checks)
     internal_error("main", __FILE__, __LINE__);
@@ -2830,7 +3102,7 @@ void config_display() {
     for (II = 0; II < chk->nb_alerts; ++II) {
       if (strlen(t) >= 1)
         strncat(t, ", ", sizeof(t));
-      strncat(t, alerts[chk->alerts_idx[II]].name, sizeof(t));
+      strncat(t, alerts[chk->alert_ctrl[II].idx].name, sizeof(t));
     }
     t[sizeof(t) - 1] = '\0';
 
@@ -2871,11 +3143,22 @@ int main(int argc, char *argv[]) {
       printf("Unknown alert '%s'\n", g_test_alert);
       exit(EXIT_FAILURE);
     }
-    char s[SMALLSTRSIZE];
-    snprintf(s, sizeof(s), "[TEST] alert for alert %s", alerts[a].name);
-    char d[12];
-    get_strnow_medium_width(d, sizeof(d));
-    execute_alert(&alerts[a], "Test check", "Test hostname", ST_UNDEF, d, s);
+    char desc[SMALLSTRSIZE];
+    snprintf(desc, sizeof(desc), "[TEST] alert for alert %s", alerts[a].name);
+
+
+
+    struct alert_ctrl_t alert_ctrl = {a, AS_NOTHING, 0, 0};
+    struct tm my_now;
+    set_current_tm(&my_now);
+    struct tm alert_info;
+    time_t ltime = time(NULL) - 30 * 60;
+    alert_info = *localtime(&ltime);
+    struct exec_alert_t exec_alert = {ST_UNDEF, AS_NOTHING, &alerts[a], &alert_ctrl, 0, &my_now, &alert_info, &alert_info,
+      1, "Test alert display name", "Test alert host name", NULL, 0, desc};
+    int r = execute_alert(&exec_alert);
+    my_logf(LL_NORMAL, LP_DATETIME, "Alert returned code %d", r);
+
     my_log_close();
     exit(EXIT_SUCCESS);
   }
