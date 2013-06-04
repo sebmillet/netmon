@@ -69,11 +69,24 @@ struct alert_ctrl_t {
 struct check_t {
   int is_valid;
 
+  long int method;
   char *display_name;
   char *host_name;
-  char *expect;
-  long int port;
-  long int connect_timeout;
+  int method_set;
+  int display_name_set;
+  int host_name_set;
+
+    // CM_TCP method
+  char *tcp_expect;
+  long int tcp_port;
+  long int tcp_connect_timeout;
+  int tcp_expect_set;
+  int tcp_port_set;
+  int tcp_connect_timeout_set;
+
+    // CM_PROGRAM method
+  char *prg_command;
+  int prg_command_set;
 
   char *alerts;
   long int alert_threshold;
@@ -84,11 +97,6 @@ struct check_t {
   int nb_alerts;
   struct alert_ctrl_t *alert_ctrl;
 
-  int display_name_set;
-  int host_name_set;
-  int expect_set;
-  int port_set;
-  int connect_timeout_set;
   int alerts_set;
   int alert_threshold_set;
   int alert_repeat_every_set;
@@ -159,7 +167,7 @@ struct alert_t {
   int log_string_set;
 };
 
-enum {CS_NONE, CS_GENERAL, CS_TCPPROBE, CS_ALERT};
+enum {CS_NONE, CS_GENERAL, CS_PROBE, CS_ALERT};
 enum {V_STR, V_INT, V_YESNO, V_STRKEY};
 struct readcfg_var_t {
   const char *name;
@@ -200,4 +208,7 @@ struct exec_alert_t {
 int execute_alert_smtp(const struct exec_alert_t *exec_alert);
 int execute_alert_program(const struct exec_alert_t *exec_alert);
 int execute_alert_log(const struct exec_alert_t *exec_alert);
+
+int perform_check_tcp(const struct check_t *chk);
+int perform_check_program(const struct check_t *chk);
 

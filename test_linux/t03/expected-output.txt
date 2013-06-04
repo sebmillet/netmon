@@ -14,26 +14,26 @@ Configuration file 'netmon.ini', line 18: variable method not allowed in this se
 Configuration file 'netmon.ini', line 19: syntax error
 Configuration file 'netmon.ini', line 20: variable method not allowed in this section
 Configuration file 'netmon.ini', line 21: variable method not allowed in this section
-Configuration file 'netmon.ini', line 29: empty value not allowed
-Configuration file 'netmon.ini', line 31: variable method not allowed in this section
-Configuration file 'netmon.ini', line 59: empty value not allowed
-Configuration file 'netmon.ini', section of line 56: no command defined, discarding alert
-Configuration file 'netmon.ini', section of line 60: no command defined, discarding alert
-Configuration file 'netmon.ini', line 66: unknown variable command
-Configuration file 'netmon.ini', section of line 63: no command defined, discarding alert
-Configuration file 'netmon.ini', line 67: unknown section name 'xalert'
-Configuration file 'netmon.ini', line 68: unknown section name 'alert1'
-Configuration file 'netmon.ini', line 69: variable name not allowed in this section
-Configuration file 'netmon.ini', line 70: variable method not allowed in this section
-Configuration file 'netmon.ini', line 71: variable method not allowed in this section
+Configuration file 'netmon.ini', line 30: empty value not allowed
+Configuration file 'netmon.ini', line 32: variable method already defined
+Configuration file 'netmon.ini', line 61: empty value not allowed
+Configuration file 'netmon.ini', section of line 58: no command defined, discarding alert
+Configuration file 'netmon.ini', section of line 62: no command defined, discarding alert
+Configuration file 'netmon.ini', line 68: unknown variable command
+Configuration file 'netmon.ini', section of line 65: no command defined, discarding alert
+Configuration file 'netmon.ini', line 69: unknown section name 'xalert'
+Configuration file 'netmon.ini', line 70: unknown section name 'alert1'
+Configuration file 'netmon.ini', line 71: variable name not allowed in this section
 Configuration file 'netmon.ini', line 72: variable method not allowed in this section
-Configuration file 'netmon.ini', line 79: unknown value 'bla' for variable method
-Configuration file 'netmon.ini', section of line 78: no name defined, discarding alert
-Configuration file 'netmon.ini', section of line 78: unknown method, discarding alert
-Configuration file 'netmon.ini', section of line 80: no method defined, discarding alert
-Configuration file 'netmon.ini', line 90: empty value not allowed
-Configuration file 'netmon.ini', section of line 87: no log file defined, discarding alert
-Configuration file 'netmon.ini', section of line 91: no log file defined, discarding alert
+Configuration file 'netmon.ini', line 73: variable method not allowed in this section
+Configuration file 'netmon.ini', line 74: variable method not allowed in this section
+Configuration file 'netmon.ini', line 82: unknown value 'bla' for variable method
+Configuration file 'netmon.ini', section of line 81: no name defined, discarding alert
+Configuration file 'netmon.ini', section of line 81: unknown method, discarding alert
+Configuration file 'netmon.ini', section of line 83: no method defined, discarding alert
+Configuration file 'netmon.ini', line 93: empty value not allowed
+Configuration file 'netmon.ini', section of line 90: no log file defined, discarding alert
+Configuration file 'netmon.ini', section of line 94: no log file defined, discarding alert
 keep_last_status not defined, taking default = 15
 Check 'Local FTP': unknown alert 'email'
 Check 'Local FTP': unknown alert ''
@@ -191,47 +191,52 @@ To check: 'My POP3' [maison-pclin:110], expect "+OK ", no alert
 To check: 'Test avec nom inconnu' [a.b.c:25], no expect, alerts: 
 Will create image files in html directory
 Starting check...
-Connecting to Local FTP (Localhost:21)...
+Performing check tcp(Local FTP)
+TCP check(Local FTP): connecting to Localhost:21...
 Running gethosbyname() on Localhost
 Will connect to Localhost:21, timeout = 5
 Connected to Localhost:21
 <<< 220 (vsFTPd 2.3.5)
 Unexpected answer: '220 (vsFTPd 2.3.5)' (expected '221 ')
-Disconnected from Localhost:21
+TCP check(Local FTP): disconnected from Localhost:21
 Local FTP -> ** KO **
 as = 1, chk->trigger_sequence = 0
 chk->nb_consecutive_notok = 1
 trigger_alert = 0
-Connecting to Local HTTP (127.0.0.1:80)...
+Performing check tcp(Local HTTP)
+TCP check(Local HTTP): connecting to 127.0.0.1:80...
 Running gethosbyname() on 127.0.0.1
 Will connect to 127.0.0.1:80, timeout = 5
 Connected to 127.0.0.1:80
-Disconnected from 127.0.0.1:80
+TCP check(Local HTTP): disconnected from 127.0.0.1:80
 Local HTTP -> ok
 as = 0, chk->trigger_sequence = 0
 chk->nb_consecutive_notok = 0
 trigger_alert = 0
-Connecting to Local SMTP (My SMTP:25)...
+Performing check tcp(Local SMTP)
+TCP check(Local SMTP): connecting to My SMTP:25...
 Running gethosbyname() on My SMTP
 Unknown host My SMTP, code=110 (Connection timed out)
-Disconnected from My SMTP:25
+TCP check(Local SMTP): disconnected from My SMTP:25
 Local SMTP -> ** ?? **
 as = 1, chk->trigger_sequence = 0
 chk->nb_consecutive_notok = 1
 trigger_alert = 0
-Connecting to My POP3 (maison-pclin:110)...
+Performing check tcp(My POP3)
+TCP check(My POP3): connecting to maison-pclin:110...
 Running gethosbyname() on maison-pclin
 Will connect to maison-pclin:110, timeout = 5
 Socket error connecting to maison-pclin:110, code=113 (No route to host)
-Disconnected from maison-pclin:110
+TCP check(My POP3): disconnected from maison-pclin:110
 My POP3 -> ** KO **
 as = 1, chk->trigger_sequence = 0
 chk->nb_consecutive_notok = 1
 trigger_alert = 0
-Connecting to Test avec nom inconnu (a.b.c:25)...
+Performing check tcp(Test avec nom inconnu)
+TCP check(Test avec nom inconnu): connecting to a.b.c:25...
 Running gethosbyname() on a.b.c
 Unknown host a.b.c, code=110 (Connection timed out)
-Disconnected from a.b.c:25
+TCP check(Test avec nom inconnu): disconnected from a.b.c:25
 Test avec nom inconnu -> ** ?? **
 as = 1, chk->trigger_sequence = 0
 chk->nb_consecutive_notok = 1

@@ -2,6 +2,7 @@
 netmon 1.0 start
 Reading configuration from 'netmon.ini'
 keep_last_status not defined, taking default = 15
-Alert(mylog) -> [TEST] alert for alert mylog
-LOG -> called alert 'mylog', desc = '[TEST] alert for alert mylog', status = '0'
-Log alert(mylog): wrote in log 'tmp-alertlog-H-Test hostname-D-Test check-N-mylog-M-log-${A.log' string '[TEST] alert for alert mylog'
+log(mylog) -> display_name = 'Test alert display name', host_name = 'Test alert host name', status = '0'
+Log alert(mylog): wrote in log 'tmp-alertlog-H-Test alert host name-D-Test alert display name-N--M--${A.log':
+Test alert display name [Test alert host name] in status Undefined since 01/01/13 00:00 -- <Nothing> <>
+Alert returned code 0

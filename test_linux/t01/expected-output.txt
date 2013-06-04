@@ -4,32 +4,33 @@ Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 2: variable display_name not allowed in this section
 Configuration file 'netmon.ini', line 3: variable check_interval not allowed in this section
 Configuration file 'netmon.ini', line 4: variable display_name not allowed in this section
-Configuration file 'netmon.ini', line 6: variable port not allowed in this section
+Configuration file 'netmon.ini', line 6: variable tcp_port not allowed in this section
 Configuration file 'netmon.ini', line 7: unknown variable bla
 Configuration file 'netmon.ini', line 13: empty value not allowed
 Configuration file 'netmon.ini', line 15: unknown variable oui
-Configuration file 'netmon.ini', line 16: variable port not allowed in this section
+Configuration file 'netmon.ini', line 16: variable tcp_port not allowed in this section
 Configuration file 'netmon.ini', line 17: syntax error
-Configuration file 'netmon.ini', line 22: empty value not allowed
-Configuration file 'netmon.ini', line 23: unknown variable alert
-Configuration file 'netmon.ini', line 24: syntax error
+Configuration file 'netmon.ini', line 23: empty value not allowed
+Configuration file 'netmon.ini', line 24: unknown variable alert
+Configuration file 'netmon.ini', line 25: syntax error
 Configuration file 'netmon.ini', section of line 19: no host name defined, discarding check
 Configuration file 'netmon.ini', section of line 19: no port defined, discarding check
-Configuration file 'netmon.ini', line 30: variable port already defined
-Configuration file 'netmon.ini', line 31: variable port already defined
-Configuration file 'netmon.ini', line 32: variable check_interval not allowed in this section
-Configuration file 'netmon.ini', line 33: unknown variable alert
-Configuration file 'netmon.ini', section of line 35: no host name defined, discarding check
-Configuration file 'netmon.ini', section of line 35: no port defined, discarding check
-Configuration file 'netmon.ini', line 45: empty value not allowed
-Configuration file 'netmon.ini', line 46: null value not allowed
-Configuration file 'netmon.ini', section of line 42: no port defined, discarding check
-Configuration file 'netmon.ini', line 48: unknown section name 'abc'
-Configuration file 'netmon.ini', line 49: unknown section name 'tcp-prob'
-Configuration file 'netmon.ini', line 50: unknown section name 'tcp-probes'
-Configuration file 'netmon.ini', line 52: null value not allowed
-Configuration file 'netmon.ini', line 54: empty value not allowed
-Configuration file 'netmon.ini', section of line 51: no port defined, discarding check
+Configuration file 'netmon.ini', line 32: variable tcp_port already defined
+Configuration file 'netmon.ini', line 33: variable tcp_port already defined
+Configuration file 'netmon.ini', line 34: variable check_interval not allowed in this section
+Configuration file 'netmon.ini', line 35: unknown variable alert
+Configuration file 'netmon.ini', section of line 37: no method defined, discarding check
+Configuration file 'netmon.ini', section of line 37: no host name defined, discarding check
+Configuration file 'netmon.ini', line 48: empty value not allowed
+Configuration file 'netmon.ini', line 49: null value not allowed
+Configuration file 'netmon.ini', section of line 45: no method defined, discarding check
+Configuration file 'netmon.ini', line 51: unknown section name 'abc'
+Configuration file 'netmon.ini', line 52: unknown section name 'chec'
+Configuration file 'netmon.ini', line 53: unknown section name 'checks'
+Configuration file 'netmon.ini', line 54: variable method not allowed in this section
+Configuration file 'netmon.ini', line 56: null value not allowed
+Configuration file 'netmon.ini', line 58: empty value not allowed
+Configuration file 'netmon.ini', section of line 55: no method defined, discarding check
 keep_last_status not defined, taking default = 15
 !! check #0 (will be ignored)
    is_valid       = No
@@ -110,19 +111,21 @@ To check: 'my Localhost' [localhost:21219], no expect, no alert
 To check: 'ab544abcbcbczc31415911' [ab544abcbcbczc31415911:18], no expect, no alert
 Will create image files in html directory
 Starting check...
-Connecting to my Localhost (localhost:21219)...
+Performing check tcp(my Localhost)
+TCP check(my Localhost): connecting to localhost:21219...
 Running gethosbyname() on localhost
 Will connect to localhost:21219, timeout = 5
 Socket error connecting to localhost:21219, code=111 (Connection refused)
-Disconnected from localhost:21219
+TCP check(my Localhost): disconnected from localhost:21219
 my Localhost -> ** KO **
 as = 1, chk->trigger_sequence = 0
 chk->nb_consecutive_notok = 1
 trigger_alert = 0
-Connecting to ab544abcbcbczc31415911 (ab544abcbcbczc31415911:18)...
+Performing check tcp(ab544abcbcbczc31415911)
+TCP check(ab544abcbcbczc31415911): connecting to ab544abcbcbczc31415911:18...
 Running gethosbyname() on ab544abcbcbczc31415911
 Unknown host ab544abcbcbczc31415911, code=110 (Connection timed out)
-Disconnected from ab544abcbcbczc31415911:18
+TCP check(ab544abcbcbczc31415911): disconnected from ab544abcbcbczc31415911:18
 ab544abcbcbczc31415911 -> ** ?? **
 as = 1, chk->trigger_sequence = 0
 chk->nb_consecutive_notok = 1
