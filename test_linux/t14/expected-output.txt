@@ -1,0 +1,16 @@
+test.sh
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=3, cons=3, as=Fail, seq=1, nf=0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=4, cons=4, as=Fail, seq=1, nf=1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=5, cons=5, as=Fail, seq=1, nf=2
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=23, cons=23, as=Fail, seq=2, nf=0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=24, cons=24, as=Fail, seq=2, nf=1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=25, cons=25, as=Fail, seq=2, nf=2
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=43, cons=43, as=Fail, seq=3, nf=0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=44, cons=44, as=Fail, seq=3, nf=1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=45, cons=45, as=Fail, seq=3, nf=2
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=63, cons=63, as=Fail, seq=4, nf=0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=64, cons=64, as=Fail, seq=4, nf=1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=65, cons=65, as=Fail, seq=4, nf=2
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Ok, lc=151, cons=0, as=Recovery, seq=5, nf=0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Ok, lc=152, cons=0, as=Nothing, seq=5, nf=1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Ok, lc=153, cons=0, as=Nothing, seq=5, nf=2

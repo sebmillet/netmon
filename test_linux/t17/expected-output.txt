@@ -1,0 +1,12 @@
+test.sh
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=14, cons=14, as=Fail, seq=1, nf=0 - WILL RETURN 0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=23, cons=23, as=Fail, seq=2, nf=0 - WILL RETURN 1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=24, cons=24, as=Fail, seq=2, nf=1 - WILL RETURN 0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=32, cons=32, as=Fail, seq=3, nf=0 - WILL RETURN 0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=41, cons=41, as=Fail, seq=4, nf=0 - WILL RETURN 1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=42, cons=42, as=Fail, seq=4, nf=1 - WILL RETURN 0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=50, cons=50, as=Fail, seq=5, nf=0 - WILL RETURN 0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=59, cons=59, as=Fail, seq=6, nf=0 - WILL RETURN 1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=60, cons=60, as=Fail, seq=6, nf=1 - WILL RETURN 0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Ok, lc=151, cons=0, as=Recovery, seq=7, nf=0 - WILL RETURN 1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Ok, lc=152, cons=0, as=Nothing, seq=7, nf=1 - WILL RETURN 0

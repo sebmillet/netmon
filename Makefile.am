@@ -4,7 +4,7 @@ SUBDIRS = src
 ACLOCAL_AMFLAGS = -I admin
 
 dist_doc_DATA=README
-dist_pkgdata_SCRIPTS = src/writeargs.sh
+dist_pkgdata_SCRIPTS = src/printargs.sh
 
 EXTRA_DIST=netmon.bkl gen-win-makefile.cmd makefile.gcc extracfg.h
 

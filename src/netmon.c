@@ -317,9 +317,9 @@ const struct readcfg_var_t readcfg_vars[] = {
     sizeof(l_alert_methods) / sizeof(*l_alert_methods)},
   {"threshold", V_INT, CS_ALERT, &(alrt00.threshold), NULL, NULL, 0, &(alrt00.threshold_set), FALSE, NULL, 0},
   {"repeat_every", V_INT, CS_ALERT, &(alrt00.repeat_every), NULL, NULL, 0, &(alrt00.repeat_every_set), FALSE, NULL, 0},
-  {"repeat_max", V_INT, CS_PROBE, &(alrt00.repeat_max), NULL, NULL, 0, &(alrt00.repeat_max_set), FALSE, NULL, 0},
+  {"repeat_max", V_INT, CS_ALERT, &(alrt00.repeat_max), NULL, NULL, 0, &(alrt00.repeat_max_set), TRUE, NULL, 0},
   {"recovery", V_YESNO, CS_ALERT, &(alrt00.recovery), NULL, NULL, 0, &(alrt00.recovery_set), FALSE, NULL, 0},
-  {"retries", V_YESNO, CS_ALERT, &(alrt00.retries), NULL, NULL, 0, &(alrt00.retries_set), FALSE, NULL, 0},
+  {"retries", V_INT, CS_ALERT, &(alrt00.retries), NULL, NULL, 0, &(alrt00.retries_set), TRUE, NULL, 0},
   {"smtp_smart_host", V_STR, CS_ALERT, NULL, &alrt00.smtp_smarthost, NULL, 0, &alrt00.smtp_smarthost_set, FALSE, NULL, 0},
   {"smtp_port", V_INT, CS_ALERT, &alrt00.smtp_port, NULL, NULL, 0, &alrt00.smtp_port_set, FALSE, NULL, 0},
   {"smtp_self", V_STR, CS_ALERT, NULL, &alrt00.smtp_self, NULL, 0, &alrt00.smtp_self_set, FALSE, NULL, 0},
@@ -457,6 +457,7 @@ char *os_last_err_desc(char *s, size_t s_bufsize) {
 }
 
 void os_init_network() {
+  signal(SIGPIPE, SIG_IGN);
 }
 
 int os_last_network_op_is_in_progress() {
@@ -1356,7 +1357,7 @@ int perform_check_tcp(const struct check_t *chk, const struct subst_t *subst, in
 //
 int perform_check_program(const struct check_t *chk, const struct subst_t *subst, int subst_len) {
   char prefix[SMALLSTRSIZE];
-  snprintf(prefix, sizeof(prefix), "Program chck(%s):", chk->display_name);
+  snprintf(prefix, sizeof(prefix), "Program check(%s):", chk->display_name);
 
   char *s_substitued = dollar_subst_alloc(chk->prg_command, subst, subst_len);
   my_logf(LL_VERBOSE, LP_DATETIME, "%s will execute the command:", prefix);
@@ -1890,7 +1891,7 @@ void almost_neverending_loop() {
         if (chk->nb_consecutive_notok - threshold >= chk->alert_repeat_every &&
               (chk->nb_consecutive_notok - threshold + chk->alert_repeat_every) % chk->alert_repeat_every == 0) {
           my_logf(LL_DEBUG, LP_DATETIME, "repeat_max = %d", repeat_max);
-          trigger_alert = (repeat_max == 0 ? TRUE : (chk->trigger_sequence <= repeat_max));
+          trigger_alert = (repeat_max < 0 ? TRUE : (chk->trigger_sequence <= repeat_max));
           chk->trigger_sequence++;
         }
       }
@@ -1914,12 +1915,11 @@ void almost_neverending_loop() {
         }
 
         if (!chk->alert_repeat_every_set) {
-          threshold = chk->alert_threshold_set ? chk->alert_threshold : DEFAULT_ALERT_THRESHOLD;
           int resend_every = alrt->repeat_every_set ? alrt->repeat_every : DEFAULT_ALERT_REPEAT_EVERY;
           if (chk->nb_consecutive_notok - threshold >= resend_every &&
                 (chk->nb_consecutive_notok - threshold + resend_every) % resend_every == 0) {
             int repm = alrt->repeat_max_set ? alrt->repeat_max : repeat_max;
-            trigger_alert_by_alert = (repeat_max == 0 ? TRUE : (chk->alert_ctrl[i].trigger_sequence <= repm));
+            trigger_alert_by_alert = (repm < 0 ? TRUE : (chk->alert_ctrl[i].trigger_sequence <= repm));
           }
         }
 
@@ -1939,13 +1939,20 @@ void almost_neverending_loop() {
           trigger_alert_by_alert = TRUE;
         }
 
-        if (chk->alert_ctrl[i].nb_failures >= 1 && chk->alert_ctrl[i].nb_failures <= retries)
+        int increase_seq = TRUE;
+
+        if (chk->alert_ctrl[i].nb_failures >= 1 && chk->alert_ctrl[i].nb_failures <= retries) {
           trigger_alert_by_alert = TRUE;
+          increase_seq = FALSE;
+        }
 
           // Here we go! We have to trigger the alert, whatever the reason is (check
           // config or alert config or default config or any combination)
         if (trigger_alert_by_alert) {
-          chk->alert_ctrl[i].trigger_sequence++;
+          if (increase_seq)
+            chk->alert_ctrl[i].trigger_sequence++;
+
+          my_logf(LL_DEBUG, LP_DATETIME, "chk trigger sequence = %d, alert trigger sequence = %d", chk->trigger_sequence, chk->alert_ctrl[i].trigger_sequence);
 
           struct exec_alert_t exec_alert = {
             chk->status,
@@ -1966,24 +1973,30 @@ void almost_neverending_loop() {
 
           int r = execute_alert(&exec_alert);
 
+          my_logf(LL_DEBUG, LP_DATETIME, "Excuted alert, result = %d", r);
+
           if (r != 0) {
             chk->alert_ctrl[i].nb_failures++;
             if (as != AS_NOTHING)
               chk->alert_ctrl[i].alert_status = as;
+
             if (chk->alert_ctrl[i].nb_failures > retries) {
               chk->alert_ctrl[i].nb_failures = 0;
-              if (as == AS_RECOVERY)
+              if (chk->alert_ctrl[i].alert_status == AS_RECOVERY)
                 chk->alert_ctrl[i].alert_status = AS_NOTHING;
             }
           } else {
+            if (as == AS_NOTHING) {
+              chk->alert_ctrl[i].trigger_sequence = 0;
+            }
             chk->alert_ctrl[i].nb_failures = 0;
             chk->alert_ctrl[i].alert_status = (as == AS_RECOVERY ? AS_NOTHING : as);
           }
         } else if (as == AS_NOTHING) {
           chk->alert_ctrl[i].alert_status = AS_NOTHING;
+          chk->alert_ctrl[i].trigger_sequence = 0;
           chk->alert_ctrl[i].nb_failures = 0;
         }
-
       }
     }
 
@@ -3182,10 +3195,26 @@ void alerts_display() {
     my_logf(LL_DEBUG, LP_INDENT, "   name              = %s", alrt->name_set ? alrt->name : "<unset>");
     my_logf(LL_DEBUG, LP_INDENT, "   method            = %s",
       (alrt->method_set && alrt->method != FIND_STRING_NOT_FOUND) ? l_alert_methods[alrt->method] : "<unset>");
+    if (alrt->threshold_set)
+      my_logf(LL_DEBUG, LP_INDENT, "   threshold         = %li", alrt->threshold);
+    else
+      my_logf(LL_DEBUG, LP_INDENT, "   threshold         = <unset>");
+    if (alrt->repeat_every_set)
+      my_logf(LL_DEBUG, LP_INDENT, "   repeat_every      = %li", alrt->repeat_every);
+    else
+      my_logf(LL_DEBUG, LP_INDENT, "   repeat_every      = <unset>");
+    if (alrt->repeat_max_set)
+      my_logf(LL_DEBUG, LP_INDENT, "   repeat_max        = %li", alrt->repeat_max);
+    else
+      my_logf(LL_DEBUG, LP_INDENT, "   repeat_max        = <unset>");
+    if (alrt->retries_set)
+      my_logf(LL_DEBUG, LP_INDENT, "   retries           = %li", alrt->retries);
+    else
+      my_logf(LL_DEBUG, LP_INDENT, "   retries           = <unset>");
     if (alrt->method == AM_SMTP) {
       my_logf(LL_DEBUG, LP_INDENT, "   SMTP/smart host = %s", alrt->smtp_smarthost_set ? alrt->smtp_smarthost : "<unset>");
       if (alrt->smtp_port_set)
-        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/port       = %i", alrt->smtp_port);
+        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/port       = %li", alrt->smtp_port);
       else
         my_logf(LL_DEBUG, LP_INDENT, "   SMTP/port       = <unset>");
       my_logf(LL_DEBUG, LP_INDENT, "   SMTP/self       = %s", alrt->smtp_self_set ? alrt->smtp_self : "<unset>");

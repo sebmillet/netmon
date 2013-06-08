@@ -1,0 +1,9 @@
+test.sh
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=9, cons=9, as=Fail, seq=1, nf=0 - WILL RETURN 1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=10, cons=10, as=Fail, seq=1, nf=1 - WILL RETURN 1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=11, cons=11, as=Fail, seq=1, nf=2 - WILL RETURN 1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Fail, lc=12, cons=12, as=Fail, seq=1, nf=3 - WILL RETURN 0
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Ok, lc=151, cons=0, as=Recovery, seq=2, nf=0 - WILL RETURN 1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Ok, lc=152, cons=0, as=Nothing, seq=2, nf=1 - WILL RETURN 1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Ok, lc=153, cons=0, as=Nothing, seq=2, nf=2 - WILL RETURN 1
+alert.sh: myprog(program) -> d=Probe-OK>=150, h=, s=Ok, lc=154, cons=0, as=Nothing, seq=2, nf=3 - WILL RETURN 1
