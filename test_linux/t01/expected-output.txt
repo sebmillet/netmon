@@ -19,18 +19,18 @@ Configuration file 'netmon.ini', line 32: variable tcp_port already defined
 Configuration file 'netmon.ini', line 33: variable tcp_port already defined
 Configuration file 'netmon.ini', line 34: variable check_interval not allowed in this section
 Configuration file 'netmon.ini', line 35: unknown variable alert
+Configuration file 'netmon.ini', section of line 37: no display_name defined, discarding check
 Configuration file 'netmon.ini', section of line 37: no method defined, discarding check
-Configuration file 'netmon.ini', section of line 37: no host name defined, discarding check
-Configuration file 'netmon.ini', line 48: empty value not allowed
-Configuration file 'netmon.ini', line 49: null value not allowed
-Configuration file 'netmon.ini', section of line 45: no method defined, discarding check
-Configuration file 'netmon.ini', line 51: unknown section name 'abc'
-Configuration file 'netmon.ini', line 52: unknown section name 'chec'
-Configuration file 'netmon.ini', line 53: unknown section name 'checks'
-Configuration file 'netmon.ini', line 54: variable method not allowed in this section
-Configuration file 'netmon.ini', line 56: null value not allowed
-Configuration file 'netmon.ini', line 58: empty value not allowed
-Configuration file 'netmon.ini', section of line 55: no method defined, discarding check
+Configuration file 'netmon.ini', line 50: empty value not allowed
+Configuration file 'netmon.ini', line 51: null value not allowed
+Configuration file 'netmon.ini', section of line 46: no method defined, discarding check
+Configuration file 'netmon.ini', line 53: unknown section name 'abc'
+Configuration file 'netmon.ini', line 54: unknown section name 'chec'
+Configuration file 'netmon.ini', line 55: unknown section name 'checks'
+Configuration file 'netmon.ini', line 56: variable method not allowed in this section
+Configuration file 'netmon.ini', line 58: null value not allowed
+Configuration file 'netmon.ini', line 61: empty value not allowed
+Configuration file 'netmon.ini', section of line 57: no method defined, discarding check
 keep_last_status not defined, taking default = 15
 !! check #0 (will be ignored)
    is_valid       = No
@@ -78,7 +78,7 @@ keep_last_status not defined, taking default = 15
    alert_repeat_max   = <unset>
 !! check #4 (will be ignored)
    is_valid       = No
-   display_name   = <unset>
+   display_name   = bla r
    host_name      = bla r
    port           = <unset>
    expect         = <unset>
@@ -89,7 +89,7 @@ keep_last_status not defined, taking default = 15
    alert_repeat_max   = <unset>
 !! check #5 (will be ignored)
    is_valid       = No
-   display_name   = <unset>
+   display_name   = bla y
    host_name      = bla y
    port           = <unset>
    expect         = <unset>

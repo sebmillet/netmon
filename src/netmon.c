@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <pthread.h>
 
 /*#define DEBUG*/
@@ -37,6 +38,7 @@ loglevel_t g_current_log_level = LL_NORMAL;
 #define DEFAULT_PRINT_SUBST_ERROR FALSE
 #define SUBST_ERROR_PREFIX  "?"
 #define SUBST_ERROR_POSTFIX "?"
+#define LAST_STATUS_CHANGE_DISPLAY_SECONDS  (60 * 60 * 23)
 
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
 const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
@@ -56,6 +58,10 @@ const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
 #define LOG_AFTER_TIMESTAMP "  "
 #define PREFIX_RECEIVED "<<< "
 #define PREFIX_SENT ">>> "
+
+  // Don't update the one below unless you know what you're doing!
+  // Linked to test_linux directory scripts
+#define TEST2_NB_LOOPS  199
 
   // As writtn here:
   //   http://nagiosplug.sourceforge.net/developer-guidelines.html#AEN76
@@ -252,7 +258,7 @@ const char *l_check_methods[] = {
   "tcp",      // CM_TCP
   "program"   // CM_PROGRAM
 };
-int (*check_func[]) (const struct check_t *) = {
+int (*check_func[]) (const struct check_t *, const struct subst_t *, int) = {
   perform_check_tcp,    // CM_TCP
   perform_check_program // CM_PROGRAM
 };
@@ -289,7 +295,7 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"alert_threshold", V_INT, CS_PROBE, &(chk00.alert_threshold), NULL, NULL, 0, &(chk00.alert_threshold_set), FALSE, NULL, 0},
   {"alert_repeat_every", V_INT, CS_PROBE, &(chk00.alert_repeat_every), NULL, NULL, 0, &(chk00.alert_repeat_every_set), FALSE, NULL, 0},
   {"alert_repeat_max", V_INT, CS_PROBE, &(chk00.alert_repeat_max), NULL, NULL, 0, &(chk00.alert_repeat_max_set), TRUE, NULL, 0},
-  {"alert_recovery", V_YESNO, CS_ALERT, &(chk00.alert_recovery), NULL, NULL, 0, &(chk00.alert_recovery_set), FALSE, NULL, 0},
+  {"alert_recovery", V_YESNO, CS_PROBE, &(chk00.alert_recovery), NULL, NULL, 0, &(chk00.alert_recovery_set), FALSE, NULL, 0},
   {"date_format", V_STRKEY, CS_GENERAL, &g_date_format, NULL, NULL, 0, &g_date_format_set, FALSE, l_date_formats,
     sizeof(l_date_formats) / sizeof(*l_date_formats)},
   {"print_subst_error", V_YESNO, CS_GENERAL, &g_print_subst_error, NULL, NULL, 0, &g_print_subst_error_set, FALSE, NULL, 0},
@@ -1328,7 +1334,7 @@ int establish_connection(const char *host_name, int port, const char *expect, in
 //
 //
 //
-int perform_check_tcp(const struct check_t *chk) {
+int perform_check_tcp(const struct check_t *chk, const struct subst_t *subst, int subst_len) {
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "TCP check(%s):", chk->display_name);
 
@@ -1348,28 +1354,31 @@ int perform_check_tcp(const struct check_t *chk) {
 //
 //
 //
-int perform_check_program(const struct check_t *chk) {
+int perform_check_program(const struct check_t *chk, const struct subst_t *subst, int subst_len) {
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "Program chck(%s):", chk->display_name);
 
-  char *s_substitued = dollar_subst_alloc(chk->prg_command, NULL, 0);
+  char *s_substitued = dollar_subst_alloc(chk->prg_command, subst, subst_len);
   my_logf(LL_VERBOSE, LP_DATETIME, "%s will execute the command:", prefix);
   my_logs(LL_VERBOSE, LP_INDENT, s_substitued);
-  int r = system(s_substitued);
-  my_logf(LL_VERBOSE, LP_DATETIME, "%s return code: %i", prefix, r);
+
+  int r1 = system(s_substitued);
+  int r2 = WEXITSTATUS(r1);
+  my_logf(LL_VERBOSE, LP_DATETIME, "%s return code: %i", prefix, r2);
   free(s_substitued);
-  if (r < _NAGIOS_FIRST)
-    r = NAGIOS_UNKNOWN;
-  else if (r > _NAGIOS_LAST)
-    r = NAGIOS_UNKNOWN;
-  if (r == NAGIOS_OK)
+  if (r2 < _NAGIOS_FIRST)
+    r2 = NAGIOS_UNKNOWN;
+  else if (r2 > _NAGIOS_LAST)
+    r2 = NAGIOS_UNKNOWN;
+  if (r2 == NAGIOS_OK)
     return ST_OK;
-  if (r == NAGIOS_WARNING)
+  if (r2 == NAGIOS_WARNING)
     return ST_FAIL;
-  if (r == NAGIOS_CRITICAL)
+  if (r2 == NAGIOS_CRITICAL)
     return ST_FAIL;
-  if (r == NAGIOS_UNKNOWN)
+  if (r2 == NAGIOS_UNKNOWN)
     return ST_UNKNOWN;
+  return ST_UNKNOWN;
 }
 
 //
@@ -1421,7 +1430,7 @@ int perform_check(const struct check_t *chk) {
     {"LOOP_COUNT", lcstr},
     {"TAB", "\t"}
   };
-  return check_func[chk->method](chk);
+  return check_func[chk->method](chk, subst, sizeof(subst) / sizeof(*subst));
 }
 
 //
@@ -1654,10 +1663,11 @@ int execute_alert_program(const struct exec_alert_t *exec_alert) {
   char *s_substitued = dollar_subst_alloc(alrt->prg_command, exec_alert->subst, exec_alert->subst_len);
   my_logf(LL_VERBOSE, LP_DATETIME, "%s will execute the command:", prefix);
   my_logs(LL_VERBOSE, LP_INDENT, s_substitued);
-  int r = system(s_substitued);
-  my_logf(LL_VERBOSE, LP_DATETIME, "%s return code: %i", prefix, r);
+  int r1 = system(s_substitued);
+  int r2 = WEXITSTATUS(r1);
+  my_logf(LL_VERBOSE, LP_DATETIME, "%s return code: %i", prefix, r2);
   free(s_substitued);
-  return r;
+  return r2;
 }
 
 //
@@ -1802,10 +1812,9 @@ void almost_neverending_loop() {
 
     my_logs(LL_NORMAL, LP_DATETIME, "Starting check...");
 
-    int wday0; int year0; int month0; int day0;
-    int hour0; int minute0; int second0; long unsigned int usec0;
-    long int gmtoff;
-    get_datetime_of_day(&wday0, &year0, &month0, &day0, &hour0, &minute0, &second0, &usec0, &gmtoff);
+    struct timeval tv0;
+    if (gettimeofday(&tv0, NULL) == GETTIMEOFDAY_ERROR)
+      fatal_error("File %s, line %i, gettimeofday() error", __FILE__, __LINE__);
 
     for (II = 0; II < g_nb_checks; ++II) {
       struct check_t *chk = &checks[II];
@@ -1842,24 +1851,9 @@ void almost_neverending_loop() {
         chk->nb_consecutive_notok = 0;
       }
 
-        // The whole code below is used to erase the information "last status change"
-        // 23 hours after, so that there is no confusion in the day.
-        // Note that the test would work for any duration from 1 hour to 23 hours,
-        // by replacing the 23 below.
       if (chk->last_status_change_flag) {
-          // M1 = Mark 1 = time at which the status last changed, minus 1 hour
-          // Expressed in minutes since midnight.
-        int M1 = ((chk->last_status_change.tm_hour + 23) % 24) * 60 + chk->last_status_change.tm_min;
-          // M2 = Mark 2 = time at which the status last changed
-          // Expressed in minutes since midnight.
-        int M2 = chk->last_status_change.tm_hour * 60 + chk->last_status_change.tm_min;
-          // MN = Mark N = now
-          // Expressed in minutes since midnight.
-        int MN = hour0 * 60 + minute0;
-          // MN must be in the interval [M1, M2[, the test takes into account the case where
-          // midnight is in [M1, M2[.
-        if ((M1 < M2 && MN >= M1 && MN < M2) ||
-          (M1 > M2 && (MN >= M1 || MN < M2))) {
+        time_t lsc = mktime(&chk->last_status_change);
+        if ((long signed int)tv0.tv_sec - (long signed int)lsc >= LAST_STATUS_CHANGE_DISPLAY_SECONDS) {
           chk->last_status_change_flag = FALSE;
         }
       }
@@ -1996,13 +1990,12 @@ void almost_neverending_loop() {
     struct tm now_done;
     set_current_tm(&now_done);
 
-    int wday1; int year1; int month1; int day1;
-    int hour1; int minute1; int second1; long unsigned int usec1;
-    get_datetime_of_day(&wday1, &year1, &month1, &day1, &hour1, &minute1, &second1, &usec1, &gmtoff);
-    if (day1 < day0)
-      day1 = day0 + 1;
-    float elapsed = (day1 - day0) * 86400 + (hour1 - hour0) * 3600 + (minute1 - minute0) * 60 + (second1 - second0);
-    elapsed += ((float)usec1 - (float)usec0) / 1000000;
+    struct timeval tv1;
+    if (gettimeofday(&tv1, NULL) == GETTIMEOFDAY_ERROR)
+      fatal_error("File %s, line %i, gettimeofday() error", __FILE__, __LINE__);
+
+    float elapsed = (long signed int)tv1.tv_sec - (long signed int)tv0.tv_sec;
+    elapsed += ((float)tv1.tv_usec - (float)tv0.tv_usec) / 1000000;
     if (g_test_mode >= 1)
       elapsed = .12345;
 
@@ -2147,7 +2140,7 @@ void almost_neverending_loop() {
     } else if (g_test_mode >=1) {
       if (g_test_mode == 1)
         break;
-      else if (g_test_mode == 2 && lc == 99)
+      else if (g_test_mode == 2 && lc == TEST2_NB_LOOPS)
         break;
     }
   };
@@ -2241,6 +2234,10 @@ void printversion() {
 	printf("This program has absolutely no warranty.\n");
 }
 
+//
+// Analyz program options ->
+//   * The log (my_logf and my_logs functions) is not yet open *
+//
 void parse_options(int argc, char *argv[]) {
 
   static struct option long_options[] = {
@@ -2342,6 +2339,11 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number) {
 
   int is_valid = TRUE;
 
+  if (!chk->display_name_set) {
+    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no display_name defined, discarding check",
+      cf, line_number);
+    is_valid = FALSE;
+  }
   if (!chk->method_set) {
     my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no method defined, discarding check",
       cf, line_number);
@@ -2352,13 +2354,12 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number) {
     is_valid = FALSE;
   }
 
-  if (!chk->host_name_set) {
-    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no host name defined, discarding check",
-      cf, line_number);
-    is_valid = FALSE;
-  }
-
   if (chk->method_set && chk->method == CM_TCP) {
+    if (!chk->host_name_set) {
+      my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no host name defined, discarding check",
+        cf, line_number);
+      is_valid = FALSE;
+    }
     if (!chk->tcp_port_set) {
       my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no port defined, discarding check",
         cf, line_number);
@@ -2378,11 +2379,10 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number) {
 
   ++g_nb_valid_checks;
 
-  if (!chk->display_name_set) {
-    size_t n = strlen(chk->host_name) + 1;
-    chk->display_name = (char *)malloc(n);
-    strncpy(chk->display_name, chk->host_name, n);
-    chk->display_name_set = TRUE;
+  if (!chk->host_name_set) {
+    chk->host_name = (char *)malloc(1);
+    strncpy(chk->host_name, "", 1);
+    chk->host_name_set = TRUE;
   }
 }
 
@@ -2446,6 +2446,9 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number) {
     ++g_nb_valid_alerts;
 }
 
+//
+// Parse the ini file
+//
 void read_configuration_file(const char *cf) {
   FILE *FCFG = NULL;
   if ((FCFG = fopen(cf, "r")) == NULL) {
@@ -2737,7 +2740,7 @@ void read_configuration_file(const char *cf) {
 //
 // Create files used for HTML display
 //
-void create_img_files() {
+void web_create_img_files() {
   char buf[BIGSTRSIZE];
 
   img_files[ST_UNDEF].var = st_undef;
@@ -3241,18 +3244,20 @@ int main(int argc, char *argv[]) {
     // rand() function used by get_unique_mime_boundary()
   srand(time(NULL));
 
-  parse_options(argc, argv);
-
   if ((errno = pthread_mutex_init(&mutex, NULL)) != 0) {
     char s_err[SMALLSTRSIZE];
     fatal_error("pthread_mutex_init(): %s", errno_error(s_err, sizeof(s_err)));
   }
+
+  parse_options(argc, argv);
 
   my_log_open();
   my_logs(LL_NORMAL, LP_NOTHING, "");
   my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_STRING " start");
 
   read_configuration_file(g_cfg_file);
+    // Match alerts as written in the alerts option of checks (checks[]) with
+    // defined alerts (alerts[])
   identify_alerts();
 
   int ii;
@@ -3291,7 +3296,7 @@ int main(int argc, char *argv[]) {
   alerts_display();
   config_display();
 
-  create_img_files();
+  web_create_img_files();
 
     // Just to call WSAStartup, yes!
   os_init_network();

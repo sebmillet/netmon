@@ -209,6 +209,6 @@ int execute_alert_smtp(const struct exec_alert_t *exec_alert);
 int execute_alert_program(const struct exec_alert_t *exec_alert);
 int execute_alert_log(const struct exec_alert_t *exec_alert);
 
-int perform_check_tcp(const struct check_t *chk);
-int perform_check_program(const struct check_t *chk);
+int perform_check_tcp(const struct check_t *chk, const struct subst_t *subst, int subst_len);
+int perform_check_program(const struct check_t *chk, const struct subst_t *subst, int subst_len);
 

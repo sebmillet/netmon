@@ -1,0 +1,7 @@
+test.sh
+log(log) -> d=Probe-tko, h=, s=Fail, cons=3, as=Fail, seq=1, nf=0
+log(log) -> d=Probe-tko, h=, s=Fail, cons=33, as=Fail, seq=2, nf=0
+log(log) -> d=Probe-tko, h=, s=Fail, cons=63, as=Fail, seq=3, nf=0
+log(log) -> d=Probe-tko, h=, s=Fail, cons=93, as=Fail, seq=4, nf=0
+log(log) -> d=Probe-tko, h=, s=Fail, cons=123, as=Fail, seq=5, nf=0
+log(log) -> d=Probe-tko, h=, s=Fail, cons=153, as=Fail, seq=6, nf=0
