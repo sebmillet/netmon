@@ -104,6 +104,10 @@ Check 'Test avec nom inconnu': unknown alert 'youpi'
    is_valid          = Yes
    name              = main
    method            = smtp
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
    SMTP/smart host = smtp1234.sfr.fr,smtp.sfr.fr
    SMTP/port       = <unset>
    SMTP/self       = localhostname
@@ -113,6 +117,10 @@ Check 'Test avec nom inconnu': unknown alert 'youpi'
    is_valid          = Yes
    name              = critical
    method            = smtp
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
    SMTP/smart host = localhost
    SMTP/port       = <unset>
    SMTP/self       = <unset>
@@ -122,54 +130,98 @@ Check 'Test avec nom inconnu': unknown alert 'youpi'
    is_valid          = Yes
    name              = prgtest1
    method            = program
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
    program/command   = allo
 !! alert #3 (will be ignored)
    is_valid          = No
    name              = prgtest2
    method            = program
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
    program/command   = <unset>
 !! alert #4 (will be ignored)
    is_valid          = No
    name              = prgtest3
    method            = program
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
    program/command   = <unset>
 !! alert #5 (will be ignored)
    is_valid          = No
    name              = prgtest4
    method            = program
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
    program/command   = <unset>
 !! alert #6 (will be ignored)
    is_valid          = No
    name              = <unset>
    method            = <unset>
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
 !! alert #7 (will be ignored)
    is_valid          = No
    name              = fake
    method            = <unset>
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
 == ALERT #8
    is_valid          = Yes
    name              = log1
    method            = log
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
    log/log_file      = yeslog
 !! alert #9 (will be ignored)
    is_valid          = No
    name              = log2
    method            = log
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
    log/log_file      = <unset>
 !! alert #10 (will be ignored)
    is_valid          = No
    name              = log3
    method            = log
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
    log/log_file      = <unset>
 == ALERT #11
    is_valid          = Yes
    name              = log4
    method            = log
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
    log/log_file      = eslog
 == ALERT #12
    is_valid          = Yes
    name              = sms
    method            = smtp
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
    SMTP/smart host = localhost
    SMTP/port       = 25
    SMTP/self       = <unset>
