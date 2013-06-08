@@ -1,4 +1,4 @@
-// netmon.h
+// main.h
 
 // Copyright Sébastien Millet, 2013
 

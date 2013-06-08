@@ -1,8 +1,8 @@
-// netmon.c
+// main.c
 
 // Copyright Sébastien Millet, 2013
 
-#include "netmon.h"
+#include "main.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -234,6 +234,7 @@ int g_html_file_set = FALSE;
 char g_html_complete_file_name[BIGSTRSIZE];
 
 #define CFGK_LIST_SEPARATOR ','
+#define CFGK_PORT_SEPARATOR ':'
 #define CFGK_COMMENT_CHAR ';'
 const char *CS_GENERAL_STR  = "general";
 const char *CS_CHECK_STR = "check";
@@ -345,261 +346,6 @@ int quitting = FALSE;
 long int loop_count = 0;
 
 pthread_mutex_t mutex;
-
-#if defined(_WIN32) || defined(_WIN64)
-
-
-  // * ******* *
-  // * WINDOWS *
-  // * ******* *
-
-const char FS_SEPARATOR = '\\';
-
-void os_sleep(long int seconds) {
-  unsigned long int msecs = (unsigned long int)seconds * 1000;
-  Sleep(msecs);
-}
-
-void os_set_sock_nonblocking_mode(int sock) {
-  u_long iMode = 1;
-  int iResult = ioctlsocket(sock, FIONBIO, &iMode);
-  if (iResult != NO_ERROR)
-    fatal_error("ioctlsocket failed with error: %ld", iResult);
-}
-
-void os_set_sock_blocking_mode(int sock) {
-  u_long iMode = 0;
-  int iResult = ioctlsocket(sock, FIONBIO, &iMode);
-  if (iResult != NO_ERROR)
-    fatal_error("ioctlsocket failed with error: %ld", iResult);
-}
-
-int os_last_err() {
-  int r = WSAGetLastError();
-  //WSACleanup();
-  return r;
-}
-
-char *os_last_err_desc(char *s, size_t s_bufsize) {
-  LPVOID lpMsgBuf;
-  DWORD last_err = WSAGetLastError();
-  FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-    NULL, last_err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, NULL);
-  char tmp[ERR_STR_BUFSIZE];
-  strncpy(tmp, (char *)lpMsgBuf, sizeof(tmp));
-  int n = strlen(tmp);
-  if (n >= 2) {
-    if (tmp[n - 2] == '\r' && tmp[n - 1] == '\n')
-      tmp[n - 2] = '\0';
-  }
-  snprintf(s, s_bufsize, "code=%lu (%s)", last_err, tmp);
-  //WSACleanup();
-  return s;
-}
-
-void os_init_network() {
-  WSADATA wsaData;
-  int e;
-  char s_err[ERR_STR_BUFSIZE];
-  if ((e = WSAStartup(MAKEWORD(2, 2), &wsaData)) != 0) {
-    fatal_error("WSAStartup() returned value %i, error: %s", e, os_last_err_desc(s_err, sizeof(s_err)));
-    WSACleanup();
-  }
-}
-
-int os_last_network_op_is_in_progress() {
-  return (WSAGetLastError() == WSAEINPROGRESS || WSAGetLastError() == WSAEWOULDBLOCK);
-}
-
-void os_closesocket(int sock) {
-  closesocket(sock);
-}
-
-int add_reader_access_right(const char *f) {
-  return 0;
-}
-
-#define strcasecmp _stricmp
-#define strncasecmp _strnicmp
-
-#else
-
-
-  // * *********** *
-  // * NOT WINDOWS *
-  // * *********** *
-
-const char FS_SEPARATOR = '/';
-
-void os_sleep(long int seconds) {
-  sleep(seconds);
-}
-
-void os_set_sock_nonblocking_mode(int sock) {
-  long arg = fcntl(sock, F_GETFL, NULL);
-  arg |= O_NONBLOCK;
-  fcntl(sock, F_SETFL, arg);
-}
-
-void os_set_sock_blocking_mode(int sock) {
-  long arg = fcntl(sock, F_GETFL, NULL);
-  arg &= ~O_NONBLOCK;
-  fcntl(sock, F_SETFL, arg);
-}
-
-int os_last_err() {
-  return errno;
-}
-
-char *os_last_err_desc(char *s, size_t s_bufsize) {
-  snprintf(s, s_bufsize, "code=%i (%s)", errno, strerror(errno));
-  return s;
-}
-
-void os_init_network() {
-  signal(SIGPIPE, SIG_IGN);
-}
-
-int os_last_network_op_is_in_progress() {
-  return (errno == EINPROGRESS);
-}
-
-void os_closesocket(int sock) {
-  close(sock);
-}
-
-int add_reader_access_right(const char *f) {
-  struct stat s;
-  int r = 0;
-  if (!stat(f, &s)) {
-    s.st_mode |= S_IRUSR | S_IRGRP | S_IROTH;
-    r = chmod(f, s.st_mode);
-  }
-  if (r) {
-    char s_err[SMALLSTRSIZE];
-    errno_error(s_err, sizeof(s_err));
-    my_logf(LL_ERROR, LP_DATETIME, "Unable to change mode of file '%s': ", f, s_err);
-  }
-  return -1;
-}
-
-#endif
-
-
-  // * *** *
-  // * ALL *
-  // * *** *
-
-#ifdef DEBUG
-void dbg_write(const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  vprintf(fmt, args);
-  va_end(args);
-}
-#else
-#define dbg_write(...)
-#endif
-
-void my_pthread_mutex_lock(pthread_mutex_t *m) {
-  char s_err[SMALLSTRSIZE];
-  if ((errno = pthread_mutex_lock(m)) != 0)
-    fatal_error("pthread_mutex_lock(): %s", errno_error(s_err, sizeof(s_err)));
-}
-
-void my_pthread_mutex_unlock(pthread_mutex_t *m) {
-  char s_err[SMALLSTRSIZE];
-  if ((errno = pthread_mutex_unlock(m)) != 0)
-    fatal_error("pthread_mutex_unlock(): %s", errno_error(s_err, sizeof(s_err)));
-}
-
-//
-// Converts errno into a readable string
-//
-char *errno_error(char *s, size_t s_len) {
-  snprintf(s, s_len, "Error %i, %s", errno, strerror(errno));
-  return s;
-}
-
-//
-// My implementation of getline()
-//
-ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
-
-#define MY_GETLINE_INITIAL_ALLOCATE 30
-#define MY_GETLINE_MIN_INCREASE     30
-#define MY_GETLINE_COEF_INCREASE    1
-
-  if (*lineptr == NULL || *n == 0) {
-    *n = MY_GETLINE_INITIAL_ALLOCATE;
-    *lineptr = (char *)malloc(*n);
-    if (*lineptr == NULL) {
-      errno = ENOMEM;
-      return -1;
-    }
-  }
-  char *write_head = *lineptr;
-  size_t char_read = 0;
-  int c;
-  while (1) {
-
-      // Check there's enough memory to store read characters
-    if (*n - char_read <= 2) {
-      size_t increase = *n * MY_GETLINE_COEF_INCREASE;
-      if (increase < MY_GETLINE_MIN_INCREASE)
-        increase = MY_GETLINE_MIN_INCREASE;
-        (*n) += increase;
-
-      char *old_lineptr = *lineptr;
-      *lineptr = (char *)realloc(*lineptr, *n);
-      write_head += (*lineptr - old_lineptr);
-
-      if (*lineptr == NULL) {
-        errno = ENOMEM;
-        return -1;
-      }
-    }
-
-      // Now read one character from stream
-    c = getc(stream);
-
-/*    dbg_write("Char: %i (%c) [*n = %lu]\n", c, c, *n);*/
-
-      // Deal with /IO error
-    if (ferror(stream) != 0)
-      return -1;
-
-      // Deal with end of file
-    if (c == EOF) {
-      if (char_read == 0)
-        return -1;
-      else
-        break;
-    }
-
-    *write_head++ = c;
-    ++char_read;
-
-      // Deal with newline character
-    if (c == '\n' || c == '\r')
-      break;
-  }
-
-  *write_head = '\0';
-  return char_read;
-}
-
-//
-// concatene a path and a file name
-//
-void fs_concatene(char *dst, const char *src, size_t dst_len) {
-  char t[2] = "\0";
-  t[0] = FS_SEPARATOR;
-  if (dst[strlen(dst) - 1] != FS_SEPARATOR)
-    strncat(dst, t, dst_len);
-  strncat(dst, src, dst_len);
-  dst[dst_len - 1] = '\0';
-}
 
 //
 // Destroy a check struct
@@ -1499,11 +1245,8 @@ void get_rfc822_header_format_current_date(char *date, size_t date_len) {
 //
 // Used by execute_alert_smtp
 //
-int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, const char *smart_host, int port) {
+int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, const char *smart_host, int port, const char *prefix) {
   struct alert_t *alrt = exec_alert->alrt;
-
-  char prefix[SMALLSTRSIZE];
-  snprintf(prefix, sizeof(prefix), "SMTP alert(%s):", alrt->name);
 
   int sock;
   my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, smart_host, port);
@@ -1644,12 +1387,54 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
 // Execute alert when method == AM_SMTP
 //
 int execute_alert_smtp(const struct exec_alert_t *exec_alert) {
-  const char *h = exec_alert->alrt->smtp_smarthost;
-  int port = exec_alert->alrt->smtp_port_set ? exec_alert->alrt->smtp_port : DEFAULT_ALERT_SMTP_PORT;
+  char prefix[SMALLSTRSIZE];
 
-  int err_smtp = core_execute_alert_smtp_one_host(exec_alert, h, port);
+  size_t l = strlen(exec_alert->alrt->smtp_smarthost) + 1;
+  char *smart_hosts = (char *)malloc(l);
+  strncpy(smart_hosts, exec_alert->alrt->smtp_smarthost, l);
+  char *h = smart_hosts;
+  char *next = NULL;
 
-  return err_smtp;
+  int port;
+  int nb_attempts_done = 0;
+  int err_smtp = ERR_SMTP_OK + 1;
+  int smart_host_number = 0;
+  while (*h != '\0' && err_smtp != ERR_SMTP_OK) {
+    smart_host_number++;
+    if (smart_host_number == 1)
+      snprintf(prefix, sizeof(prefix), "SMTP alert(%s):", exec_alert->alrt->name);
+    else
+      snprintf(prefix, sizeof(prefix), "SMTP alert(%s)[%i]:", exec_alert->alrt->name, smart_host_number);
+
+    if ((next = strchr(h, CFGK_LIST_SEPARATOR)) != NULL) {
+      *next = '\0';
+      ++next;
+    }
+    char *col = strchr(h, CFGK_PORT_SEPARATOR);
+    if (col != NULL) {
+      *col = '\0';
+      char *strport = col + 1;
+      strport = trim(strport);
+      port = atoi(strport);
+    } else {
+      port = exec_alert->alrt->smtp_port_set ? exec_alert->alrt->smtp_port : DEFAULT_ALERT_SMTP_PORT;
+    }
+    h = trim(h);
+
+    my_logf(LL_DEBUG, LP_DATETIME, "%s will attempt SMTP connection", prefix);
+
+    if (port < 1) {
+      my_logf(LL_ERROR, LP_DATETIME, "%s invalid port number (%s:%i)", prefix, h, port);
+    } else {
+      nb_attempts_done++;
+      err_smtp = core_execute_alert_smtp_one_host(exec_alert, h, port, prefix);
+    }
+
+    h = (next == NULL ? &h[strlen(h)] : next);
+  }
+  free (smart_hosts);
+
+  return nb_attempts_done == 0 ? -1 : err_smtp;
 }
 
 //
