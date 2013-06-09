@@ -49,8 +49,9 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_netmon_OBJECTS = netmon.$(OBJEXT) st-undef.$(OBJEXT) \
-	st-unknown.$(OBJEXT) st-ok.$(OBJEXT) st-fail.$(OBJEXT)
+am_netmon_OBJECTS = main.$(OBJEXT) util.$(OBJEXT) webserver.$(OBJEXT) \
+	st-undef.$(OBJEXT) st-unknown.$(OBJEXT) st-ok.$(OBJEXT) \
+	st-fail.$(OBJEXT)
 netmon_OBJECTS = $(am_netmon_OBJECTS)
 netmon_LDADD = $(LDADD)
 netmon_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(netmon_LDFLAGS) \
@@ -162,7 +163,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-netmon_SOURCES = netmon.c netmon.h \
+netmon_SOURCES = main.c main.h util.c util.h webserver.c \
 	img/st-undef.png img/st-undef.c \
 	img/st-unknown.png img/st-unknown.c \
 	img/st-ok.png img/st-ok.c \
@@ -250,11 +251,13 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netmon.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/st-fail.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/st-ok.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/st-undef.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/st-unknown.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/util.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/webserver.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

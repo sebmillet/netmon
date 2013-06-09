@@ -19,9 +19,6 @@
 typedef int socklen_t;
 #endif
 
-#define FALSE 0
-#define TRUE  1
-
 #define BIND_ERROR -1
 #define LISTEN_ERROR -1
 #define ACCEPT_ERROR -1
@@ -30,12 +27,6 @@ typedef int socklen_t;
 #define RECV_ERROR -1
 #define SEND_ERROR -1
 #define SETSOCKOPT_ERROR -1
-#define GETTIMEOFDAY_ERROR -1
-
-  // Level of log
-typedef enum {LL_ERROR = -1, LL_WARNING = 0, LL_NORMAL = 1, LL_VERBOSE = 2, LL_DEBUG = 3} loglevel_t;
-  // Type of prefix output in the log
-typedef enum {LP_DATETIME, LP_NOTHING, LP_INDENT} logdisp_t;
 
 void os_set_sock_nonblocking_mode(int sock);
 void os_set_sock_blocking_mode(int sock);
@@ -45,19 +36,19 @@ void os_init_network();
 int os_last_network_op_is_in_progress();
 void os_closesocket(int sock);
 
-void fatal_error(const char *format, ...);
-void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *format, ...);
-char *errno_error(char *s, size_t s_len);
-
-struct subst_t {
-  const char *find;
-  const char *replace;
-};
-
+enum {ST_UNDEF = 0, ST_UNKNOWN = 1, ST_OK = 2, ST_FAIL = 3, _ST_LAST = 3, _ST_NBELEMS = 4};
 enum {EC_OK, EC_RESOLVE_ERROR, EC_CONNECTION_ERROR, EC_UNEXPECTED_ANSWER};
 enum {SRT_SUCCESS, SRT_SOCKET_ERROR, SRT_UNEXPECTED_ANSWER};
 enum {ERR_SMTP_OK = 0, ERR_SMTP_RESOLVE_ERROR, ERR_SMTP_NETIO, ERR_SMTP_BAD_ANSWER_TO_EHLO, ERR_SMTP_SENDER_REJECTED, ERR_SMTP_NO_RECIPIENT_ACCEPTED,
   ERR_SMTP_DATA_COMMAND_REJECTED};
+
+  // Used for HTML page image files (small icons giving the status
+  // of an entry)
+struct img_file_t {
+  const char *file_name;
+  const char *var;
+  size_t var_len;
+};
 
 struct alert_ctrl_t {
   int idx;
@@ -66,7 +57,38 @@ struct alert_ctrl_t {
   int nb_failures;
 };
 
+struct rfc821_enveloppe_t {
+  char *smarthost;
+  long int port;
+  char *self;
+  char *sender;
+  char *recipients;
+  long int connect_timeout;
+  int smarthost_set;
+  int port_set;
+  int self_set;
+  int sender_set;
+  int recipients_set;
+  int connect_timeout_set;
+};
+
+struct pop3_account_t {
+  char *server;
+  long int port;
+  char *user;
+  char *password;
+  long int connect_timeout;
+  int server_set;
+  int port_set;
+  int user_set;
+  int password_set;
+  int connect_timeout_set;
+};
+
 struct check_t {
+
+// 1. Defined at build time
+
   int is_valid;
 
   long int method;
@@ -88,6 +110,11 @@ struct check_t {
   char *prg_command;
   int prg_command_set;
 
+    // CM_LOOP method
+  struct rfc821_enveloppe_t loop_smtp;
+  struct pop3_account_t loop_pop3;
+
+    // Common to all methods
   char *alerts;
   long int alert_threshold;
   long int alert_repeat_every;
@@ -103,17 +130,13 @@ struct check_t {
   int alert_repeat_max_set;
   int alert_recovery_set;
 
+// 2. Updatable
+
   int status;
   int prev_status;
-    // Format is hh:mm
-//  char time_last_status_change[6];
-    // Format is dd/mm hh:mm
-//  char datetime_alert_info[12];
   int last_status_change_flag;
   struct tm last_status_change;
   struct tm alert_info;
-//  int h_time_last_status_change;
-//  int m_time_last_status_change;
 
   char *str_prev_status;
 
@@ -124,11 +147,9 @@ struct alert_t {
   int is_valid;
 
   char *name;
-//  char *method_name;
   long int method;
 
   int name_set;
-//  int method_name_set;
   int method_set;
 
   long int threshold;
@@ -143,18 +164,7 @@ struct alert_t {
   int retries_set;
 
     // "smtp" method
-  char *smtp_smarthost;
-  long int smtp_port;
-  char *smtp_self;
-  char *smtp_sender;
-  char *smtp_recipients;
-  long int smtp_connect_timeout;
-  int smtp_smarthost_set;
-  int smtp_port_set;
-  int smtp_self_set;
-  int smtp_sender_set;
-  int smtp_recipients_set;
-  int smtp_connect_timeout_set;
+  struct rfc821_enveloppe_t smtp_env;
 
     // "program" method
   char *prg_command;
@@ -211,4 +221,7 @@ int execute_alert_log(const struct exec_alert_t *exec_alert);
 
 int perform_check_tcp(const struct check_t *chk, const struct subst_t *subst, int subst_len);
 int perform_check_program(const struct check_t *chk, const struct subst_t *subst, int subst_len);
+
+  // From webserver.c
+void *webserver(void *p);
 

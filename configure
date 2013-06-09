@@ -565,7 +565,7 @@ PACKAGE_STRING='netmon 1.0'
 PACKAGE_BUGREPORT='sebastien.millet1@club-internet.fr'
 PACKAGE_URL=''
 
-ac_unique_file="src/netmon.h"
+ac_unique_file="src/main.h"
 # Factoring default headers for most tests.
 ac_includes_default="\
 #include <stdio.h>

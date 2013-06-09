@@ -7,7 +7,7 @@ AC_PREREQ([2.68])
 
 AC_INIT([netmon], [1.0], [sebastien.millet1@club-internet.fr])
 
-AC_CONFIG_SRCDIR([src/netmon.h])
+AC_CONFIG_SRCDIR([src/main.h])
 AC_CONFIG_AUX_DIR([admin])
 
 AC_CANONICAL_BUILD

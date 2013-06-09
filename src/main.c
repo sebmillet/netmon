@@ -3,25 +3,17 @@
 // Copyright Sébastien Millet, 2013
 
 #include "main.h"
+#include "util.h"
 
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/time.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <pthread.h>
+#include <signal.h>
+#include <getopt.h>
 
 /*#define DEBUG*/
 
-loglevel_t g_current_log_level = LL_NORMAL;
-
-#define DEFAULT_DATE_FORMAT DF_FRENCH
-#define DEFAULT_LOG_USEC TRUE
 #define DEFAULT_CHECK_INTERVAL 120
 #define DEFAULT_NB_KEEP_LAST_STATUS 15
 #define DEFAULT_DISPLAY_NAME_WIDTH 20
@@ -35,27 +27,13 @@ loglevel_t g_current_log_level = LL_NORMAL;
 #define DEFAULT_ALERT_SMTP_SELF PACKAGE_TARNAME
 #define DEFAULT_ALERT_LOG_STRING "${NOW_TIMESTAMP}  ${DESCRIPTION}"
 #define DEFAULT_CONNECT_TIMEOUT 5
-#define DEFAULT_PRINT_SUBST_ERROR FALSE
-#define SUBST_ERROR_PREFIX  "?"
-#define SUBST_ERROR_POSTFIX "?"
 #define LAST_STATUS_CHANGE_DISPLAY_SECONDS  (60 * 60 * 23)
 
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
 const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
 
-#define DEFAULT_HTML_REFRESH_PERIOD 20
-#define DEFAULT_HTML_NB_COLUMNS 2
+const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
 
-#define WEBSERVER_LOG_PREFIX  "WEBSERVER"
-#if defined(_WIN32) || defined(_WIN64)
-#define DEFAULT_WEBSERVER_ON TRUE
-#define DEFAULT_WEBSERVER_PORT 80
-#else
-#define DEFAULT_WEBSERVER_ON FALSE
-#define DEFAULT_WEBSERVER_PORT 8080
-#endif
-
-#define LOG_AFTER_TIMESTAMP "  "
 #define PREFIX_RECEIVED "<<< "
 #define PREFIX_SENT ">>> "
 
@@ -71,17 +49,11 @@ enum {_NAGIOS_FIRST = 0, NAGIOS_OK = 0, NAGIOS_WARNING = 1, NAGIOS_CRITICAL = 2,
 
   // WINDOWS
 
-#define DEFAULT_HTML_DIRECTORY (".")
-#define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
-
 #include <winsock2.h>
 
 #else
 
   // NOT WINDOWS
-
-#define DEFAULT_HTML_DIRECTORY (".")
-#define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -90,16 +62,6 @@ enum {_NAGIOS_FIRST = 0, NAGIOS_OK = 0, NAGIOS_WARNING = 1, NAGIOS_CRITICAL = 2,
 
 #endif
 
-#include <signal.h>
-#include <ctype.h>
-#include <getopt.h>
-#include <time.h>
-
-#define SMALLSTRSIZE  200
-#define BIGSTRSIZE    1000
-
-#define REGULAR_STR_STRBUFSIZE 2000
-#define ERR_STR_BUFSIZE 200
 #define DEFAULT_BUFFER_SIZE 10000
   // Maximum size of an input line in the TCP connection
 #define MAX_READLINE_SIZE 10000
@@ -116,7 +78,6 @@ const char *alert_status_names[] = {
   "Recovery"  // AS_RECOVERY
 };
 
-enum {ST_UNDEF = 0, ST_UNKNOWN = 1, ST_OK = 2, ST_FAIL = 3, ST_LAST = 3};
 const char ST_TO_CHAR[] = {
   ' ', // ST_UNDEF
   '?', // ST_UNKNOWN
@@ -142,57 +103,35 @@ const char *ST_TO_LONGSTR_SIMPLE[] = {
   "Fail"        // ST_FAIL
 };
 
-struct img_file_t {
-  const char *file_name;
-  const char *var;
-  size_t var_len;
-};
-struct img_file_t img_files[] = {
-  {"st-undef.png", NULL, 0},    // ST_UNDEF
-  {"st-unknown.png", NULL, 0},  // ST_UNKNOWN
-  {"st-ok.png", NULL, 0},       // ST_OK
-  {"st-fail.png", NULL, 0}      // ST_FAIL
-};
-
-const char *ST_TO_BGCOLOR_FORHTML[] = {
-  "#FFFFFF", // ST_UNDEF
-  "#B0B0B0", // ST_UNKNOWN
-  "#00FF00", // ST_OK
-  "#FF0000"  // ST_FAIL
-};
-
 
 //
-// HTML & WEB SERVER
+// Web Server
 //
-
-char g_html_title[SMALLSTRSIZE] = PACKAGE_STRING;
-int g_html_title_set = FALSE;
-
-long int g_html_refresh_interval = DEFAULT_HTML_REFRESH_PERIOD;
+extern long int g_html_refresh_interval;
 int g_html_refresh_interval_set = FALSE;
 
-long int g_html_nb_columns = DEFAULT_HTML_NB_COLUMNS;
+extern char g_html_title[SMALLSTRSIZE];
+int g_html_title_set = FALSE;
+
+extern long int g_html_nb_columns;
 int g_html_nb_columns_set = FALSE;
 
-long int g_webserver_on = DEFAULT_WEBSERVER_ON;
+extern long int g_webserver_on;
 int g_webserver_on_set = FALSE;
-long int g_webserver_port = DEFAULT_WEBSERVER_PORT;
+
+extern long int g_webserver_port;
 int g_webserver_port_set = FALSE;
 
-extern char const st_undef[];
-extern size_t const st_undef_len;
-extern char const st_unknown[];
-extern size_t const st_unknown_len;
-extern char const st_ok[];
-extern size_t const st_ok_len;
-extern char const st_fail[];
-extern size_t const st_fail_len;
-
+extern const char *ST_TO_BGCOLOR_FORHTML[];
+struct img_file_t img_files[_ST_NBELEMS];
 
 //
 // CONFIG
 //
+
+extern loglevel_t g_current_log_level;
+
+extern char g_log_file[SMALLSTRSIZE];
 
 struct check_t checks[2000];
 int g_nb_checks = 0;
@@ -202,7 +141,6 @@ struct alert_t alerts[100];
 int g_nb_alerts = 0;
 int g_nb_valid_alerts = 0;
 
-char g_log_file[SMALLSTRSIZE];
 char g_cfg_file[SMALLSTRSIZE];
 
 char g_test_alert[SMALLSTRSIZE];
@@ -212,7 +150,7 @@ int g_check_interval_set = FALSE;
 long int g_nb_keep_last_status = -1;
 int g_nb_keep_last_status_set = FALSE;
 
-long int g_print_subst_error = DEFAULT_PRINT_SUBST_ERROR;
+extern long int g_print_subst_error;
 int g_print_subst_error_set = FALSE;
 
 long int g_display_name_width = DEFAULT_DISPLAY_NAME_WIDTH;
@@ -223,13 +161,14 @@ int g_buffer_size_set = FALSE;
 long int g_connect_timeout = DEFAULT_CONNECT_TIMEOUT;
 int g_connect_timeout_set = FALSE;
 int telnet_log = FALSE;
-int g_print_log = FALSE;
+
+extern int g_print_log;
 int g_print_status = FALSE;
 int g_test_mode = 0;
 
-char g_html_directory[BIGSTRSIZE] = DEFAULT_HTML_DIRECTORY;
+extern char g_html_directory[BIGSTRSIZE];
 int g_html_directory_set = FALSE;
-char g_html_file[SMALLSTRSIZE] = DEFAULT_HTML_FILE;
+extern char g_html_file[SMALLSTRSIZE];
 int g_html_file_set = FALSE;
 char g_html_complete_file_name[BIGSTRSIZE];
 
@@ -254,10 +193,11 @@ int (*alert_func[]) (const struct exec_alert_t *) = {
   execute_alert_log       // AM_LOG
 };
 
-enum {CM_UNDEF = FIND_STRING_NOT_FOUND, CM_TCP = 0, CM_PROGRAM = 1};
+enum {CM_UNDEF = FIND_STRING_NOT_FOUND, CM_TCP = 0, CM_PROGRAM = 1, CM_LOOP = 2};
 const char *l_check_methods[] = {
   "tcp",      // CM_TCP
-  "program"   // CM_PROGRAM
+  "program",  // CM_PROGRAM
+  "loop"      // CM_LOOP
 };
 int (*check_func[]) (const struct check_t *, const struct subst_t *, int) = {
   perform_check_tcp,    // CM_TCP
@@ -270,33 +210,68 @@ const char *l_yesno[] = {
   "no"    // ID_NO
 };
 
-long int g_log_usec = DEFAULT_LOG_USEC;
+extern long int g_log_usec;
 int g_log_usec_set = FALSE;
 long int g_date_format;
 int g_date_format_set = FALSE;
-enum {DF_FRENCH = 0, DF_ENGLISH = 1};
-int g_date_df = (DEFAULT_DATE_FORMAT == DF_FRENCH);
+extern int g_date_df;
 const char *l_date_formats[] = {
   "french", // DF_FENCH
   "english" // DF_ENGLISH
 };
 
+
+//
+// All variabls found in the ini file
+//
 struct check_t chk00;
 struct alert_t alrt00;
 const struct readcfg_var_t readcfg_vars[] = {
+
+// CHECKS
+
   {"method", V_STRKEY, CS_PROBE, &chk00.method, NULL, NULL, 0, &chk00.method_set, FALSE, l_check_methods,
     sizeof(l_check_methods) / sizeof(*l_check_methods)},
   {"display_name", V_STR, CS_PROBE, NULL, &(chk00.display_name), NULL, 0, &(chk00.display_name_set), FALSE, NULL, 0},
   {"host_name", V_STR, CS_PROBE, NULL, &(chk00.host_name), NULL, 0, &(chk00.host_name_set), FALSE, NULL, 0},
+
+// CHCKS -> TCP method
+
   {"tcp_port", V_INT, CS_PROBE, &(chk00.tcp_port), NULL, NULL, 0, &(chk00.tcp_port_set), FALSE, NULL, 0},
   {"tcp_connect_timeout", V_INT, CS_PROBE, &(chk00.tcp_connect_timeout), NULL, NULL, 0, &(chk00.tcp_connect_timeout_set), FALSE, NULL, 0},
   {"tcp_expect", V_STR, CS_PROBE, NULL, &(chk00.tcp_expect), NULL, 0, &(chk00.tcp_expect_set), FALSE, NULL, 0},
+
+// CHECKS -> PROGRAM method
+
   {"program_command", V_STR, CS_PROBE, NULL, &(chk00.prg_command), NULL, 0, &(chk00.prg_command_set), FALSE, NULL, 0},
+
+// CHECKS -> LOOP method
+
+  {"loop_smtp_smart_host", V_STR, CS_PROBE, NULL, &chk00.loop_smtp.smarthost, NULL, 0,
+    &chk00.loop_smtp.smarthost_set, FALSE, NULL, 0},
+  {"loop_smtp_port", V_INT, CS_PROBE, &chk00.loop_smtp.port, NULL, NULL, 0, &chk00.loop_smtp.port_set, FALSE, NULL, 0},
+  {"loop_smtp_self", V_STR, CS_PROBE, NULL, &chk00.loop_smtp.self, NULL, 0, &chk00.loop_smtp.self_set, FALSE, NULL, 0},
+  {"loop_smtp_sender", V_STR, CS_PROBE, NULL, &chk00.loop_smtp.sender, NULL, 0, &chk00.loop_smtp.sender_set, TRUE, NULL, 0},
+  {"loop_smtp_recipients", V_STR, CS_PROBE, NULL, &chk00.loop_smtp.recipients, NULL, 0, &chk00.loop_smtp.recipients_set, FALSE, NULL, 0},
+  {"loop_smtp_connect_timeout", V_INT, CS_PROBE, &chk00.loop_smtp.connect_timeout, NULL, NULL, 0,
+    &chk00.loop_smtp.connect_timeout_set, FALSE, NULL, 0},
+  {"loop_pop3_server", V_STR, CS_PROBE, NULL, &chk00.loop_pop3.server, NULL, 0, &chk00.loop_pop3.server_set, FALSE, NULL, 0},
+  {"loop_pop3_port", V_INT, CS_PROBE, &chk00.loop_pop3.port, NULL, NULL, 0, &chk00.loop_pop3.port_set, FALSE, NULL, 0},
+  {"loop_pop3_user", V_STR, CS_PROBE, NULL, &chk00.loop_pop3.user, NULL, 0, &chk00.loop_pop3.user_set, FALSE, NULL, 0},
+  {"loop_pop3_password", V_STR, CS_PROBE, NULL, &chk00.loop_pop3.password, NULL, 0, &chk00.loop_pop3.password_set, FALSE, NULL, 0},
+  {"loop_pop3_connect_timeout", V_INT, CS_PROBE, &chk00.loop_pop3.connect_timeout, NULL, NULL, 0,
+    &chk00.loop_pop3.connect_timeout_set, FALSE, NULL, 0},
+
+// CHECKS -> alerts
+
   {"alerts", V_STR, CS_PROBE, NULL, &(chk00.alerts), NULL, 0, &(chk00.alerts_set), FALSE, NULL, 0},
   {"alert_threshold", V_INT, CS_PROBE, &(chk00.alert_threshold), NULL, NULL, 0, &(chk00.alert_threshold_set), FALSE, NULL, 0},
   {"alert_repeat_every", V_INT, CS_PROBE, &(chk00.alert_repeat_every), NULL, NULL, 0, &(chk00.alert_repeat_every_set), FALSE, NULL, 0},
   {"alert_repeat_max", V_INT, CS_PROBE, &(chk00.alert_repeat_max), NULL, NULL, 0, &(chk00.alert_repeat_max_set), TRUE, NULL, 0},
   {"alert_recovery", V_YESNO, CS_PROBE, &(chk00.alert_recovery), NULL, NULL, 0, &(chk00.alert_recovery_set), FALSE, NULL, 0},
+
+// GENERAL
+
   {"date_format", V_STRKEY, CS_GENERAL, &g_date_format, NULL, NULL, 0, &g_date_format_set, FALSE, l_date_formats,
     sizeof(l_date_formats) / sizeof(*l_date_formats)},
   {"print_subst_error", V_YESNO, CS_GENERAL, &g_print_subst_error, NULL, NULL, 0, &g_print_subst_error_set, FALSE, NULL, 0},
@@ -313,6 +288,9 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"html_nb_columns", V_INT, CS_GENERAL, &g_html_nb_columns, NULL, NULL, 0, &g_html_nb_columns_set, FALSE, NULL, 0},
   {"webserver_on", V_YESNO, CS_GENERAL, &g_webserver_on, NULL, NULL, 0, &g_webserver_on_set, FALSE, NULL, 0},
   {"webserver_port", V_INT, CS_GENERAL, &g_webserver_port, NULL, NULL, 0, &g_webserver_port_set, FALSE, NULL, 0},
+
+// ALERTS
+
   {"name", V_STR, CS_ALERT, NULL, &alrt00.name, NULL, 0, &alrt00.name_set, FALSE, NULL, 0},
   {"method", V_STRKEY, CS_ALERT, &alrt00.method, NULL, NULL, 0, &alrt00.method_set, FALSE, l_alert_methods,
     sizeof(l_alert_methods) / sizeof(*l_alert_methods)},
@@ -321,13 +299,25 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"repeat_max", V_INT, CS_ALERT, &(alrt00.repeat_max), NULL, NULL, 0, &(alrt00.repeat_max_set), TRUE, NULL, 0},
   {"recovery", V_YESNO, CS_ALERT, &(alrt00.recovery), NULL, NULL, 0, &(alrt00.recovery_set), FALSE, NULL, 0},
   {"retries", V_INT, CS_ALERT, &(alrt00.retries), NULL, NULL, 0, &(alrt00.retries_set), TRUE, NULL, 0},
-  {"smtp_smart_host", V_STR, CS_ALERT, NULL, &alrt00.smtp_smarthost, NULL, 0, &alrt00.smtp_smarthost_set, FALSE, NULL, 0},
-  {"smtp_port", V_INT, CS_ALERT, &alrt00.smtp_port, NULL, NULL, 0, &alrt00.smtp_port_set, FALSE, NULL, 0},
-  {"smtp_self", V_STR, CS_ALERT, NULL, &alrt00.smtp_self, NULL, 0, &alrt00.smtp_self_set, FALSE, NULL, 0},
-  {"smtp_sender", V_STR, CS_ALERT, NULL, &alrt00.smtp_sender, NULL, 0, &alrt00.smtp_sender_set, TRUE, NULL, 0},
-  {"smtp_recipients", V_STR, CS_ALERT, NULL, &alrt00.smtp_recipients, NULL, 0, &alrt00.smtp_recipients_set, FALSE, NULL, 0},
-  {"smtp_connect_timeout", V_INT, CS_ALERT, &alrt00.smtp_connect_timeout, NULL, NULL, 0, &alrt00.smtp_connect_timeout_set, FALSE, NULL, 0},
+
+// ALERTS -> SMTP method
+
+  {"smtp_smart_host", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.smarthost, NULL, 0,
+    &alrt00.smtp_env.smarthost_set, FALSE, NULL, 0},
+  {"smtp_port", V_INT, CS_ALERT, &alrt00.smtp_env.port, NULL, NULL, 0, &alrt00.smtp_env.port_set, FALSE, NULL, 0},
+  {"smtp_self", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.self, NULL, 0, &alrt00.smtp_env.self_set, FALSE, NULL, 0},
+  {"smtp_sender", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.sender, NULL, 0, &alrt00.smtp_env.sender_set, TRUE, NULL, 0},
+  {"smtp_recipients", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.recipients, NULL, 0,
+    &alrt00.smtp_env.recipients_set, FALSE, NULL, 0},
+  {"smtp_connect_timeout", V_INT, CS_ALERT, &alrt00.smtp_env.connect_timeout, NULL, NULL, 0,
+    &alrt00.smtp_env.connect_timeout_set, FALSE, NULL, 0},
+
+// ALERTS -> PROGRAM method
+
   {"program_command", V_STR, CS_ALERT, NULL, &alrt00.prg_command, NULL, 0, &alrt00.prg_command_set, FALSE, NULL, 0},
+
+// ALERTS -> LOG method
+
   {"log_file", V_STR, CS_ALERT, NULL, &alrt00.log_file, NULL, 0, &alrt00.log_file_set, FALSE, NULL, 0},
   {"log_string", V_STR, CS_ALERT, NULL, &alrt00.log_string, NULL, 0, &alrt00.log_string_set, FALSE, NULL, 0}
 };
@@ -337,7 +327,6 @@ const struct readcfg_var_t readcfg_vars[] = {
 // GENERAL
 //
 
-FILE *log_fd;
 int g_trace_network_traffic;
 
 int flag_interrupted = FALSE;
@@ -347,9 +336,26 @@ long int loop_count = 0;
 
 pthread_mutex_t mutex;
 
-//
-// Destroy a check struct
-//
+void rfc821_enveloppe_t_destroy(struct rfc821_enveloppe_t *s) {
+  if (s->smarthost != NULL)
+    free(s->smarthost);
+  if (s->self != NULL)
+    free(s->self);
+  if (s->sender != NULL)
+    free(s->sender);
+  if (s->recipients != NULL)
+    free(s->recipients);
+}
+
+void pop3_account_t_destroy(struct pop3_account_t *p) {
+  if (p->server != NULL)
+    free(p->server);
+  if (p->user != NULL)
+    free(p->user);
+  if (p->password != NULL)
+    free(p->password);
+}
+
 void check_t_destroy(struct check_t *chk) {
   if (chk->display_name != NULL)
     free(chk->display_name);
@@ -361,6 +367,9 @@ void check_t_destroy(struct check_t *chk) {
 
   if (chk->prg_command != NULL)
     free(chk->prg_command);
+  
+  rfc821_enveloppe_t_destroy(&chk->loop_smtp);
+  pop3_account_t_destroy(&chk->loop_pop3);
 
   if (chk->alerts != NULL)
     free(chk->alerts);
@@ -368,6 +377,39 @@ void check_t_destroy(struct check_t *chk) {
     free(chk->str_prev_status);
   if (chk->alert_ctrl != NULL)
     free(chk->alert_ctrl);
+}
+
+void rfc821_enveloppe_t_create(struct rfc821_enveloppe_t *smtp_env) {
+  smtp_env->smarthost_set = FALSE;
+  smtp_env->smarthost = NULL;
+
+  smtp_env->port_set = FALSE;
+
+  smtp_env->self_set = FALSE;
+  smtp_env->self = NULL;
+
+  smtp_env->sender_set = FALSE;
+  smtp_env->sender = NULL;
+
+  smtp_env->recipients_set = FALSE;
+  smtp_env->recipients = NULL;
+
+  smtp_env->connect_timeout_set = FALSE;
+}
+
+void pop3_account_t_create(struct pop3_account_t *p) {
+  p->server_set = FALSE;
+  p->server = NULL;
+
+  p->port_set = FALSE;
+
+  p->user_set = FALSE;
+  p->user = NULL;
+
+  p->password_set = FALSE;
+  p->password = NULL;
+
+  p->connect_timeout_set = FALSE;
 }
 
 //
@@ -394,6 +436,9 @@ void check_t_create(struct check_t *chk) {
 
   chk->prg_command = NULL;
   chk->prg_command_set = FALSE;
+
+  rfc821_enveloppe_t_create(&chk->loop_smtp);
+  pop3_account_t_create(&chk->loop_pop3);
 
   chk->alerts = NULL;
   chk->alerts_set = FALSE;
@@ -472,21 +517,7 @@ void alert_t_create(struct alert_t *alrt) {
 
     // SMTP
 
-  alrt->smtp_smarthost_set = FALSE;
-  alrt->smtp_smarthost = NULL;
-
-  alrt->smtp_port_set = FALSE;
-
-  alrt->smtp_self_set = FALSE;
-  alrt->smtp_self = NULL;
-
-  alrt->smtp_sender_set = FALSE;
-  alrt->smtp_sender = NULL;
-
-  alrt->smtp_recipients_set = FALSE;
-  alrt->smtp_recipients = NULL;
-
-  alrt->smtp_connect_timeout_set = FALSE;
+  rfc821_enveloppe_t_create(&alrt->smtp_env);
 
     // PROGRAM
 
@@ -498,303 +529,6 @@ void alert_t_create(struct alert_t *alrt) {
   alrt->log_file_set = FALSE;
   alrt->log_string = NULL;
   alrt->log_string_set = FALSE;
-}
-
-//
-// Finds a word in a table, return index found or -1 if not found.
-// Case insensitive search
-//
-int find_word(const char **table, int n, const char *elem) {
-  int i;
-  for (i = 0; i < n; ++i) {
-    if (strcasecmp(table[i], elem) == 0)
-      return i;
-  }
-  return -1;
-}
-
-//
-// Removes leading and traling spaces in a *MODIFYABLE* string.
-// To remove trailing spaces, it just writes '\0' after the last non-space
-// found from right to left.
-//
-char *trim(char *str) {
-  char *end;
-
-  while(isspace(*str)) str++;
-
-  if(*str == 0) {
-    return str;
-  }
-
-  end = str + strlen(str) - 1;
-  while (end > str && isspace(*end))
-    end--;
-
-  *(end + 1) = '\0';
-  return str;
-}
-
-//
-// Print an error in standard error and exit program
-// if exit_program is true.
-//
-void fatal_error(const char *format, ...) {
-  va_list args;
-  va_start(args, format);
-
-  char str[REGULAR_STR_STRBUFSIZE];
-  vsnprintf(str, sizeof(str), format, args);
-  strncat(str, "\n", sizeof(str));
-  fprintf(stderr, str, NULL);
-  va_end(args);
-  exit(EXIT_FAILURE);
-}
-
-//
-// Stops after an internal error
-//
-void internal_error(const char *desc, const char *source_file, const unsigned long int line) {
-  fatal_error("Internal error %s, file %s, line %lu", desc, source_file, line);
-}
-
-//
-// Initializes the program log
-//
-void my_log_open() {
-  if (strlen(g_log_file) >= 1)
-    log_fd = fopen(g_log_file, "a");
-  else
-    log_fd = NULL;
-}
-
-//
-// Closes the program log
-//
-void my_log_close() {
-  if (log_fd)
-    fclose(log_fd);
-}
-
-//
-// Do string substitution
-// The subst_t array can be NULL (meaning, no substitution to do), in that case n MUST be set to 0
-//
-char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
-  size_t sc_len = strlen(s) + 1;
-  char *sc = (char *)malloc(sc_len);
-  strncpy(sc, s, sc_len);
-
-  char var[SMALLSTRSIZE];
-  char var2[SMALLSTRSIZE];
-
-  char *p = sc;
-  for (; *p != '\0'; ++p) {
-    if (*p == '$' && *(p + 1) == '{') {
-      char *c = p + 2;
-      for (; *c != '}' && *c != '\0'; ++c)
-        ;
-      int l = c - p - 2;
-      if (*c == '}' && l >= 1) {
-        *c = '\0';
-        strncpy(var, p + 2, sizeof(var));
-        var[sizeof(var) - 1] = '\0';
-
-/*        dbg_write("Found variable '%s'\n", var);*/
-
-        int i;
-
-        if (g_print_subst_error) {
-          strncpy(var2, SUBST_ERROR_PREFIX, sizeof(var2));
-          strncat(var2, var, sizeof(var2));
-          strncat(var2, SUBST_ERROR_POSTFIX, sizeof(var2));
-        } else {
-          strncpy(var2, "", sizeof(var2));
-        }
-
-        char *rep = var2;
-        for (i = 0; i < n; ++i) {
-          if (strcasecmp(subst[i].find, var) == 0) {
-            rep = (char *)subst[i].replace;
-            break;
-          }
-        }
-
-/*        dbg_write("=== before: '%s'\n", sc);*/
-
-        size_t buf_len = strlen(c + 1) + 1;
-        char *buf = (char *)malloc(buf_len);
-        strncpy(buf, c + 1, buf_len);
-        *p = '\0';
-        size_t need_len = strlen(sc) + strlen(rep) + strlen(buf) + 1;
-        if (need_len > sc_len) {
-          char *new_sc = (char *)realloc(sc, need_len);
-
-/*          dbg_write("Reallocated from %lu to %lu\n", sc_len, need_len);*/
-
-          sc_len = need_len;
-          p += (new_sc - sc);
-          sc = new_sc;
-        }
-        strncat(sc, rep, sc_len);
-        strncat(sc, buf, sc_len);
-        free(buf);
-
-/*        dbg_write("=== after:  '%s'\n", sc);*/
-      }
-    }
-  }
-  return sc;
-}
-
-//
-// Get date/time of day
-//
-void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, int *minute, int *second,
-       long unsigned int *usec, long int *gmtoff) {
-  time_t ltime = time(NULL);
-  struct tm ts;
-  ts = *localtime(&ltime);
-
-  struct timeval tv;
-  struct timezone tz;
-  if (gettimeofday(&tv, &tz) == GETTIMEOFDAY_ERROR) {
-    char s_err[ERR_STR_BUFSIZE];
-    fatal_error("gettimeofday() error, %s", os_last_err_desc(s_err, sizeof(s_err)));
-  }
-
-  *wday = ts.tm_wday;
-  *year = ts.tm_year + 1900;
-  *month = ts.tm_mon + 1;
-  *day = ts.tm_mday;
-  *hour = ts.tm_hour;
-  *minute = ts.tm_min;
-  *second = ts.tm_sec;
-  *usec = tv.tv_usec;
-  *gmtoff = ts.tm_gmtoff;
-}
-
-//
-// Remplit la structure avec les date/heure actuelles
-void set_current_tm(struct tm *ts) {
-  time_t ltime = time(NULL);
-  *ts = *localtime(&ltime);
-}
-
-//
-// Date & time to str for network HTTP usage
-//
-char *my_ctime_r(const time_t *timep, char *buf, size_t buflen) {
-  my_pthread_mutex_lock(&mutex);
-
-  char *c = ctime(timep);
-  if (c == NULL)
-    return c;
-  strncpy(buf, c, buflen);
-  buf[buflen - 1] = '\0';
-  trim(buf);
-
-  my_pthread_mutex_unlock(&mutex);
-
-  return buf;
-}
-
-//
-//
-//
-#define STR_LOG_TIMESTAMP 25
-void set_log_timestamp(char *s, size_t s_len,
-                       int year, int month, int day, int hour, int minute, int second, long int usec) {
-  if (g_log_usec && usec >= 0) {
-    snprintf(s, s_len, "%02i/%02i/%02i %02i:%02i:%02i.%06lu", g_date_df ? day : month, g_date_df ? month : day,
-      year % 100, hour, minute, second, usec);
-  } else {
-    snprintf(s, s_len, "%02i/%02i/%02i %02i:%02i:%02i", g_date_df ? day : month, g_date_df ? month : day,
-      year % 100, hour, minute, second);
-  }
-  s[s_len - 1] = '\0';
-}
-
-//
-// Prepare prefix string, used by my_log only
-//
-void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt, size_t dt_len) {
-  int wday; int year; int month; int day;
-  int hour; int minute; int second; long unsigned int usec;
-  long int gmtoff;
-  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
-
-  set_log_timestamp(dt, dt_len, year, month, day, hour, minute, second, usec);
-  size_t l = strlen(dt);
-
-  if (log_disp == LP_NOTHING) {
-    strncpy(dt, "", l);
-  } else if (log_disp == LP_INDENT) {
-    memset(dt, ' ', l);
-  }
-}
-
-//
-// Output log string, used by my_log only
-//
-void my_log_core_output(const char *s, size_t dt_len) {
-  my_pthread_mutex_lock(&mutex);
-
-  if (log_fd) {
-    fputs(s, log_fd);
-    fputs("\n", log_fd);
-    fflush(log_fd);
-  }
-  if (g_print_log) {
-    const char *t = s;
-    size_t i = 0;
-    for (i = 0; i < dt_len; ++i) {
-      if (*t == '\0')
-        break;
-      ++t;
-    }
-    puts(t);
-    fflush(stdout);
-  }
-
-  my_pthread_mutex_unlock(&mutex);
-}
-
-//
-// Output a string in the program log
-//
-void my_logs(const loglevel_t log_level, const logdisp_t log_disp, const char *s) {
-  if (log_level > g_current_log_level)
-    return;
-
-  char dt[REGULAR_STR_STRBUFSIZE];
-
-  my_log_core_get_dt_str(log_disp, dt, sizeof(dt));
-  strncat(dt, LOG_AFTER_TIMESTAMP, sizeof(dt));
-  size_t dt_len = strlen(dt);
-  strncat(dt, s, sizeof(dt));
-  my_log_core_output(dt, dt_len);
-}
-
-//
-// Output a formatted string in the program log
-//
-void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *format, ...) {
-
-  if (log_level > g_current_log_level)
-    return;
-
-  char dt[REGULAR_STR_STRBUFSIZE];
-  char str[REGULAR_STR_STRBUFSIZE];
-  my_log_core_get_dt_str(log_disp, dt, sizeof(dt));
-  va_list args;
-  va_start(args, format);
-  vsnprintf(str, sizeof(str), format, args);
-  va_end(args);
-  strncat(dt, LOG_AFTER_TIMESTAMP, sizeof(dt));
-  size_t dt_len = strlen(dt);
-  strncat(dt, str, sizeof(dt));
-  my_log_core_output(dt, dt_len);
 }
 
 //
@@ -928,9 +662,7 @@ int socket_line_sendf(int *s, int trace, const char *fmt, ...) {
 
   strncat(tmp, "\015\012", l);
 
-  dbg_write("Mark 1168a\n");
   int e = send(*s, tmp, strlen(tmp), 0);
-  dbg_write("Mark 1168b\n");
 
   free(tmp);
 
@@ -993,7 +725,7 @@ int s_begins_with(const char *s, const char *begins_with) {
 //    dd/mm hh:mm:ss
 //
 #define STR_NOW 15
-void get_str_now(char *s, size_t s_len, struct tm *ts) {
+void get_str_now(char *s, size_t s_len, const struct tm *ts) {
   snprintf(s, s_len, "%02i/%02i %02i:%02i:%02i",
     g_date_df ? ts->tm_mday : ts->tm_mon + 1, g_date_df ? ts->tm_mon + 1 : ts->tm_mday, ts->tm_hour, ts->tm_min, ts->tm_sec);
 }
@@ -1251,12 +983,12 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
   int sock;
   my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, smart_host, port);
   int ec = establish_connection(smart_host, port, "220 ",
-    alrt->smtp_connect_timeout_set ? alrt->smtp_connect_timeout : g_connect_timeout, &sock);
+    alrt->smtp_env.connect_timeout_set ? alrt->smtp_env.connect_timeout : g_connect_timeout, &sock);
   if (ec != EC_OK)
     return (ec == EC_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR : ERR_SMTP_NETIO);
 
   if (socket_line_sendf(&sock, g_trace_network_traffic, "EHLO %s",
-      alrt->smtp_self_set ? alrt->smtp_self : DEFAULT_ALERT_SMTP_SELF)) {
+      alrt->smtp_env.self_set ? alrt->smtp_env.self : DEFAULT_ALERT_SMTP_SELF)) {
     return ERR_SMTP_NETIO;
   }
 
@@ -1271,7 +1003,7 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
     return ERR_SMTP_BAD_ANSWER_TO_EHLO;
   }
   char from_buf[SMALLSTRSIZE];
-  char *from_orig = alrt->smtp_sender_set ? alrt->smtp_sender : DEFAULT_ALERT_SMTP_SENDER;
+  char *from_orig = alrt->smtp_env.sender_set ? alrt->smtp_env.sender : DEFAULT_ALERT_SMTP_SENDER;
   strncpy(from_buf, from_orig, sizeof(from_buf));
   char *from = from_buf;
   from = smtp_address(from);
@@ -1281,9 +1013,9 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
   }
 
   int nb_ok_recipients = 0;
-  size_t l = strlen(alrt->smtp_recipients) + 1;
+  size_t l = strlen(alrt->smtp_env.recipients) + 1;
   char *recipients = (char *)malloc(l);
-  strncpy(recipients, alrt->smtp_recipients, l);
+  strncpy(recipients, alrt->smtp_env.recipients, l);
   char *r = recipients;
   char *next = NULL;
   while (*r != '\0') {
@@ -1318,7 +1050,7 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
     my_logf(LL_ERROR, LP_DATETIME, "%s DATA command not accepted, closing connection", prefix);
     return (res == SRT_SOCKET_ERROR ? ERR_SMTP_NETIO : ERR_SMTP_DATA_COMMAND_REJECTED);
   }
-  my_logf(LL_DEBUG, LP_DATETIME, "%s will now send email content", prefix);
+/*  my_logf(LL_DEBUG, LP_DATETIME, "%s will now send email content", prefix);*/
 
   char boundary[SMALLSTRSIZE];
   get_unique_mime_boundary(boundary, sizeof(boundary));
@@ -1332,7 +1064,7 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
     socket_line_sendf(&sock, g_trace_network_traffic, "sender: %s", from);
     socket_line_sendf(&sock, g_trace_network_traffic, "from: %s", from_orig);
   }
-  socket_line_sendf(&sock, g_trace_network_traffic, "to: %s", alrt->smtp_recipients);
+  socket_line_sendf(&sock, g_trace_network_traffic, "to: %s", alrt->smtp_env.recipients);
   socket_line_sendf(&sock, g_trace_network_traffic, "x-mailer: %s", PACKAGE_STRING);
   socket_line_sendf(&sock, g_trace_network_traffic, "subject: %s", exec_alert->desc);
   socket_line_sendf(&sock, g_trace_network_traffic, "date: %s", date);
@@ -1374,7 +1106,7 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
 
 // End
 
-  socket_line_sendf(&sock, g_trace_network_traffic, ".", alrt->smtp_recipients);
+  socket_line_sendf(&sock, g_trace_network_traffic, ".", alrt->smtp_env.recipients);
   socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
 
   os_closesocket(sock);
@@ -1389,9 +1121,9 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
 int execute_alert_smtp(const struct exec_alert_t *exec_alert) {
   char prefix[SMALLSTRSIZE];
 
-  size_t l = strlen(exec_alert->alrt->smtp_smarthost) + 1;
+  size_t l = strlen(exec_alert->alrt->smtp_env.smarthost) + 1;
   char *smart_hosts = (char *)malloc(l);
-  strncpy(smart_hosts, exec_alert->alrt->smtp_smarthost, l);
+  strncpy(smart_hosts, exec_alert->alrt->smtp_env.smarthost, l);
   char *h = smart_hosts;
   char *next = NULL;
 
@@ -1417,7 +1149,7 @@ int execute_alert_smtp(const struct exec_alert_t *exec_alert) {
       strport = trim(strport);
       port = atoi(strport);
     } else {
-      port = exec_alert->alrt->smtp_port_set ? exec_alert->alrt->smtp_port : DEFAULT_ALERT_SMTP_PORT;
+      port = exec_alert->alrt->smtp_env.port_set ? exec_alert->alrt->smtp_env.port : DEFAULT_ALERT_SMTP_PORT;
     }
     h = trim(h);
 
@@ -1582,9 +1314,142 @@ int execute_alert(struct exec_alert_t *exec_alert) {
 }
 
 //
+// After checks, render result
+//
+void manage_output(const struct tm *now_done, float elapsed) {
+  if (g_print_status) {
+    const char *LC_PREFIX = "Last check: ";
+    char now[STR_NOW];
+    get_str_now(now, sizeof(now), now_done);
+    char duration[50];
+    snprintf(duration, sizeof(duration), ", done in %6.3fs", elapsed);
+    char sf[50];
+    int l = g_nb_keep_last_status - strlen(now) - strlen(LC_PREFIX) - strlen(duration) + g_display_name_width + 5;
+    snprintf(sf, sizeof(sf), "%%s %%s %%s%%%is%%s\n", l < 1 ? 1 : l);
+
+    fputs(TERM_CLEAR_SCREEN, stdout);
+    printf(sf, LC_PREFIX, now, duration, "", "LUPDT");
+    printf("  LUPDT = Last status UPDated Time\n");
+    printf("  Check interval = %li second%s", g_check_interval, g_check_interval >= 2 ? "s" : "");
+    if (g_nb_keep_last_status >= 1)
+      printf(", range = %li min", (g_check_interval * g_nb_keep_last_status) / 60);
+    printf("\n");
+    printf("  . = ok, X = fail, ? = unknown, <space> = undefined\n");
+  }
+
+  FILE *H = NULL;
+  if (g_test_mode == 0) {
+    H = fopen(g_html_complete_file_name, "w+");
+    if (H == NULL)
+      my_logf(LL_ERROR, LP_DATETIME, "Unable to open HTML output file %s", g_html_complete_file_name);
+    else
+      my_logf(LL_VERBOSE, LP_DATETIME, "Creating %s", g_html_complete_file_name);
+  }
+  if (H != NULL) {
+    char now[STR_NOW];
+    get_str_now(now, sizeof(now), now_done);
+    fputs("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n", H);
+    fputs("<html>\n", H);
+    fputs("<head>\n", H);
+    fprintf(H, "<META HTTP-EQUIV=\"Refresh\" CONTENT=\"%li\">\n", g_html_refresh_interval);
+    fputs("</head>\n", H);
+    fputs("<body>\n", H);
+    fprintf(H, "<h1>%s</h1>\n", g_html_title);
+    fputs("<hr>\n", H);
+    fprintf(H, "<h3>Last check: %s</h3>\n", now);
+    fprintf(H, "<p>Last check done in %6.3fs<br>\n", elapsed);
+    if (g_nb_keep_last_status >= 1) {
+      fprintf(H, "Check interval = %li second%s, range = %li min<br>\n",
+        g_check_interval, g_check_interval >= 2 ? "s" : "", (g_check_interval * g_nb_keep_last_status) / 60);
+    }
+    fputs("</p>", H);
+    fputs("<table cellpadding=\"2\" cellspacing=\"1\" border=\"1\">\n", H);
+    fputs("<tr>\n", H);
+    int i;
+    for (i = 0; i < g_html_nb_columns; ++i) {
+      fputs("<td>Name</td><td>Status</td><td>Last *</td>", H);
+      if (g_nb_keep_last_status >= 1)
+        fputs("<td>History</td>", H);
+        fputs("\n", H);
+    }
+    fputs("</tr>\n", H);
+  }
+
+  int counter = 0;
+  int II;
+  for (II = 0; II < g_nb_checks; ++II) {
+    struct check_t *chk = &checks[II];
+    if (!chk->is_valid)
+      continue;
+
+    char lsc[STR_LASTSTATUS_CHANGE];
+    strncpy(lsc, "", sizeof(lsc));
+    if (chk->last_status_change_flag)
+      get_str_last_status_change(lsc, sizeof(lsc), &chk->last_status_change);
+
+    if (g_print_status) {
+      char short_display_name[g_display_name_width + 1];
+      strncpy(short_display_name, chk->display_name, g_display_name_width + 1);
+      short_display_name[g_display_name_width] = '\0';
+
+      char f[50];
+      if (g_nb_keep_last_status >= 1) {
+        snprintf(f, sizeof(f), "%%-%lis %%s |%%s| %%s\n", g_display_name_width);
+        printf(f, short_display_name, ST_TO_STR2[chk->status], chk->str_prev_status, lsc);
+      } else {
+        snprintf(f, sizeof(f), "%%-%lis %%s %%s\n", g_display_name_width);
+        printf(f, short_display_name, ST_TO_STR2[chk->status], lsc);
+      }
+    }
+
+    if (H != NULL) {
+      if (counter % g_html_nb_columns == 0)
+        fputs("<tr>\n", H);
+      fprintf(H, "<td>%s</td><td bgcolor=\"%s\">%s</td>\n",
+        chk->display_name, ST_TO_BGCOLOR_FORHTML[chk->status], ST_TO_LONGSTR_SIMPLE[chk->status]);
+      fprintf(H, "<td>%s</td>", lsc);
+      if (g_nb_keep_last_status >= 1) {
+        fputs("<td>", H);
+        int i;
+        for (i = 0; i < g_nb_keep_last_status; ++i) {
+          char c = chk->str_prev_status[i];
+          int j;
+          for (j = 0; j <= _ST_LAST; ++j) {
+            if (ST_TO_CHAR[j] == c)
+              break;
+          }
+          if (j > _ST_LAST)
+            j = ST_UNKNOWN;
+          fprintf(H, "<img src=\"%s\">\n", img_files[j].file_name);
+        }
+        fprintf(H, "</td>\n");
+      }
+      if (counter % g_html_nb_columns == g_html_nb_columns - 1 || counter == g_nb_valid_checks - 1) {
+        int k;
+        for (k = counter; k % g_html_nb_columns != g_html_nb_columns - 1; ++k) {
+          fputs("<td></td><td></td><td></td>", H);
+          if (g_nb_keep_last_status >= 1)
+            fputs("<td></td>", H);
+        }
+        fputs("</tr>\n", H);
+      }
+    }
+    ++counter;
+  }
+
+  if (H != NULL) {
+    fputs("</table>\n", H);
+    fputs("<p>* Time at which the status last changed\n</p>", H);
+    fputs("</body>\n", H);
+    fputs("</html>\n", H);
+    fclose(H);
+    add_reader_access_right(g_html_complete_file_name);
+  }
+}
+
+//
 // Main loop
 //
-const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
 void almost_neverending_loop() {
 
   while (1) {
@@ -1608,7 +1473,7 @@ void almost_neverending_loop() {
         continue;
 
       int status = perform_check(chk);
-      if (status < 0 || status > ST_LAST)
+      if (status < 0 || status > _ST_LAST)
         internal_error("almost_neverending_loop", __FILE__, __LINE__);
 
       struct tm my_now;
@@ -1675,15 +1540,14 @@ void almost_neverending_loop() {
       } else if (chk->alert_repeat_every_set) {
         if (chk->nb_consecutive_notok - threshold >= chk->alert_repeat_every &&
               (chk->nb_consecutive_notok - threshold + chk->alert_repeat_every) % chk->alert_repeat_every == 0) {
-          my_logf(LL_DEBUG, LP_DATETIME, "repeat_max = %d", repeat_max);
           trigger_alert = (repeat_max < 0 ? TRUE : (chk->trigger_sequence <= repeat_max));
           chk->trigger_sequence++;
         }
       }
 
-      my_logf(LL_DEBUG, LP_DATETIME, "as = %d, chk->trigger_sequence = %d", as, chk->trigger_sequence);
-      my_logf(LL_DEBUG, LP_DATETIME, "chk->nb_consecutive_notok = %d", chk->nb_consecutive_notok);
-      my_logf(LL_DEBUG, LP_DATETIME, "trigger_alert = %d", trigger_alert);
+/*      my_logf(LL_DEBUG, LP_DATETIME, "as = %d, chk->trigger_sequence = %d", as, chk->trigger_sequence);*/
+/*      my_logf(LL_DEBUG, LP_DATETIME, "chk->nb_consecutive_notok = %d", chk->nb_consecutive_notok);*/
+/*      my_logf(LL_DEBUG, LP_DATETIME, "trigger_alert = %d", trigger_alert);*/
 
       int i;
       for (i = 0; i < chk->nb_alerts; ++i) {
@@ -1737,28 +1601,18 @@ void almost_neverending_loop() {
           if (increase_seq)
             chk->alert_ctrl[i].trigger_sequence++;
 
-          my_logf(LL_DEBUG, LP_DATETIME, "chk trigger sequence = %d, alert trigger sequence = %d", chk->trigger_sequence, chk->alert_ctrl[i].trigger_sequence);
+/*          my_logf(LL_DEBUG, LP_DATETIME, "chk trigger sequence = %d, alert trigger sequence = %d",*/
+/*            chk->trigger_sequence, chk->alert_ctrl[i].trigger_sequence);*/
 
-          struct exec_alert_t exec_alert = {
-            chk->status,
-            as,
-            alrt,
-            &chk->alert_ctrl[i],
-            lc,
-            &my_now,
-            &chk->alert_info,
-            &chk->last_status_change,
-            chk->nb_consecutive_notok,
-            chk->display_name,
-            chk->host_name,
-            NULL,
-            0,
-            NULL
+          struct exec_alert_t exec_alert = { chk->status, as, alrt, &chk->alert_ctrl[i], lc,
+            &my_now, &chk->alert_info, &chk->last_status_change,
+            chk->nb_consecutive_notok, chk->display_name, chk->host_name,
+            NULL, 0, NULL
           };
 
           int r = execute_alert(&exec_alert);
 
-          my_logf(LL_DEBUG, LP_DATETIME, "Excuted alert, result = %d", r);
+          my_logf(LL_DEBUG, LP_DATETIME, "Executed alert, result = %d", r);
 
           if (r != 0) {
             chk->alert_ctrl[i].nb_failures++;
@@ -1797,135 +1651,17 @@ void almost_neverending_loop() {
     if (g_test_mode >= 1)
       elapsed = .12345;
 
-    if (g_print_status) {
-      const char *LC_PREFIX = "Last check: ";
-      char now[STR_NOW];
-      get_str_now(now, sizeof(now), &now_done);
-      char duration[50];
-      snprintf(duration, sizeof(duration), ", done in %6.3fs", elapsed);
-      char sf[50];
-      int l = g_nb_keep_last_status - strlen(now) - strlen(LC_PREFIX) - strlen(duration) + g_display_name_width + 5;
-      snprintf(sf, sizeof(sf), "%%s %%s %%s%%%is%%s\n", l < 1 ? 1 : l);
+//
+// Display result (terminal and HTML file)
+//
 
-      fputs(TERM_CLEAR_SCREEN, stdout);
-      printf(sf, LC_PREFIX, now, duration, "", "LUPDT");
-      printf("  LUPDT = Last status UPDated Time\n");
-      printf("  Check interval = %li second%s", g_check_interval, g_check_interval >= 2 ? "s" : "");
-      if (g_nb_keep_last_status >= 1)
-        printf(", range = %li min", (g_check_interval * g_nb_keep_last_status) / 60);
-      printf("\n");
-      printf("  . = ok, X = fail, ? = unknown, <space> = undefined\n");
-    }
-
-    FILE *H = NULL;
-    if (g_test_mode == 0) {
-      H = fopen(g_html_complete_file_name, "w+");
-      if (H == NULL)
-        my_logf(LL_ERROR, LP_DATETIME, "Unable to open HTML output file %s", g_html_complete_file_name);
-      else
-        my_logf(LL_VERBOSE, LP_DATETIME, "Creating %s", g_html_complete_file_name);
-    }
-    if (H != NULL) {
-      char now[STR_NOW];
-      get_str_now(now, sizeof(now), &now_done);
-      fputs("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n", H);
-      fputs("<html>\n", H);
-      fputs("<head>\n", H);
-      fprintf(H, "<META HTTP-EQUIV=\"Refresh\" CONTENT=\"%li\">\n", g_html_refresh_interval);
-      fputs("</head>\n", H);
-      fputs("<body>\n", H);
-      fprintf(H, "<h1>%s</h1>\n", g_html_title);
-      fputs("<hr>\n", H);
-      fprintf(H, "<h3>Last check: %s</h3>\n", now);
-      fprintf(H, "<p>Last check done in %6.3fs<br>\n", elapsed);
-      if (g_nb_keep_last_status >= 1) {
-        fprintf(H, "Check interval = %li second%s, range = %li min<br>\n",
-          g_check_interval, g_check_interval >= 2 ? "s" : "", (g_check_interval * g_nb_keep_last_status) / 60);
-      }
-      fputs("</p>", H);
-      fputs("<table cellpadding=\"2\" cellspacing=\"1\" border=\"1\">\n", H);
-      fputs("<tr>\n", H);
-      int i;
-      for (i = 0; i < g_html_nb_columns; ++i) {
-        fputs("<td>Name</td><td>Status</td><td>Last *</td>", H);
-        if (g_nb_keep_last_status >= 1)
-          fputs("<td>History</td>", H);
-          fputs("\n", H);
-      }
-      fputs("</tr>\n", H);
-    }
-
-    int counter = 0;
-    for (II = 0; II < g_nb_checks; ++II) {
-      struct check_t *chk = &checks[II];
-      if (!chk->is_valid)
-        continue;
-
-      char lsc[STR_LASTSTATUS_CHANGE];
-      strncpy(lsc, "", sizeof(lsc));
-      if (chk->last_status_change_flag)
-        get_str_last_status_change(lsc, sizeof(lsc), &chk->last_status_change);
-
-      if (g_print_status) {
-        char short_display_name[g_display_name_width + 1];
-        strncpy(short_display_name, chk->display_name, g_display_name_width + 1);
-        short_display_name[g_display_name_width] = '\0';
-
-        char f[50];
-        if (g_nb_keep_last_status >= 1) {
-          snprintf(f, sizeof(f), "%%-%lis %%s |%%s| %%s\n", g_display_name_width);
-          printf(f, short_display_name, ST_TO_STR2[chk->status], chk->str_prev_status, lsc);
-        } else {
-          snprintf(f, sizeof(f), "%%-%lis %%s %%s\n", g_display_name_width);
-          printf(f, short_display_name, ST_TO_STR2[chk->status], lsc);
-        }
-      }
-
-      if (H != NULL) {
-        if (counter % g_html_nb_columns == 0)
-          fputs("<tr>\n", H);
-        fprintf(H, "<td>%s</td><td bgcolor=\"%s\">%s</td>\n",
-          chk->display_name, ST_TO_BGCOLOR_FORHTML[chk->status], ST_TO_LONGSTR_SIMPLE[chk->status]);
-        fprintf(H, "<td>%s</td>", lsc);
-        if (g_nb_keep_last_status >= 1) {
-          fputs("<td>", H);
-          int i;
-          for (i = 0; i < g_nb_keep_last_status; ++i) {
-            char c = chk->str_prev_status[i];
-            int j;
-            for (j = 0; j <= ST_LAST; ++j) {
-              if (ST_TO_CHAR[j] == c)
-                break;
-            }
-            if (j > ST_LAST)
-              j = ST_UNKNOWN;
-            fprintf(H, "<img src=\"%s\">\n", img_files[j].file_name);
-          }
-          fprintf(H, "</td>\n");
-        }
-        if (counter % g_html_nb_columns == g_html_nb_columns - 1 || counter == g_nb_valid_checks - 1) {
-          int k;
-          for (k = counter; k % g_html_nb_columns != g_html_nb_columns - 1; ++k) {
-            fputs("<td></td><td></td><td></td>", H);
-            if (g_nb_keep_last_status >= 1)
-              fputs("<td></td>", H);
-          }
-          fputs("</tr>\n", H);
-        }
-      }
-      ++counter;
-    }
-
-    if (H != NULL) {
-      fputs("</table>\n", H);
-      fputs("<p>* Time at which the status last changed\n</p>", H);
-      fputs("</body>\n", H);
-      fputs("</html>\n", H);
-      fclose(H);
-      add_reader_access_right(g_html_complete_file_name);
-    }
+    manage_output(&now_done, elapsed);
 
     my_logf(LL_NORMAL, LP_DATETIME, "Check done in %fs", elapsed);
+
+//
+// Sleep before next loop
+//
 
     if (g_check_interval && g_test_mode == 0) {
       long int delay = g_check_interval - (long int)elapsed;
@@ -2057,6 +1793,7 @@ void parse_options(int argc, char *argv[]) {
 
   int n;
 
+  char x = g_log_file[0];
   strncpy(g_log_file, DEFAULT_LOGFILE, sizeof(g_log_file));
   strncpy(g_cfg_file, DEFAULT_CFGFILE, sizeof(g_cfg_file));
   strncpy(g_test_alert, "", sizeof(g_test_alert));
@@ -2163,7 +1900,7 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number) {
         cf, line_number);
       is_valid = FALSE;
     }
-  } else if (chk->method_set && chk->method == CM_TCP) {
+  } else if (chk->method_set && chk->method == CM_PROGRAM) {
     if (!chk->prg_command_set) {
       my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no command defined, discarding check",
         cf, line_number);
@@ -2208,12 +1945,12 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number) {
   }
 
   if (alrt->method == AM_SMTP) {
-    if (!alrt->smtp_smarthost_set) {
+    if (!alrt->smtp_env.smarthost_set) {
       my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no smart host defined, discarding alert",
         cf, line_number);
       is_valid = FALSE;
     }
-    if (!alrt->smtp_recipients_set) {
+    if (!alrt->smtp_env.recipients_set) {
       my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no recipients defined, discarding alert",
         cf, line_number);
       is_valid = FALSE;
@@ -2536,313 +2273,6 @@ void read_configuration_file(const char *cf) {
 }
 
 //
-// Create files used for HTML display
-//
-void web_create_img_files() {
-  char buf[BIGSTRSIZE];
-
-  img_files[ST_UNDEF].var = st_undef;
-  img_files[ST_UNDEF].var_len = st_undef_len;
-  img_files[ST_UNKNOWN].var = st_unknown;
-  img_files[ST_UNKNOWN].var_len = st_unknown_len;
-  img_files[ST_OK].var = st_ok;
-  img_files[ST_OK].var_len = st_ok_len;
-  img_files[ST_FAIL].var = st_fail;
-  img_files[ST_FAIL].var_len = st_fail_len;
-
-  my_logf(LL_VERBOSE, LP_DATETIME, "Will create image files in html directory");
-
-  int i;
-  for (i = 0; i <= ST_LAST; ++i) {
-    strncpy(buf, g_html_directory, sizeof(buf));
-    fs_concatene(buf, img_files[i].file_name, sizeof(buf));
-    FILE *IMG = fopen(buf, "wb+");
-
-    if (IMG == NULL) {
-      my_logf(LL_ERROR, LP_DATETIME, "Unable to create %s", buf);
-    } else {
-      int j;
-      const char const *v = img_files[i].var;
-      size_t l = img_files[i].var_len;
-
-  /*    dbg_write("Creating %s of size %lu\n", buf, l);*/
-
-      if (IMG != NULL) {
-        for (j = 0; (unsigned int)j < l; ++j) {
-          fputc(v[j], IMG);
-        }
-        fclose(IMG);
-      }
-    }
-
-    add_reader_access_right(buf);
-  }
-
-}
-
-//
-// Start server listening
-//
-int server_listen(int listen_port, const char *prefix) {
-  struct sockaddr_in listen_sa;
-
-  char s_err[ERR_STR_BUFSIZE];
-
-  int sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (sock == -1) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s: error creating socket, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
-    return 0;
-  }
-
-  int bOptVal = TRUE;
-  socklen_t bOptLen = sizeof(int);
-  if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&bOptVal, bOptLen) == SOCKET_ERROR) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s: cannot set socket option, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
-    os_closesocket(sock);
-    return 0;
-  }
-
-  listen_sa.sin_addr.s_addr = htonl(INADDR_ANY);
-  listen_sa.sin_port = htons((u_short)listen_port);
-  listen_sa.sin_family = AF_INET;
-
-  if (bind(sock, (struct sockaddr*)&listen_sa, sizeof(listen_sa)) == SOCKET_ERROR) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s: cannot bind, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
-    os_closesocket(sock);
-    return 0;
-  }
-  if (listen(sock, SOMAXCONN) == SOCKET_ERROR) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s: cannot listen, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
-    os_closesocket(sock);
-    return 0;
-  }
-  return sock;
-}
-
-//
-// Have server accept incoming connections
-//
-int server_accept(int listen_sock, struct sockaddr_in* remote_sin, int listen_port, const char* prefix) {
-  socklen_t remote_sin_len;
-
-  char s_err[SMALLSTRSIZE];
-
-  my_logf(LL_VERBOSE, LP_DATETIME, "%s: listening on port %u...", prefix, listen_port);
-  remote_sin_len = sizeof(*remote_sin);
-  int sock = accept(listen_sock, (struct sockaddr *)remote_sin, &remote_sin_len);
-  if (sock == -1) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s: cannot accept, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
-    os_closesocket(listen_sock);
-    return 0;
-  }
-  my_logf(LL_VERBOSE, LP_DATETIME, "%s: connection accepted from %s", prefix, inet_ntoa(remote_sin->sin_addr));
-  return sock;
-}
-
-//
-// Send error page over HTTP connection
-//
-void http_send_error_page(int sock, const char *e, const char *t) {
-  my_logf(LL_DEBUG, LP_DATETIME, "Sending HTTP error %s / %s", e, t);
-
-  socket_line_sendf(&sock, g_trace_network_traffic, "HTTP/1.1 %s", e);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Connection: close");
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-type: text/html");
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
-  socket_line_sendf(&sock, g_trace_network_traffic, "<html><head><title>Not Found</title></head>");
-  socket_line_sendf(&sock, g_trace_network_traffic, "<body><p><b>%s</b></p></body></html>", t);
-
-  my_logf(LL_DEBUG, LP_DATETIME, "Finished sending HTTP error %s / %s", e, t);
-}
-
-//
-// Answers web connections
-//
-int manage_web_transaction(int sock, const struct sockaddr_in *remote_sin) {
-
-  my_logf(LL_DEBUG, LP_DATETIME, "Entering web transaction...");
-
-  char *received = NULL;
-  int size;
-  int read_res = 0;
-  if ((read_res = socket_read_line_alloc(sock, &received, g_trace_network_traffic, &size)) < 0) {
-    free(received);
-    return -1;
-  }
-
-  my_logf(LL_DEBUG, LP_DATETIME, "Received request '%s'", received);
-
-  char *p = received;
-  if (strncmp(p, "GET", 3)) {
-    free(received);
-    http_send_error_page(sock, "400 Bad Request", "Could not understand request");
-    return -1;
-  }
-  p += 3;
-  while (*p == ' ')
-    ++p;
-  if (strncmp(p, "http://", 7) == 0)
-    p += 7;
-  if (*p == '/')
-    ++p;
-
-  char *tmpurl = p;
-
-  while (*p != '\0' && *p != ' ')
-    ++p;
-  if (p != '\0') {
-    *p = '\0';
-    ++p;
-  }
-
-  while (*p == ' ')
-    ++p;
-  if (strncmp(p, "HTTP/1.1", 8)) {
-    free(received);
-    http_send_error_page(sock, "400 Bad Request", "Could not understand request");
-    return -1;
-  }
-
-  char *t = strrchr(tmpurl, '/');
-  if (t != NULL)
-    tmpurl = t + 1;
-  if (strstr(received, "..") != 0) {
-    free(received);
-    http_send_error_page(sock, "401 Unauthorized", "Not allowed to go up in directory tree");
-    return -1;
-  }
-
-  char url[BIGSTRSIZE];
-  strncpy(url, tmpurl, sizeof(url));
-
-  int keep_alive = TRUE;
-  while (strlen(received) != 0) {
-    if ((read_res = socket_read_line_alloc(sock, &received, g_trace_network_traffic, &size)) < 0) {
-      free(received);
-      return -1;
-    }
-
-    if (strncasecmp(received, "connection:", 11) == 0 && strstr(received, "close") != NULL) {
-      my_logf(LL_DEBUG, LP_DATETIME, "Connection will be closed afterwards");
-      keep_alive = FALSE;
-    }
-  }
-
-  free(received);
-
-  my_logf(LL_DEBUG, LP_DATETIME, WEBSERVER_LOG_PREFIX ": client requested '%s'", url);
-
-  char path[BIGSTRSIZE];
-  strncpy(path, g_html_directory, sizeof(path));
-  fs_concatene(path, strlen(url) == 0 ? g_html_file : url, sizeof(path));
-
-  my_logf(LL_DEBUG, LP_DATETIME, "Will stat file '%s'", path);
-
-  struct stat s;
-  if (stat(path, &s)) {
-    char s_err[SMALLSTRSIZE];
-    errno_error(s_err, sizeof(s_err));
-    my_logf(LL_ERROR, LP_DATETIME, "%s", s_err);
-    http_send_error_page(sock, "404 Not found", s_err);
-    return -1;
-  }
-
-  char dt_fileupdate[50];
-  char dt_now[50];
-  struct timeval tv;
-  if (my_ctime_r(&s.st_mtime, dt_fileupdate, sizeof(dt_fileupdate)) == 0 ||
-      gettimeofday(&tv, NULL) != 0 ||
-      my_ctime_r(&tv.tv_sec, dt_now, sizeof(dt_now)) == 0) {
-    http_send_error_page(sock, "500 Server error", "Internal server error");
-    return -1;
-  }
-
-  FILE *F = fopen(path, "rb");
-  if (F == NULL) {
-    http_send_error_page(sock, "404 Not found", "File not found");
-    return -1;
-  }
-  char *pos;
-  char *content_type = "application/octet-stream";
-  if ((pos = strrchr(path, '.')) != NULL) {
-    ++pos;
-    if (strcasecmp(pos, "png") == 0)
-      content_type = "image/png";
-    else if (strcasecmp(pos, "htm") == 0 || strcasecmp(pos, "html") == 0)
-      content_type = "text/html";
-    else if (strcasecmp(pos, "ini") == 0 || strcasecmp(pos, "log") == 0)
-      content_type = "text/ascii";
-  }
-
-    // No way to work with binary files and kep-alive? I don't find...
-  keep_alive = FALSE;
-
-  socket_line_sendf(&sock, g_trace_network_traffic, "HTTP/1.1 200 OK");
-  socket_line_sendf(&sock, g_trace_network_traffic, "Connection: %s", keep_alive ? "keep-alive" : "close");
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-length: %li", (long int)s.st_size);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-type: %s", content_type);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Date: %s", dt_now);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Last-modified: %s", dt_fileupdate);
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
-
-  char *buffer = (char *)malloc(g_buffer_size);
-  size_t n;
-  ssize_t e;
-  while (feof(F) == 0) {
-
-    if ((n = fread(buffer, 1, sizeof(buffer), F)) == 0) {
-      if (feof(F) == 0) {
-        my_logf(LL_ERROR, LP_DATETIME, "Error reading file %s", path);
-        keep_alive = FALSE;
-        break;
-      }
-    }
-
-    e = send(sock, buffer, n, 0);
-    if (e == SOCKET_ERROR) {
-      my_logf(LL_ERROR, LP_DATETIME, "Socket error");
-        keep_alive = FALSE;
-      break;
-    }
-  }
-
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
-
-  free(buffer);
-  fclose(F);
-
-  return keep_alive ? 0 : -1;
-}
-
-//
-// Manages web server
-//
-void *webserver(void *p) {
-  int listen_sock = server_listen(g_webserver_port, WEBSERVER_LOG_PREFIX);
-  if (listen_sock == 0) {
-    return NULL;
-  }
-
-  my_logf(LL_NORMAL, LP_DATETIME, WEBSERVER_LOG_PREFIX ": start");
-
-  struct sockaddr_in remote_sin;
-  int sock;
-  while (1) {
-    sock = server_accept(listen_sock, &remote_sin, g_webserver_port, WEBSERVER_LOG_PREFIX);
-    while (sock != -1) {
-      if (manage_web_transaction(sock, &remote_sin) != 0) {
-        os_closesocket(sock);
-        sock = -1;
-        my_logf(LL_VERBOSE, LP_DATETIME, WEBSERVER_LOG_PREFIX ": terminated connection with client");
-      } else {
-        my_logf(LL_VERBOSE, LP_DATETIME, WEBSERVER_LOG_PREFIX ": continuing connection with client");
-      }
-    }
-  }
-  return NULL;
-}
-
-//
 // Identify an alert by its name
 // Returns -1 if the alert is not found
 //
@@ -2932,12 +2362,44 @@ void checks_display() {
     my_logf(LL_DEBUG, LP_INDENT, "   display_name   = %s", chk->display_name_set ? chk->display_name : "<unset>");
     my_logf(LL_DEBUG, LP_INDENT, "   host_name      = %s", chk->host_name_set ? chk->host_name : "<unset>");
 
-    if (chk->tcp_port_set)
-      my_logf(LL_DEBUG, LP_INDENT, "   port           = %i", chk->tcp_port);
-    else
-      my_logf(LL_DEBUG, LP_INDENT, "   port           = <unset>");
+    my_logf(LL_DEBUG, LP_INDENT, "   method         = %s",
+      (chk->method_set && chk->method != FIND_STRING_NOT_FOUND) ? l_check_methods[chk->method] : "<unset>");
 
-    my_logf(LL_DEBUG, LP_INDENT, "   expect         = %s", chk->tcp_expect_set ? chk->tcp_expect : "<unset>");
+    if (chk->method == CM_TCP) {
+      if (chk->tcp_port_set)
+        my_logf(LL_DEBUG, LP_INDENT, "   TCP/port                   = %i", chk->tcp_port);
+      else
+        my_logf(LL_DEBUG, LP_INDENT, "   TCP/port                   = <unset>");
+
+      my_logf(LL_DEBUG, LP_INDENT, "   TCP/expect                 = %s", chk->tcp_expect_set ? chk->tcp_expect : "<unset>");
+    } else if (chk->method == CM_PROGRAM) {
+      my_logf(LL_DEBUG, LP_INDENT, "   PROGRAM/command            = %s", chk->prg_command_set ? chk->prg_command : "<unset>");
+    } else if (chk->method == CM_LOOP) {
+      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/smarthost        = %s", chk->loop_smtp.smarthost_set ? chk->loop_smtp.smarthost : "<unset>");
+      if (chk->loop_smtp.port_set)
+        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/port             = %i", chk->loop_smtp.port);
+      else
+        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/port             = <unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/self             = %s", chk->loop_smtp.self_set ? chk->loop_smtp.self : "<unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/sender           = %s", chk->loop_smtp.sender_set ? chk->loop_smtp.sender : "<unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/recipients       = %s", chk->loop_smtp.recipients_set ? chk->loop_smtp.recipients : "<unset>");
+      if (chk->loop_smtp.connect_timeout_set)
+        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/connect_timeout  = %i", chk->loop_smtp.connect_timeout);
+      else
+        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/connect_timeout  = <unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/server           = %s", chk->loop_pop3.server_set ? chk->loop_pop3.server : "<unset>");
+      if (chk->loop_pop3.port_set)
+        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/port             = %i", chk->loop_pop3.port);
+      else
+        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/port             = <unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/user             = %s", chk->loop_pop3.user_set ? chk->loop_pop3.user : "<unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/password         = %s", chk->loop_pop3.password_set ? "*****" : "<unset>");
+      if (chk->loop_pop3.connect_timeout_set)
+        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/connect_timeout  = %i", chk->loop_pop3.connect_timeout);
+      else
+        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/connect_timeout  = <unset>");
+    }
+
     my_logf(LL_DEBUG, LP_INDENT, "   alerts         = %s", chk->alerts_set ? chk->alerts : "<unset>");
     my_logf(LL_DEBUG, LP_INDENT, "   nb alerts      = %i", chk->nb_alerts);
     int j;
@@ -2997,14 +2459,18 @@ void alerts_display() {
     else
       my_logf(LL_DEBUG, LP_INDENT, "   retries           = <unset>");
     if (alrt->method == AM_SMTP) {
-      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/smart host = %s", alrt->smtp_smarthost_set ? alrt->smtp_smarthost : "<unset>");
-      if (alrt->smtp_port_set)
-        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/port       = %li", alrt->smtp_port);
+      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/smart host = %s", alrt->smtp_env.smarthost_set ? alrt->smtp_env.smarthost : "<unset>");
+      if (alrt->smtp_env.port_set)
+        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/port       = %li", alrt->smtp_env.port);
       else
         my_logf(LL_DEBUG, LP_INDENT, "   SMTP/port       = <unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/self       = %s", alrt->smtp_self_set ? alrt->smtp_self : "<unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/sender     = %s", alrt->smtp_sender_set ? alrt->smtp_sender : "<unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/recipients = %s", alrt->smtp_recipients_set ? alrt->smtp_recipients : "<unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/self       = %s", alrt->smtp_env.self_set ? alrt->smtp_env.self : "<unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/sender     = %s", alrt->smtp_env.sender_set ? alrt->smtp_env.sender : "<unset>");
+      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/recipients = %s", alrt->smtp_env.recipients_set ? alrt->smtp_env.recipients : "<unset>");
+      if (alrt->smtp_env.connect_timeout_set)
+        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/timeout    = %li", alrt->smtp_env.connect_timeout);
+      else
+        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/timeout    = <unset>");
     } else if (alrt->method == AM_PROGRAM) {
       my_logf(LL_DEBUG, LP_INDENT, "   program/command   = %s", alrt->prg_command_set ? alrt->prg_command : "<unset>");
     } else if (alrt->method == AM_LOG) {
@@ -3058,10 +2524,8 @@ int main(int argc, char *argv[]) {
     // rand() function used by get_unique_mime_boundary()
   srand(time(NULL));
 
-  if ((errno = pthread_mutex_init(&mutex, NULL)) != 0) {
-    char s_err[SMALLSTRSIZE];
-    fatal_error("pthread_mutex_init(): %s", errno_error(s_err, sizeof(s_err)));
-  }
+  my_pthread_mutex_init(&mutex);
+  util_my_pthread_init();
 
   parse_options(argc, argv);
 

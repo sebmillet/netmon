@@ -1,7 +1,7 @@
 # src/Makefile.am
 
 bin_PROGRAMS=netmon
-netmon_SOURCES=netmon.c netmon.h \
+netmon_SOURCES=main.c main.h util.c util.h webserver.c \
 	img/st-undef.png img/st-undef.c \
 	img/st-unknown.png img/st-unknown.c \
 	img/st-ok.png img/st-ok.c \

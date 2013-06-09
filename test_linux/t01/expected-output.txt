@@ -31,13 +31,16 @@ Configuration file 'netmon.ini', line 56: variable method not allowed in this se
 Configuration file 'netmon.ini', line 58: null value not allowed
 Configuration file 'netmon.ini', line 61: empty value not allowed
 Configuration file 'netmon.ini', section of line 57: no method defined, discarding check
+Configuration file 'netmon.ini', line 66: syntax error
+Configuration file 'netmon.ini', section of line 63: no command defined, discarding check
 keep_last_status not defined, taking default = 15
 !! check #0 (will be ignored)
    is_valid       = No
    display_name   = Office PC SMTP
    host_name      = <unset>
-   port           = <unset>
-   expect         = <unset>
+   method         = tcp
+   TCP/port                   = <unset>
+   TCP/expect                 = <unset>
    alerts         = <unset>
    nb alerts      = 0
    alert_threshold    = <unset>
@@ -47,8 +50,9 @@ keep_last_status not defined, taking default = 15
    is_valid       = Yes
    display_name   = my Localhost
    host_name      = localhost
-   port           = 21219
-   expect         = <unset>
+   method         = tcp
+   TCP/port                   = 21219
+   TCP/expect                 = <unset>
    alerts         = <unset>
    nb alerts      = 0
    alert_threshold    = <unset>
@@ -58,8 +62,9 @@ keep_last_status not defined, taking default = 15
    is_valid       = No
    display_name   = <unset>
    host_name      = <unset>
-   port           = <unset>
-   expect         = <unset>
+   method         = <unset>
+   TCP/port                   = <unset>
+   TCP/expect                 = <unset>
    alerts         = <unset>
    nb alerts      = 0
    alert_threshold    = <unset>
@@ -69,8 +74,9 @@ keep_last_status not defined, taking default = 15
    is_valid       = Yes
    display_name   = ab544abcbcbczc31415911
    host_name      = ab544abcbcbczc31415911
-   port           = 18
-   expect         = <unset>
+   method         = tcp
+   TCP/port                   = 18
+   TCP/expect                 = <unset>
    alerts         = <unset>
    nb alerts      = 0
    alert_threshold    = <unset>
@@ -80,8 +86,9 @@ keep_last_status not defined, taking default = 15
    is_valid       = No
    display_name   = bla r
    host_name      = bla r
-   port           = <unset>
-   expect         = <unset>
+   method         = <unset>
+   TCP/port                   = <unset>
+   TCP/expect                 = <unset>
    alerts         = <unset>
    nb alerts      = 0
    alert_threshold    = <unset>
@@ -91,8 +98,31 @@ keep_last_status not defined, taking default = 15
    is_valid       = No
    display_name   = bla y
    host_name      = bla y
-   port           = <unset>
-   expect         = <unset>
+   method         = <unset>
+   TCP/port                   = <unset>
+   TCP/expect                 = <unset>
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
+!! check #6 (will be ignored)
+   is_valid       = No
+   display_name   = my program check
+   host_name      = <unset>
+   method         = program
+   PROGRAM/command            = <unset>
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
+== CHECK #7
+   is_valid       = Yes
+   display_name   = my program check
+   host_name      = none
+   method         = program
+   PROGRAM/command            = exit 127
    alerts         = <unset>
    nb alerts      = 0
    alert_threshold    = <unset>
@@ -105,10 +135,11 @@ html_directory = ../www
 html_file = netmon.html
 html_title = netmon 1.0
 html_refresh_interval = 20
-Valid check(s) defined: 2
+Valid check(s) defined: 3
 Run web server: no
 To check: 'my Localhost' [localhost:21219], no expect, no alert
 To check: 'ab544abcbcbczc31415911' [ab544abcbcbczc31415911:18], no expect, no alert
+To check: 'my program check' [none:18], no expect, no alert
 Will create image files in html directory
 Starting check...
 Performing check tcp(my Localhost)
@@ -118,17 +149,16 @@ Will connect to localhost:21219, timeout = 5
 Socket error connecting to localhost:21219, code=111 (Connection refused)
 TCP check(my Localhost): disconnected from localhost:21219
 my Localhost -> ** KO **
-as = 1, chk->trigger_sequence = 0
-chk->nb_consecutive_notok = 1
-trigger_alert = 0
 Performing check tcp(ab544abcbcbczc31415911)
 TCP check(ab544abcbcbczc31415911): connecting to ab544abcbcbczc31415911:18...
 Running gethosbyname() on ab544abcbcbczc31415911
 Unknown host ab544abcbcbczc31415911, code=110 (Connection timed out)
 TCP check(ab544abcbcbczc31415911): disconnected from ab544abcbcbczc31415911:18
 ab544abcbcbczc31415911 -> ** ?? **
-as = 1, chk->trigger_sequence = 0
-chk->nb_consecutive_notok = 1
-trigger_alert = 0
+Performing check program(my program check)
+Program check(my program check): will execute the command:
+exit 127
+Program check(my program check): return code: 127
+my program check -> ** ?? **
 Check done in 0.123450s
 netmon end
