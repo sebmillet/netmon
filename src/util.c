@@ -214,11 +214,6 @@ char *errno_error(char *s, size_t s_len) {
 // My implementation of getline()
 //
 ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
-
-#define MY_GETLINE_INITIAL_ALLOCATE 30
-#define MY_GETLINE_MIN_INCREASE     30
-#define MY_GETLINE_COEF_INCREASE    1
-
   if (*lineptr == NULL || *n == 0) {
     *n = MY_GETLINE_INITIAL_ALLOCATE;
     *lineptr = (char *)malloc(*n);

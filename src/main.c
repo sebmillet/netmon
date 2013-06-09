@@ -25,9 +25,12 @@
 #define DEFAULT_ALERT_RETRIES 2
 #define DEFAULT_ALERT_SMTP_PORT 25
 #define DEFAULT_ALERT_SMTP_SELF PACKAGE_TARNAME
+#define DEFAULT_LOOP_SMTP_SELF  PACKAGE_TARNAME
 #define DEFAULT_ALERT_LOG_STRING "${NOW_TIMESTAMP}  ${DESCRIPTION}"
 #define DEFAULT_CONNECT_TIMEOUT 5
 #define LAST_STATUS_CHANGE_DISPLAY_SECONDS  (60 * 60 * 23)
+#define LOOP_STATUS_WHEN_SENDING_FAILS  ST_UNKNOWN
+#define DEFAULT_LOOP_ID "NMNM"
 
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
 const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
@@ -200,8 +203,9 @@ const char *l_check_methods[] = {
   "loop"      // CM_LOOP
 };
 int (*check_func[]) (const struct check_t *, const struct subst_t *, int) = {
-  perform_check_tcp,    // CM_TCP
-  perform_check_program // CM_PROGRAM
+  perform_check_tcp,      // CM_TCP
+  perform_check_program,  // CM_PROGRAM
+  perform_check_loop      // CM_LOOP
 };
 
 enum {ID_YES = 0, ID_NO = 1};
@@ -247,6 +251,7 @@ const struct readcfg_var_t readcfg_vars[] = {
 
 // CHECKS -> LOOP method
 
+  {"loop_id", V_STR, CS_PROBE, NULL, &chk00.loop_id, NULL, 0, &chk00.loop_id_set, TRUE, NULL, 0},
   {"loop_smtp_smart_host", V_STR, CS_PROBE, NULL, &chk00.loop_smtp.smarthost, NULL, 0,
     &chk00.loop_smtp.smarthost_set, FALSE, NULL, 0},
   {"loop_smtp_port", V_INT, CS_PROBE, &chk00.loop_smtp.port, NULL, NULL, 0, &chk00.loop_smtp.port_set, FALSE, NULL, 0},
@@ -369,6 +374,8 @@ void check_t_destroy(struct check_t *chk) {
     free(chk->prg_command);
   
   rfc821_enveloppe_t_destroy(&chk->loop_smtp);
+  if (chk->loop_id != NULL)
+    free(chk->loop_id);
   pop3_account_t_destroy(&chk->loop_pop3);
 
   if (chk->alerts != NULL)
@@ -438,6 +445,8 @@ void check_t_create(struct check_t *chk) {
   chk->prg_command_set = FALSE;
 
   rfc821_enveloppe_t_create(&chk->loop_smtp);
+  chk->loop_id = NULL;
+  chk->loop_id_set = FALSE;
   pop3_account_t_create(&chk->loop_pop3);
 
   chk->alerts = NULL;
@@ -529,6 +538,18 @@ void alert_t_create(struct alert_t *alrt) {
   alrt->log_file_set = FALSE;
   alrt->log_string = NULL;
   alrt->log_string_set = FALSE;
+}
+
+//
+// Fill the string with a boundary string, garanteed unique
+//
+void get_unique_mime_boundary(char *boundary, size_t boundary_len) {
+  int wday; int year; int month; int day;
+  int hour; int minute; int second; long unsigned int usec;
+  long int gmtoff;
+  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
+  snprintf(boundary, boundary_len, "nm1_%04d%02d%02d%02d%02d%02d%06lu_%d_%d",
+    year, month, day, hour, minute, second, usec, rand(), rand());
 }
 
 //
@@ -863,6 +884,60 @@ int perform_check_program(const struct check_t *chk, const struct subst_t *subst
 //
 //
 //
+int perform_check_loop(const struct check_t *chk, const struct subst_t *subst, int subst_len) {
+  char prefix[SMALLSTRSIZE];
+  snprintf(prefix, sizeof(prefix), "Loop check(%s):", chk->display_name);
+
+  int sock;
+
+  struct rfc821_enveloppe_t smtp = chk->loop_smtp;
+  char from_buf[SMALLSTRSIZE];
+  int r;
+  if ((r = smtp_email_sending_pre(&smtp, prefix, &sock, from_buf, sizeof(from_buf))) != ERR_SMTP_OK) {
+    os_closesocket(sock);
+    return LOOP_STATUS_WHEN_SENDING_FAILS;
+  }
+
+// Email headers
+
+  if ((r = smtp_mail_sending_stdheaders(&sock, &smtp)) != ERR_SMTP_OK) {
+    os_closesocket(sock);
+    return LOOP_STATUS_WHEN_SENDING_FAILS;
+  }
+
+  int wday; int year; int month; int day;
+  int hour; int minute; int second; long unsigned int usec;
+  long int gmtoff;
+  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
+  char loop_ref[SMALLSTRSIZE];
+  char *loop_id = chk->loop_id_set ? chk->loop_id : DEFAULT_LOOP_ID;
+  snprintf(loop_ref, sizeof(loop_ref), "%s-%04d-%02d-%02d-%02d-%02d-%02d-%06lu",
+    loop_id, year, month, day, hour, minute, second, usec);
+  socket_line_sendf(&sock, g_trace_network_traffic, "subject: %s", loop_ref);
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "MIME-Version: 1.0");
+  socket_line_sendf(&sock, g_trace_network_traffic, "Content-Type: text/plain");
+  socket_line_sendf(&sock, g_trace_network_traffic, "Content-Transfer-Encoding: 7bit");
+
+// Email body
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "");
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "");
+  socket_line_sendf(&sock, g_trace_network_traffic, "This is a loop email sent by " PACKAGE_STRING);
+  socket_line_sendf(&sock, g_trace_network_traffic, "");
+
+// Email end
+
+  char email_ref[SMALLSTRSIZE];
+  r = smtp_mail_sending_post(sock, prefix, email_ref, sizeof(email_ref));
+
+  return r == ERR_SMTP_OK ? ST_OK : LOOP_STATUS_WHEN_SENDING_FAILS;
+}
+
+//
+//
+//
 void loop_count_to_str(char *lcstr, size_t lcstr_len) {
   my_pthread_mutex_lock(&mutex);
   long int lc = loop_count;
@@ -946,18 +1021,6 @@ char *smtp_address(char *a) {
 }
 
 //
-// Fill the string with a boundary string, garanteed unique
-//
-void get_unique_mime_boundary(char *boundary, size_t boundary_len) {
-  int wday; int year; int month; int day;
-  int hour; int minute; int second; long unsigned int usec;
-  long int gmtoff;
-  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
-  snprintf(boundary, boundary_len, "nm1_%04d%02d%02d%02d%02d%02d%06lu_%d_%d",
-    year, month, day, hour, minute, second, usec, rand(), rand());
-}
-
-//
 // Fill the string with a standard date
 //
 void get_rfc822_header_format_current_date(char *date, size_t date_len) {
@@ -975,47 +1038,70 @@ void get_rfc822_header_format_current_date(char *date, size_t date_len) {
 }
 
 //
-// Used by execute_alert_smtp
+// Perform an SMTP transaction up to the DATA command (inclusive)
+// Returns ERR_SMTP_* constants
 //
-int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, const char *smart_host, int port, const char *prefix) {
-  struct alert_t *alrt = exec_alert->alrt;
+int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, int *sock, char *from_buf, size_t from_buf_len) {
+  env->nb_recipients_wanted = -1;
+  env->nb_recipients_ok = -1;
 
-  int sock;
-  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, smart_host, port);
-  int ec = establish_connection(smart_host, port, "220 ",
-    alrt->smtp_env.connect_timeout_set ? alrt->smtp_env.connect_timeout : g_connect_timeout, &sock);
+  char h[SMALLSTRSIZE];
+  int p;
+
+  strncpy(h, env->smarthost, sizeof(h));
+  h[sizeof(h) - 1] = '\0';
+  char *col = strchr(h, CFGK_PORT_SEPARATOR);
+  if (col != NULL) {
+    *col = '\0';
+    char *strport = col + 1;
+    strport = trim(strport);
+    p = atoi(strport);
+  } else {
+    p = env->port_set ? env->port : DEFAULT_ALERT_SMTP_PORT;
+  }
+  if (p < 1) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s invalid port number (%s:%i)", prefix, h, p);
+    return ERR_SMTP_INVALID_PORT_NUMBER;
+  }
+
+  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, h, p);
+  int ec = establish_connection(h, p, "220 ",
+    env->connect_timeout_set ? env->connect_timeout_set : g_connect_timeout, sock);
   if (ec != EC_OK)
     return (ec == EC_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR : ERR_SMTP_NETIO);
 
-  if (socket_line_sendf(&sock, g_trace_network_traffic, "EHLO %s",
-      alrt->smtp_env.self_set ? alrt->smtp_env.self : DEFAULT_ALERT_SMTP_SELF)) {
+  if (socket_line_sendf(sock, g_trace_network_traffic, "EHLO %s",
+      env->self_set ? env->self : DEFAULT_LOOP_SMTP_SELF)) {
     return ERR_SMTP_NETIO;
   }
 
   char *response = NULL;
   int response_size;
   do {
-    if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0)
+    if (socket_read_line_alloc(*sock, &response, g_trace_network_traffic, &response_size) < 0) {
       return ERR_SMTP_NETIO;
+    }
   } while (s_begins_with(response, "250-"));
   if (!s_begins_with(response, "250 ")) {
     my_logf(LL_ERROR, LP_DATETIME, "%s unexpected answer from server '%s'", prefix, response);
     return ERR_SMTP_BAD_ANSWER_TO_EHLO;
   }
-  char from_buf[SMALLSTRSIZE];
-  char *from_orig = alrt->smtp_env.sender_set ? alrt->smtp_env.sender : DEFAULT_ALERT_SMTP_SENDER;
-  strncpy(from_buf, from_orig, sizeof(from_buf));
-  char *from = from_buf;
-  from = smtp_address(from);
-  if (socket_round_trip(sock, "250 ", "MAIL FROM: <%s>", from) != SRT_SUCCESS) {
+  env->from_orig = env->sender_set ? env->sender : DEFAULT_ALERT_SMTP_SENDER;
+  strncpy(from_buf, env->from_orig, from_buf_len);
+  from_buf[from_buf_len - 1] = '\0';
+  env->from = from_buf;
+  env->from = smtp_address(env->from);
+  if (socket_round_trip(*sock, "250 ", "MAIL FROM: <%s>", env->from) != SRT_SUCCESS) {
+    socket_line_sendf(sock, g_trace_network_traffic, "QUIT");
     my_logf(LL_ERROR, LP_DATETIME, "%s sender not accepted, closing connection", prefix);
     return ERR_SMTP_SENDER_REJECTED;
   }
 
-  int nb_ok_recipients = 0;
-  size_t l = strlen(alrt->smtp_env.recipients) + 1;
+  env->nb_recipients_wanted = 0;
+  env->nb_recipients_ok = 0;
+  size_t l = strlen(env->recipients) + 1;
   char *recipients = (char *)malloc(l);
-  strncpy(recipients, alrt->smtp_env.recipients, l);
+  strncpy(recipients, env->recipients, l);
   char *r = recipients;
   char *next = NULL;
   while (*r != '\0') {
@@ -1025,9 +1111,10 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
     }
     r = smtp_address(r);
     if (strlen(r) >= 1) {
-      int res = socket_round_trip(sock, "250 ", "RCPT TO: <%s>", r);
+      env->nb_recipients_wanted++;
+      int res = socket_round_trip(*sock, "250 ", "RCPT TO: <%s>", r);
       if (res == SRT_SUCCESS)
-        ++nb_ok_recipients;
+        env->nb_recipients_ok++;
       else if (res != SRT_SUCCESS && res != SRT_UNEXPECTED_ANSWER) {
         free(recipients);
         return ERR_SMTP_NETIO;
@@ -1038,41 +1125,108 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
   }
   free(recipients);
 
-  if (nb_ok_recipients == 0) {
+  if (env->nb_recipients_ok == 0) {
     my_logf(LL_ERROR, LP_DATETIME, "%s no recipient accepted, closing connection", prefix);
-    socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
-    os_closesocket(sock);
+    socket_line_sendf(sock, g_trace_network_traffic, "QUIT");
     return ERR_SMTP_NO_RECIPIENT_ACCEPTED;
   }
 
   int res;
-  if ((res = socket_round_trip(sock, "354 ", "DATA")) != SRT_SUCCESS) {
+  if ((res = socket_round_trip(*sock, "354 ", "DATA")) != SRT_SUCCESS) {
     my_logf(LL_ERROR, LP_DATETIME, "%s DATA command not accepted, closing connection", prefix);
     return (res == SRT_SOCKET_ERROR ? ERR_SMTP_NETIO : ERR_SMTP_DATA_COMMAND_REJECTED);
   }
-/*  my_logf(LL_DEBUG, LP_DATETIME, "%s will now send email content", prefix);*/
+}
 
-  char boundary[SMALLSTRSIZE];
-  get_unique_mime_boundary(boundary, sizeof(boundary));
+//
+//
+//
+int smtp_mail_sending_post(int sock, const char *prefix, char *email_ref, const size_t email_ref_len) {
+  if (socket_line_sendf(&sock, g_trace_network_traffic, "") || socket_line_sendf(&sock, g_trace_network_traffic, ".")) {
+    return ERR_SMTP_NETIO;
+  }
+
+  char *response = NULL;
+  int response_size;
+  if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0) {
+    free(response);
+    os_closesocket(sock);
+    return ERR_SMTP_NETIO;
+  }
+  if (!s_begins_with(response, "250 ")) {
+    free(response);
+    my_logf(LL_ERROR, LP_DATETIME, "%s remote end did not confirm email reception", prefix);
+    return ERR_SMTP_EMAIL_RECEPTION_NOT_CONFIRMED;
+  }
+  char *e;
+
+#define QUEUED_AS " queued as "
+  if ((e = strcasestr(response, QUEUED_AS)) != NULL) {
+    strncpy(email_ref, e + strlen(QUEUED_AS), email_ref_len);
+    email_ref[email_ref_len - 1] = '\0';
+    my_logf(LL_DEBUG, LP_DATETIME, "%s email received by smart host, ref '%s'", prefix, email_ref);
+  }
+  free(response);
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
+  os_closesocket(sock);
+
+  my_logf(LL_DEBUG, LP_DATETIME, "Disconnected");
+
+  return ERR_SMTP_OK;
+}
+
+//
+//
+//
+int smtp_mail_sending_stdheaders(int *sock, const struct rfc821_enveloppe_t *smtp) {
+  if (strlen(smtp->from_orig) >= 1) {
+    socket_line_sendf(sock, g_trace_network_traffic, "return-path: %s", smtp->from);
+    socket_line_sendf(sock, g_trace_network_traffic, "sender: %s", smtp->from);
+    socket_line_sendf(sock, g_trace_network_traffic, "from: %s", smtp->from_orig);
+  }
+  socket_line_sendf(sock, g_trace_network_traffic, "to: %s", smtp->recipients);
+  socket_line_sendf(sock, g_trace_network_traffic, "x-mailer: %s", PACKAGE_STRING);
   char date[SMALLSTRSIZE];
   get_rfc822_header_format_current_date(date, sizeof(date));
+  return socket_line_sendf(sock, g_trace_network_traffic, "date: %s", date) ? ERR_SMTP_NETIO : ERR_SMTP_OK;
+}
+
+//
+// Used by execute_alert_smtp
+//
+int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, const char *smart_host, const char *prefix) {
+  struct alert_t *alrt = exec_alert->alrt;
+
+  int r;
+  int sock;
+
+  struct rfc821_enveloppe_t smtp = alrt->smtp_env;
+  smtp.smarthost = (char *)smart_host;
+  smtp.smarthost_set = TRUE;
+  char from_buf[SMALLSTRSIZE];
+  if ((r = smtp_email_sending_pre(&smtp, prefix, &sock, from_buf, sizeof(from_buf))) != ERR_SMTP_OK) {
+    os_closesocket(sock);
+    return r;
+  }
+
+/*  my_logf(LL_DEBUG, LP_DATETIME, "%s will now send email content", prefix);*/
 
 // Email headers
 
-  if (strlen(from_orig) >= 1) {
-    socket_line_sendf(&sock, g_trace_network_traffic, "return-path: %s", from);
-    socket_line_sendf(&sock, g_trace_network_traffic, "sender: %s", from);
-    socket_line_sendf(&sock, g_trace_network_traffic, "from: %s", from_orig);
+  if ((r = smtp_mail_sending_stdheaders(&sock, &smtp)) != ERR_SMTP_OK) {
+    os_closesocket(sock);
+    return r;
   }
-  socket_line_sendf(&sock, g_trace_network_traffic, "to: %s", alrt->smtp_env.recipients);
-  socket_line_sendf(&sock, g_trace_network_traffic, "x-mailer: %s", PACKAGE_STRING);
   socket_line_sendf(&sock, g_trace_network_traffic, "subject: %s", exec_alert->desc);
-  socket_line_sendf(&sock, g_trace_network_traffic, "date: %s", date);
   socket_line_sendf(&sock, g_trace_network_traffic, "MIME-Version: 1.0");
+  char boundary[SMALLSTRSIZE];
+  get_unique_mime_boundary(boundary, sizeof(boundary));
   socket_line_sendf(&sock, g_trace_network_traffic, "Content-Type: multipart/alternative; boundary=%s", boundary);
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
 
 // Email body
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "");
 
     // Alternative 1: plain text
   socket_line_sendf(&sock, g_trace_network_traffic, "--%s", boundary);
@@ -1102,17 +1256,13 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
 
     // End of alternatives
   socket_line_sendf(&sock, g_trace_network_traffic, "--%s--", boundary);
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
 
-// End
+// Email end
 
-  socket_line_sendf(&sock, g_trace_network_traffic, ".", alrt->smtp_env.recipients);
-  socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
+  char email_ref[SMALLSTRSIZE];
+  r = smtp_mail_sending_post(sock, prefix, email_ref, sizeof(email_ref));
 
-  os_closesocket(sock);
-  my_logf(LL_DEBUG, LP_DATETIME, "Disconnected from %s:%i", smart_host, port);
-
-  return ERR_SMTP_OK;
+  return r;
 }
 
 //
@@ -1142,25 +1292,11 @@ int execute_alert_smtp(const struct exec_alert_t *exec_alert) {
       *next = '\0';
       ++next;
     }
-    char *col = strchr(h, CFGK_PORT_SEPARATOR);
-    if (col != NULL) {
-      *col = '\0';
-      char *strport = col + 1;
-      strport = trim(strport);
-      port = atoi(strport);
-    } else {
-      port = exec_alert->alrt->smtp_env.port_set ? exec_alert->alrt->smtp_env.port : DEFAULT_ALERT_SMTP_PORT;
-    }
-    h = trim(h);
 
     my_logf(LL_DEBUG, LP_DATETIME, "%s will attempt SMTP connection", prefix);
 
-    if (port < 1) {
-      my_logf(LL_ERROR, LP_DATETIME, "%s invalid port number (%s:%i)", prefix, h, port);
-    } else {
-      nb_attempts_done++;
-      err_smtp = core_execute_alert_smtp_one_host(exec_alert, h, port, prefix);
-    }
+    nb_attempts_done++;
+    err_smtp = core_execute_alert_smtp_one_host(exec_alert, h, prefix);
 
     h = (next == NULL ? &h[strlen(h)] : next);
   }

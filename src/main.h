@@ -39,8 +39,9 @@ void os_closesocket(int sock);
 enum {ST_UNDEF = 0, ST_UNKNOWN = 1, ST_OK = 2, ST_FAIL = 3, _ST_LAST = 3, _ST_NBELEMS = 4};
 enum {EC_OK, EC_RESOLVE_ERROR, EC_CONNECTION_ERROR, EC_UNEXPECTED_ANSWER};
 enum {SRT_SUCCESS, SRT_SOCKET_ERROR, SRT_UNEXPECTED_ANSWER};
-enum {ERR_SMTP_OK = 0, ERR_SMTP_RESOLVE_ERROR, ERR_SMTP_NETIO, ERR_SMTP_BAD_ANSWER_TO_EHLO, ERR_SMTP_SENDER_REJECTED, ERR_SMTP_NO_RECIPIENT_ACCEPTED,
-  ERR_SMTP_DATA_COMMAND_REJECTED};
+enum {ERR_SMTP_OK = 0, ERR_SMTP_RESOLVE_ERROR, ERR_SMTP_NETIO, ERR_SMTP_BAD_ANSWER_TO_EHLO, ERR_SMTP_SENDER_REJECTED,
+  ERR_SMTP_NO_RECIPIENT_ACCEPTED, ERR_SMTP_DATA_COMMAND_REJECTED, ERR_SMTP_EMAIL_RECEPTION_NOT_CONFIRMED,
+  ERR_SMTP_INVALID_PORT_NUMBER};
 
   // Used for HTML page image files (small icons giving the status
   // of an entry)
@@ -70,6 +71,11 @@ struct rfc821_enveloppe_t {
   int sender_set;
   int recipients_set;
   int connect_timeout_set;
+
+  int nb_recipients_wanted;
+  int nb_recipients_ok;
+  char *from_orig;
+  char *from;
 };
 
 struct pop3_account_t {
@@ -111,6 +117,8 @@ struct check_t {
   int prg_command_set;
 
     // CM_LOOP method
+  char *loop_id;
+  int loop_id_set;
   struct rfc821_enveloppe_t loop_smtp;
   struct pop3_account_t loop_pop3;
 
@@ -221,6 +229,7 @@ int execute_alert_log(const struct exec_alert_t *exec_alert);
 
 int perform_check_tcp(const struct check_t *chk, const struct subst_t *subst, int subst_len);
 int perform_check_program(const struct check_t *chk, const struct subst_t *subst, int subst_len);
+int perform_check_loop(const struct check_t *chk, const struct subst_t *subst, int subst_len);
 
   // From webserver.c
 void *webserver(void *p);
