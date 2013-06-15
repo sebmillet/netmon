@@ -469,7 +469,6 @@ void set_current_tm(struct tm *ts) {
 //
 //
 //
-#define STR_LOG_TIMESTAMP 25
 void set_log_timestamp(char *s, size_t s_len,
                        int year, int month, int day, int hour, int minute, int second, long int usec) {
   if (g_log_usec && usec >= 0) {

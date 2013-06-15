@@ -28,6 +28,8 @@ typedef int socklen_t;
 #define SEND_ERROR -1
 #define SETSOCKOPT_ERROR -1
 
+#define LOOP_REF_SIZE 70
+
 void os_set_sock_nonblocking_mode(int sock);
 void os_set_sock_blocking_mode(int sock);
 int os_last_err();
@@ -42,6 +44,8 @@ enum {SRT_SUCCESS, SRT_SOCKET_ERROR, SRT_UNEXPECTED_ANSWER};
 enum {ERR_SMTP_OK = 0, ERR_SMTP_RESOLVE_ERROR, ERR_SMTP_NETIO, ERR_SMTP_BAD_ANSWER_TO_EHLO, ERR_SMTP_SENDER_REJECTED,
   ERR_SMTP_NO_RECIPIENT_ACCEPTED, ERR_SMTP_DATA_COMMAND_REJECTED, ERR_SMTP_EMAIL_RECEPTION_NOT_CONFIRMED,
   ERR_SMTP_INVALID_PORT_NUMBER};
+enum {ERR_POP3_OK = 0, ERR_POP3_INVALID_PORT_NUMBER, ERR_POP3_USER_REJECTED, ERR_POP3_PASSWORD_REJECTED, ERR_POP3_NETIO,
+  ERR_POP3_STAT_ERROR, ERR_POP3_RESOLVE_ERROR, ERR_POP3_EMAIL_NOT_RETRIEVABLE};
 
   // Used for HTML page image files (small icons giving the status
   // of an entry)
@@ -89,6 +93,14 @@ struct pop3_account_t {
   int user_set;
   int password_set;
   int connect_timeout_set;
+};
+
+enum {LE_NONE = 0, LE_SENT = 1, LE_RECEIVED = 2};
+struct loop_t {
+  int status;
+  char loop_ref[LOOP_REF_SIZE];
+  time_t sent_time;
+  time_t received_time;
 };
 
 struct check_t {

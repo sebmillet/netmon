@@ -13,6 +13,7 @@
 #include <getopt.h>
 
 /*#define DEBUG*/
+/*#define DEBUG_LOOP*/
 
 #define DEFAULT_CHECK_INTERVAL 120
 #define DEFAULT_NB_KEEP_LAST_STATUS 15
@@ -23,14 +24,19 @@
 #define DEFAULT_ALERT_REPEAT_MAX 5
 #define DEFAULT_ALERT_RECOVERY TRUE
 #define DEFAULT_ALERT_RETRIES 2
-#define DEFAULT_ALERT_SMTP_PORT 25
 #define DEFAULT_ALERT_SMTP_SELF PACKAGE_TARNAME
-#define DEFAULT_LOOP_SMTP_SELF  PACKAGE_TARNAME
+#define DEFAULT_SMTP_PORT 25
+#define DEFAULT_POP3_PORT 110
 #define DEFAULT_ALERT_LOG_STRING "${NOW_TIMESTAMP}  ${DESCRIPTION}"
 #define DEFAULT_CONNECT_TIMEOUT 5
+#define DEFAULT_LOOP_SMTP_SELF  PACKAGE_TARNAME
 #define LAST_STATUS_CHANGE_DISPLAY_SECONDS  (60 * 60 * 23)
 #define LOOP_STATUS_WHEN_SENDING_FAILS  ST_UNKNOWN
 #define DEFAULT_LOOP_ID "NMNM"
+#define LOOP_PREFIX     PACKAGE_NAME
+#define LOOP_POSTFIX    PACKAGE_NAME
+#define LOOP_ARRAY_REALLOC_STEP 2
+#define LOOP_HEADER_REF "subject:"
 
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
 const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
@@ -226,7 +232,7 @@ const char *l_date_formats[] = {
 
 
 //
-// All variabls found in the ini file
+// All variables found in the ini file
 //
 struct check_t chk00;
 struct alert_t alrt00;
@@ -332,6 +338,13 @@ const struct readcfg_var_t readcfg_vars[] = {
 // GENERAL
 //
 
+
+const char *LE_NAMES[] = {
+  "None",     // LE_NONE
+  "Sent",     // LE_SENT
+  "Received"  // LE_RECEIVED
+};
+
 int g_trace_network_traffic;
 
 int flag_interrupted = FALSE;
@@ -340,6 +353,16 @@ int quitting = FALSE;
 long int loop_count = 0;
 
 pthread_mutex_t mutex;
+
+struct loop_t *loops = NULL;
+int first_loop = 0;
+int last_loop = -1;
+int loops_nb_alloc = 0;
+
+
+//
+// FUNCTIONS
+//
 
 void rfc821_enveloppe_t_destroy(struct rfc821_enveloppe_t *s) {
   if (s->smarthost != NULL)
@@ -668,28 +691,31 @@ int socket_line_sendf(int *s, int trace, const char *fmt, ...) {
     return -1;
   }
 
-    // Newline (\015\012) + null terminating character
-  int l = strlen(fmt) + 100;
-  char *tmp;
-  tmp = (char *)malloc(l + 1);
+    // FIXME, used to be malloc'ed but the instruction free(tmp) (later)
+    // crashes the code...
+/*  int l = strlen(fmt) + 100;*/
+/*  char *tmp;*/
+/*  tmp = (char *)malloc(l + 1);*/
+  char tmp[1000];
 
   va_list args;
   va_start(args, fmt);
-  vsnprintf(tmp, l, fmt, args);
+/*  vsnprintf(tmp, l, fmt, args);*/
+  vsnprintf(tmp, sizeof(tmp), fmt, args);
   va_end(args);
 
   if (trace)
     my_logf(LL_VERBOSE, LP_DATETIME, PREFIX_SENT "%s", tmp);
 
-  strncat(tmp, "\015\012", l);
+  strncat(tmp, "\015\012", sizeof(tmp));
 
   int e = send(*s, tmp, strlen(tmp), 0);
 
-  free(tmp);
+/*  free(tmp);*/
 
   if (e == SOCKET_ERROR) {
     char s_err[ERR_STR_BUFSIZE];
-    my_logf(LL_ERROR, LP_DATETIME, "Error sending to socket, error %s", os_last_err_desc(s_err, sizeof(s_err)));
+    my_logf(LL_ERROR, LP_DATETIME, "Network I/O error: %s", os_last_err_desc(s_err, sizeof(s_err)));
     os_closesocket(*s);
     *s = -1;
     return -1;
@@ -774,7 +800,9 @@ void get_str_alert_info(char *s, size_t s_len, const struct tm *ts) {
 //
 //
 //
-int establish_connection(const char *host_name, int port, const char *expect, int timeout, int *sock) {
+int establish_connection(const char *host_name, int port, const char *expect, int timeout, int *sock, const char *prefix) {
+  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, host_name, port);
+
   char server_desc[SMALLSTRSIZE];
   char s_err[ERR_STR_BUFSIZE];
 
@@ -839,9 +867,8 @@ int perform_check_tcp(const struct check_t *chk, const struct subst_t *subst, in
   snprintf(prefix, sizeof(prefix), "TCP check(%s):", chk->display_name);
 
   int sock;
-  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, chk->host_name, chk->tcp_port);
   int ec = establish_connection(chk->host_name, chk->tcp_port, chk->tcp_expect_set ? chk->tcp_expect : NULL,
-    chk->tcp_connect_timeout_set ? chk->tcp_connect_timeout : g_connect_timeout, &sock);
+    chk->tcp_connect_timeout_set ? chk->tcp_connect_timeout : g_connect_timeout, &sock, prefix);
   os_closesocket(sock);
   my_logf(LL_VERBOSE, LP_DATETIME, "%s disconnected from %s:%i", prefix, chk->host_name, chk->tcp_port);
   if (ec == EC_OK)
@@ -882,12 +909,23 @@ int perform_check_program(const struct check_t *chk, const struct subst_t *subst
 }
 
 //
+// Construct a reference for email loops
 //
-//
-int perform_check_loop(const struct check_t *chk, const struct subst_t *subst, int subst_len) {
-  char prefix[SMALLSTRSIZE];
-  snprintf(prefix, sizeof(prefix), "Loop check(%s):", chk->display_name);
+void build_email_ref(const struct check_t *chk, const time_t time_ref, char *s, const size_t s_len) {
+  char r1[7];
+  char r2[7];
+  snprintf(r1, sizeof(r1), "%06d", rand());
+  snprintf(r2, sizeof(r2), "%06d", rand());
+  r1[sizeof(r1) - 1] = '\0';
+  r2[sizeof(r2) - 1] = '\0';
+  snprintf(s, s_len, "%s:%s:%010lu-%s-%s:%s",
+    LOOP_PREFIX, chk->loop_id_set ? chk->loop_id : DEFAULT_LOOP_ID, (long unsigned int)time_ref, r1, r2, LOOP_POSTFIX);
+}
 
+//
+//
+//
+int loop_send_email(const struct check_t *chk, const struct subst_t *subst, int subst_len, const char *prefix) {
   int sock;
 
   struct rfc821_enveloppe_t smtp = chk->loop_smtp;
@@ -905,15 +943,21 @@ int perform_check_loop(const struct check_t *chk, const struct subst_t *subst, i
     return LOOP_STATUS_WHEN_SENDING_FAILS;
   }
 
-  int wday; int year; int month; int day;
-  int hour; int minute; int second; long unsigned int usec;
-  long int gmtoff;
-  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
-  char loop_ref[SMALLSTRSIZE];
-  char *loop_id = chk->loop_id_set ? chk->loop_id : DEFAULT_LOOP_ID;
-  snprintf(loop_ref, sizeof(loop_ref), "%s-%04d-%02d-%02d-%02d-%02d-%02d-%06lu",
-    loop_id, year, month, day, hour, minute, second, usec);
-  socket_line_sendf(&sock, g_trace_network_traffic, "subject: %s", loop_ref);
+  ++last_loop;
+  if (last_loop >= loops_nb_alloc) {
+    loops_nb_alloc += LOOP_ARRAY_REALLOC_STEP;
+    loops = (struct loop_t *)realloc(loops, loops_nb_alloc * sizeof(struct loop_t));
+  }
+
+  struct loop_t *loop = &loops[last_loop];
+  loop->status = LE_NONE;
+
+  struct tm now;
+  time_t ltime = time(NULL);
+  now = *localtime(&ltime);
+
+  build_email_ref(chk, ltime, loop->loop_ref, sizeof(loop->loop_ref));
+  socket_line_sendf(&sock, g_trace_network_traffic, LOOP_HEADER_REF " %s", loop->loop_ref);
 
   socket_line_sendf(&sock, g_trace_network_traffic, "MIME-Version: 1.0");
   socket_line_sendf(&sock, g_trace_network_traffic, "Content-Type: text/plain");
@@ -923,16 +967,262 @@ int perform_check_loop(const struct check_t *chk, const struct subst_t *subst, i
 
   socket_line_sendf(&sock, g_trace_network_traffic, "");
 
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
   socket_line_sendf(&sock, g_trace_network_traffic, "This is a loop email sent by " PACKAGE_STRING);
+  char strnow[STR_NOW];
+  get_str_now(strnow, sizeof(strnow), &now);
+  socket_line_sendf(&sock, g_trace_network_traffic, "Sent: %s", strnow);
+  socket_line_sendf(&sock, g_trace_network_traffic, "Refrence: '%s'", loop->loop_ref);
   socket_line_sendf(&sock, g_trace_network_traffic, "");
 
 // Email end
 
   char email_ref[SMALLSTRSIZE];
-  r = smtp_mail_sending_post(sock, prefix, email_ref, sizeof(email_ref));
+  if ((r = smtp_mail_sending_post(sock, prefix, email_ref, sizeof(email_ref))) == ERR_SMTP_OK) {
+    loop->status = LE_SENT;
+    loop->sent_time = ltime;
+  }
 
   return r == ERR_SMTP_OK ? ST_OK : LOOP_STATUS_WHEN_SENDING_FAILS;
+}
+
+//
+// Check whether the email ref s2 matches s1, that is, belongs to the same loop
+// The criteria is: all characters must match (at the exact same position) EXCEPT
+// when they are numbers in which case they can differ.
+//
+// Example of refs that match:
+//    s1 = "netmon:MY_ID_REF:1371148661-136482-116824:netmon"
+//    s2 = "netmon:MY_ID_REF:1371148555-181991-141563:netmon"
+//
+// Example of refs that do not match:
+//    s1 = "netmon:MY_ID_REF:1371148555-181991-141563:netmon"
+//    s2 = "netmon:OTHER_REF:1371148596-530793-827558:netmon"
+//
+int does_this_email_belong_to_me(const char *s1, const char *s2) {
+  int i;
+  for (i = 0; s1[i] != '\0'; ++i) {
+    if (s1[i] != s2[i]) {
+      if (!isdigit(s1[i]) || !isdigit(s2[i])) {
+        return FALSE;
+      }
+    }
+  }
+  return s2[i] == '\0';
+}
+
+//
+//
+//
+void loop_manage_retrieved_email(const char *reference, const char *prefix) {
+  int i;
+  for (i = last_loop; i >= first_loop; --i) {
+    if (loops[i].status != LE_NONE && !strcmp(reference, loops[i].loop_ref)) {
+      if (loops[i].status == LE_RECEIVED) {
+        my_logf(LL_WARNING, LP_DATETIME, "%s loop email already retrieved, email loop ref = '%s'", prefix, reference);
+      }
+      loops[i].received_time = time(NULL);
+      long int duration = (signed long int)loops[i].received_time - (signed long int)loops[i].sent_time;
+      my_logf(LL_VERBOSE, LP_DATETIME, "%s loop email retrieved, delay = %lis, email loop ref = '%s'", prefix, duration, reference);
+      loops[i].status = LE_RECEIVED;
+      return;
+    }
+  }
+  my_logf(LL_WARNING, LP_DATETIME, "%s loop email found without internal match, email loop ref = '%s'", prefix, reference);
+}
+
+//
+//
+//
+int loop_receive_emails(const struct check_t *chk, const struct subst_t *subst, int subst_len, const char *prefix) {
+  char h[SMALLSTRSIZE];
+  int p;
+  const struct pop3_account_t *pop3 = &chk->loop_pop3;
+
+  if (split_hostname(pop3->server, pop3->port, pop3->port_set, DEFAULT_POP3_PORT, prefix, h, sizeof(h), &p))
+    return ERR_POP3_INVALID_PORT_NUMBER;
+
+  int sock;
+  int r;
+
+  int ec = establish_connection(h, p, "+OK ",
+    pop3->connect_timeout_set ? pop3->connect_timeout_set : g_connect_timeout, &sock, prefix);
+  if (ec != EC_OK)
+    return (ec == EC_RESOLVE_ERROR ? ERR_POP3_RESOLVE_ERROR : ERR_POP3_NETIO);
+
+  if ((r = socket_round_trip(sock, "+OK ", "USER %s", pop3->user)) != SRT_SUCCESS) {
+    if (r != SRT_SOCKET_ERROR) {
+      socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
+      my_logf(LL_ERROR, LP_DATETIME, "%s user not accepted, closing connection", prefix);
+      os_closesocket(sock);
+      return ERR_POP3_USER_REJECTED;
+    } else {
+      return ERR_POP3_NETIO;
+    }
+  }
+
+  if ((r = socket_round_trip(sock, "+OK ", "PASS %s", pop3->password)) != SRT_SUCCESS) {
+    if (r != SRT_SOCKET_ERROR) {
+      socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
+      my_logf(LL_ERROR, LP_DATETIME, "%s user not accepted, closing connection", prefix);
+      os_closesocket(sock);
+      return ERR_POP3_PASSWORD_REJECTED;
+    } else {
+      return ERR_POP3_NETIO;
+    }
+  }
+
+  if (socket_line_sendf(&sock, g_trace_network_traffic, "STAT")) {
+    return ERR_POP3_NETIO;
+  }
+  char *response = NULL;
+  int response_size;
+  if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0) {
+    free(response);
+    return ERR_POP3_NETIO;
+  }
+  char *space = NULL;
+  char *strN = response + 4;
+  if (strlen(response) >= 5)
+    space = strchr(strN, ' ');
+  if (!s_begins_with(response, "+OK ") || space == NULL) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s unexpected answer from server '%s'", prefix, response);
+    free(response);
+    os_closesocket(sock);
+    return ERR_POP3_STAT_ERROR;
+  }
+  *space = '\0';
+  char *d = strN;
+  while (TRUE) {
+    if (isdigit(*d))
+      d++;
+    else if (*d == '\0')
+      break;
+    else {
+      my_logf(LL_ERROR, LP_DATETIME, "%s unable to analyze answer from server: '%s'", prefix, response);
+      free(response);
+      os_closesocket(sock);
+      return ERR_POP3_STAT_ERROR;
+    }
+  }
+  int N = atoi(strN);
+
+  my_logf(LL_DEBUG, LP_DATETIME, "%s number of emails: %d", prefix, N);
+
+  time_t ltime = time(NULL);
+  char refex[LOOP_REF_SIZE];
+  build_email_ref(chk, ltime, refex, sizeof(refex));
+
+  int I;
+  for (I = 1; I <= N; ++I) {
+
+// 1. Retrieve email headers
+
+    if ((r = socket_round_trip(sock, "+OK ", "TOP %d 0", I)) == SRT_SOCKET_ERROR) {
+      free(response);
+      return ERR_POP3_NETIO;
+    } else if (r == SRT_UNEXPECTED_ANSWER) {
+      my_logf(LL_ERROR, LP_DATETIME, "%s unable to analyze email #%d", prefix, I);
+      continue;
+    }
+
+    char *header_value = NULL;
+    do {
+      if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0) {
+        free(response);
+        return ERR_POP3_NETIO;
+      }
+
+      if (s_begins_with(response, LOOP_HEADER_REF)) {
+          // Found the header we are interested in!
+        char *hv = response + strlen(LOOP_HEADER_REF);
+        hv = trim(hv);
+        size_t l = strlen(hv) + 1;
+        header_value = (char *)malloc(l);
+        strncpy(header_value, hv, l);
+        header_value[l - 1] = '\0';
+      }
+    } while (strcmp(response, "."));
+
+// 2. Check the email loop reference
+
+    if (header_value != NULL && does_this_email_belong_to_me(refex, header_value)) {
+      my_logf(LL_DEBUG, LP_DATETIME, "%s email %d of reference '%s' is mine", prefix, I, header_value);
+      loop_manage_retrieved_email(header_value, prefix);
+
+      if ((r = socket_round_trip(sock, "+OK ", "DELE %d", I)) == SRT_SOCKET_ERROR) {
+        free(response);
+        return ERR_POP3_NETIO;
+      } else if (r == SRT_UNEXPECTED_ANSWER) {
+        my_logf(LL_ERROR, LP_DATETIME, "%s cannot delete email %d of reference '%s'", prefix, I, header_value);
+      } else if (r == SRT_SUCCESS) {
+        my_logf(LL_VERBOSE, LP_DATETIME, "%s deleted email %d of reference '%s'", prefix, I, header_value);
+      } else {
+        internal_error("loop_receive_emails", __FILE__, __LINE__);
+      }
+    } else {
+      my_logf(LL_DEBUG, LP_DATETIME, "%s Email %d of reference '%s' is not mine, ignoring", prefix, I, header_value);
+    }
+    if (header_value != NULL)
+      free(header_value);
+  }
+
+  free(response);
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
+  my_logf(LL_DEBUG, LP_DATETIME, "%s closing POP3 connection", prefix);
+  os_closesocket(sock);
+
+  return ERR_POP3_OK;
+}
+
+//
+//
+//
+int perform_check_loop(const struct check_t *chk, const struct subst_t *subst, int subst_len) {
+  char prefix[SMALLSTRSIZE];
+  snprintf(prefix, sizeof(prefix), "Loop check(%s):", chk->display_name);
+
+/*  if (loop_count % 2 == 0) {*/
+    loop_send_email(chk, subst, subst_len, prefix);
+    loop_receive_emails(chk, subst, subst_len, prefix);
+/*  } else {*/
+/*    loop_receive_emails(chk, subst, subst_len, prefix);*/
+/*    loop_send_email(chk, subst, subst_len, prefix);*/
+/*  }*/
+
+// 1. Cleaning list, step 1
+
+  while (first_loop <= last_loop && loops[first_loop].status == LE_RECEIVED)
+    ++first_loop;
+  if (first_loop > last_loop) {
+    dbg_write("No more email in the list, restarting from zero\n");
+    first_loop = 0;
+    last_loop = -1;
+  }
+
+#ifdef DEBUG_LOOP
+  int i;
+  dbg_write("------\n");
+  for (i = first_loop; i <= last_loop; ++i) {
+    char sent[STR_NOW] = "n/a";
+    char received[STR_NOW] = "n/a";
+    if (loops[i].status == LE_SENT || loops[i].status == LE_RECEIVED) {
+      struct tm t_sent = *localtime(&loops[i].sent_time);
+      get_str_now(sent, sizeof(sent), &t_sent);
+    }
+    if (loops[i].status == LE_RECEIVED) {
+      struct tm t_received = *localtime(&loops[i].received_time);
+      get_str_now(received, sizeof(received), &t_received);
+    }
+    dbg_write("#%05d - %-10s  %-16s %-16s %s\n", i, LE_NAMES[loops[i].status], sent, received, loops[i].loop_ref);
+  }
+  dbg_write("------\n");
+  dbg_write("first_loop = %d, last_loop = %d, loops_nb_alloc = %d, loops = %lu\n",
+    first_loop, last_loop, loops_nb_alloc, (long unsigned int)loops);
+  dbg_write("------\n");
+#endif
+
+  return ST_OK;
 }
 
 //
@@ -1038,6 +1328,32 @@ void get_rfc822_header_format_current_date(char *date, size_t date_len) {
 }
 
 //
+// Split a hostname between the real hostname and the port, in case
+// the hostname is in the form
+//    hostname:port
+// If no ':' is found, just return the hostname and the default port
+//
+int split_hostname(const char *hostname, const int port, const int port_set, const int default_port, const char *prefix,
+    char *h, const size_t h_len, int *p) {
+  strncpy(h, hostname, h_len);
+  h[h_len - 1] = '\0';
+  char *col = strchr(h, CFGK_PORT_SEPARATOR);
+  if (col != NULL) {
+    *col = '\0';
+    char *strport = col + 1;
+    strport = trim(strport);
+    *p = atoi(strport);
+  } else {
+    *p = port_set ? port : default_port;
+  }
+  if (*p < 1) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s invalid port number (%s:%i)", prefix, h, *p);
+    return -1;
+  }
+  return 0;
+}
+
+//
 // Perform an SMTP transaction up to the DATA command (inclusive)
 // Returns ERR_SMTP_* constants
 //
@@ -1048,25 +1364,11 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, i
   char h[SMALLSTRSIZE];
   int p;
 
-  strncpy(h, env->smarthost, sizeof(h));
-  h[sizeof(h) - 1] = '\0';
-  char *col = strchr(h, CFGK_PORT_SEPARATOR);
-  if (col != NULL) {
-    *col = '\0';
-    char *strport = col + 1;
-    strport = trim(strport);
-    p = atoi(strport);
-  } else {
-    p = env->port_set ? env->port : DEFAULT_ALERT_SMTP_PORT;
-  }
-  if (p < 1) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s invalid port number (%s:%i)", prefix, h, p);
+  if (split_hostname(env->smarthost, env->port, env->port_set, DEFAULT_SMTP_PORT, prefix, h, sizeof(h), &p))
     return ERR_SMTP_INVALID_PORT_NUMBER;
-  }
 
-  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, h, p);
   int ec = establish_connection(h, p, "220 ",
-    env->connect_timeout_set ? env->connect_timeout_set : g_connect_timeout, sock);
+    env->connect_timeout_set ? env->connect_timeout_set : g_connect_timeout, sock, prefix);
   if (ec != EC_OK)
     return (ec == EC_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR : ERR_SMTP_NETIO);
 
@@ -1084,8 +1386,10 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, i
   } while (s_begins_with(response, "250-"));
   if (!s_begins_with(response, "250 ")) {
     my_logf(LL_ERROR, LP_DATETIME, "%s unexpected answer from server '%s'", prefix, response);
+    free(response);
     return ERR_SMTP_BAD_ANSWER_TO_EHLO;
   }
+  free(response);
   env->from_orig = env->sender_set ? env->sender : DEFAULT_ALERT_SMTP_SENDER;
   strncpy(from_buf, env->from_orig, from_buf_len);
   from_buf[from_buf_len - 1] = '\0';
