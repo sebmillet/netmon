@@ -30,13 +30,16 @@
 #define DEFAULT_ALERT_LOG_STRING "${NOW_TIMESTAMP}  ${DESCRIPTION}"
 #define DEFAULT_CONNECT_TIMEOUT 5
 #define DEFAULT_LOOP_SMTP_SELF  PACKAGE_TARNAME
-#define LAST_STATUS_CHANGE_DISPLAY_SECONDS  (60 * 60 * 23)
-#define LOOP_STATUS_WHEN_SENDING_FAILS  ST_UNKNOWN
+#define DEFAULT_LOOP_FAIL_TIMEOUT (60 * 60 * 4)
+#define DEFAULT_LOOP_FAIL_DELAY (60 * 10)
 #define DEFAULT_LOOP_ID "NMNM"
+#define LOOP_STATUS_WHEN_SENDING_FAILS  ST_UNKNOWN
+#define LOOP_TRIGGER_OPTIMIZE_ARRAY 10
 #define LOOP_PREFIX     PACKAGE_NAME
 #define LOOP_POSTFIX    PACKAGE_NAME
-#define LOOP_ARRAY_REALLOC_STEP 2
+#define LOOP_ARRAY_REALLOC_STEP 60
 #define LOOP_HEADER_REF "subject:"
+#define LAST_STATUS_CHANGE_DISPLAY_SECONDS  (60 * 60 * 23)
 
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
 const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
@@ -49,6 +52,7 @@ const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
   // Don't update the one below unless you know what you're doing!
   // Linked to test_linux directory scripts
 #define TEST2_NB_LOOPS  199
+#define TEST3_NB_LOOPS  20
 
   // As writtn here:
   //   http://nagiosplug.sourceforge.net/developer-guidelines.html#AEN76
@@ -138,6 +142,8 @@ struct img_file_t img_files[_ST_NBELEMS];
 // CONFIG
 //
 
+int g_laxist = FALSE;
+
 extern loglevel_t g_current_log_level;
 
 extern char g_log_file[SMALLSTRSIZE];
@@ -184,11 +190,6 @@ char g_html_complete_file_name[BIGSTRSIZE];
 #define CFGK_LIST_SEPARATOR ','
 #define CFGK_PORT_SEPARATOR ':'
 #define CFGK_COMMENT_CHAR ';'
-const char *CS_GENERAL_STR  = "general";
-const char *CS_CHECK_STR = "check";
-const char *CS_ALERT_STR = "alert";
-
-#define FIND_STRING_NOT_FOUND -1
 
 enum {AM_UNDEF = FIND_STRING_NOT_FOUND, AM_SMTP = 0, AM_PROGRAM = 1, AM_LOG = 2};
 const char *l_alert_methods[] = {
@@ -236,101 +237,125 @@ const char *l_date_formats[] = {
 //
 struct check_t chk00;
 struct alert_t alrt00;
+
+enum {CS_NONE = -1, CS_GENERAL = 0, CS_CHECK = 1, CS_ALERT = 2};
+  // Indexed with CS_ constants
+const char *l_sections_names[] = {
+  "general",  // CS_GENERAL
+  "check",    // CS_CHECK
+  "alert"     // CS_ALERT
+};
+struct section_method_mgmt_t l_sections_methods[] = {
+  {NULL, NULL, NULL, NULL},                                                                    // CS_GENERAL
+  {(const char **)l_check_methods, &chk00.guess_method, &chk00.method, &chk00.method_set},     // CS_CHECK
+  {(const char **)l_alert_methods, &alrt00.guess_method, &alrt00.method, &alrt00.method_set}   // CS_ALERT
+};
+
 const struct readcfg_var_t readcfg_vars[] = {
 
 // CHECKS
 
-  {"method", V_STRKEY, CS_PROBE, &chk00.method, NULL, NULL, 0, &chk00.method_set, FALSE, l_check_methods,
-    sizeof(l_check_methods) / sizeof(*l_check_methods)},
-  {"display_name", V_STR, CS_PROBE, NULL, &(chk00.display_name), NULL, 0, &(chk00.display_name_set), FALSE, NULL, 0},
-  {"host_name", V_STR, CS_PROBE, NULL, &(chk00.host_name), NULL, 0, &(chk00.host_name_set), FALSE, NULL, 0},
+  {"method", V_STRKEY, CS_CHECK, &chk00.method, NULL, NULL, 0, &chk00.method_set, FALSE, l_check_methods,
+    sizeof(l_check_methods) / sizeof(*l_check_methods), -1},
+  {"display_name", V_STR, CS_CHECK, NULL, &(chk00.display_name), NULL, 0, &(chk00.display_name_set), FALSE, NULL, 0, -1},
+  {"host_name", V_STR, CS_CHECK, NULL, &(chk00.host_name), NULL, 0, &(chk00.host_name_set), FALSE, NULL, 0, -1},
 
 // CHCKS -> TCP method
 
-  {"tcp_port", V_INT, CS_PROBE, &(chk00.tcp_port), NULL, NULL, 0, &(chk00.tcp_port_set), FALSE, NULL, 0},
-  {"tcp_connect_timeout", V_INT, CS_PROBE, &(chk00.tcp_connect_timeout), NULL, NULL, 0, &(chk00.tcp_connect_timeout_set), FALSE, NULL, 0},
-  {"tcp_expect", V_STR, CS_PROBE, NULL, &(chk00.tcp_expect), NULL, 0, &(chk00.tcp_expect_set), FALSE, NULL, 0},
+  {"tcp_port", V_INT, CS_CHECK, &(chk00.tcp_port), NULL, NULL, 0, &(chk00.tcp_port_set), FALSE, NULL, 0, CM_TCP},
+  {"tcp_connect_timeout", V_INT, CS_CHECK, &(chk00.tcp_connect_timeout), NULL, NULL, 0,
+    &(chk00.tcp_connect_timeout_set), FALSE, NULL, 0, CM_TCP},
+  {"tcp_expect", V_STR, CS_CHECK, NULL, &(chk00.tcp_expect), NULL, 0, &(chk00.tcp_expect_set), FALSE, NULL, 0, CM_TCP},
 
 // CHECKS -> PROGRAM method
 
-  {"program_command", V_STR, CS_PROBE, NULL, &(chk00.prg_command), NULL, 0, &(chk00.prg_command_set), FALSE, NULL, 0},
+  {"program_command", V_STR, CS_CHECK, NULL, &(chk00.prg_command), NULL, 0, &(chk00.prg_command_set), FALSE, NULL, 0, CM_PROGRAM},
 
 // CHECKS -> LOOP method
 
-  {"loop_id", V_STR, CS_PROBE, NULL, &chk00.loop_id, NULL, 0, &chk00.loop_id_set, TRUE, NULL, 0},
-  {"loop_smtp_smart_host", V_STR, CS_PROBE, NULL, &chk00.loop_smtp.smarthost, NULL, 0,
-    &chk00.loop_smtp.smarthost_set, FALSE, NULL, 0},
-  {"loop_smtp_port", V_INT, CS_PROBE, &chk00.loop_smtp.port, NULL, NULL, 0, &chk00.loop_smtp.port_set, FALSE, NULL, 0},
-  {"loop_smtp_self", V_STR, CS_PROBE, NULL, &chk00.loop_smtp.self, NULL, 0, &chk00.loop_smtp.self_set, FALSE, NULL, 0},
-  {"loop_smtp_sender", V_STR, CS_PROBE, NULL, &chk00.loop_smtp.sender, NULL, 0, &chk00.loop_smtp.sender_set, TRUE, NULL, 0},
-  {"loop_smtp_recipients", V_STR, CS_PROBE, NULL, &chk00.loop_smtp.recipients, NULL, 0, &chk00.loop_smtp.recipients_set, FALSE, NULL, 0},
-  {"loop_smtp_connect_timeout", V_INT, CS_PROBE, &chk00.loop_smtp.connect_timeout, NULL, NULL, 0,
-    &chk00.loop_smtp.connect_timeout_set, FALSE, NULL, 0},
-  {"loop_pop3_server", V_STR, CS_PROBE, NULL, &chk00.loop_pop3.server, NULL, 0, &chk00.loop_pop3.server_set, FALSE, NULL, 0},
-  {"loop_pop3_port", V_INT, CS_PROBE, &chk00.loop_pop3.port, NULL, NULL, 0, &chk00.loop_pop3.port_set, FALSE, NULL, 0},
-  {"loop_pop3_user", V_STR, CS_PROBE, NULL, &chk00.loop_pop3.user, NULL, 0, &chk00.loop_pop3.user_set, FALSE, NULL, 0},
-  {"loop_pop3_password", V_STR, CS_PROBE, NULL, &chk00.loop_pop3.password, NULL, 0, &chk00.loop_pop3.password_set, FALSE, NULL, 0},
-  {"loop_pop3_connect_timeout", V_INT, CS_PROBE, &chk00.loop_pop3.connect_timeout, NULL, NULL, 0,
-    &chk00.loop_pop3.connect_timeout_set, FALSE, NULL, 0},
+  {"loop_id", V_STR, CS_CHECK, NULL, &chk00.loop_id, NULL, 0, &chk00.loop_id_set, TRUE, NULL, 0, CM_LOOP},
+  {"loop_fail_delay", V_INT, CS_CHECK, &chk00.loop_fail_delay, NULL, NULL, 0, &chk00.loop_fail_delay_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_fail_timeout", V_INT, CS_CHECK, &chk00.loop_fail_timeout, NULL, NULL, 0,
+    &chk00.loop_fail_timeout_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_send_every", V_INT, CS_CHECK, &chk00.loop_send_every, NULL, NULL, 0, &chk00.loop_send_every_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_smtp_smart_host", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.smarthost, NULL, 0,
+    &chk00.loop_smtp.smarthost_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_smtp_port", V_INT, CS_CHECK, &chk00.loop_smtp.port, NULL, NULL, 0, &chk00.loop_smtp.port_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_smtp_self", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.self, NULL, 0, &chk00.loop_smtp.self_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_smtp_sender", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.sender, NULL, 0, &chk00.loop_smtp.sender_set, TRUE, NULL, 0, CM_LOOP},
+  {"loop_smtp_recipients", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.recipients, NULL, 0,
+    &chk00.loop_smtp.recipients_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_smtp_connect_timeout", V_INT, CS_CHECK, &chk00.loop_smtp.connect_timeout, NULL, NULL, 0,
+    &chk00.loop_smtp.connect_timeout_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_pop3_server", V_STR, CS_CHECK, NULL, &chk00.loop_pop3.server, NULL, 0, &chk00.loop_pop3.server_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_pop3_port", V_INT, CS_CHECK, &chk00.loop_pop3.port, NULL, NULL, 0, &chk00.loop_pop3.port_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_pop3_user", V_STR, CS_CHECK, NULL, &chk00.loop_pop3.user, NULL, 0, &chk00.loop_pop3.user_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_pop3_password", V_STR, CS_CHECK, NULL, &chk00.loop_pop3.password, NULL, 0,
+    &chk00.loop_pop3.password_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_pop3_connect_timeout", V_INT, CS_CHECK, &chk00.loop_pop3.connect_timeout, NULL, NULL, 0,
+    &chk00.loop_pop3.connect_timeout_set, FALSE, NULL, 0, CM_LOOP},
 
 // CHECKS -> alerts
 
-  {"alerts", V_STR, CS_PROBE, NULL, &(chk00.alerts), NULL, 0, &(chk00.alerts_set), FALSE, NULL, 0},
-  {"alert_threshold", V_INT, CS_PROBE, &(chk00.alert_threshold), NULL, NULL, 0, &(chk00.alert_threshold_set), FALSE, NULL, 0},
-  {"alert_repeat_every", V_INT, CS_PROBE, &(chk00.alert_repeat_every), NULL, NULL, 0, &(chk00.alert_repeat_every_set), FALSE, NULL, 0},
-  {"alert_repeat_max", V_INT, CS_PROBE, &(chk00.alert_repeat_max), NULL, NULL, 0, &(chk00.alert_repeat_max_set), TRUE, NULL, 0},
-  {"alert_recovery", V_YESNO, CS_PROBE, &(chk00.alert_recovery), NULL, NULL, 0, &(chk00.alert_recovery_set), FALSE, NULL, 0},
+  {"alerts", V_STR, CS_CHECK, NULL, &(chk00.alerts), NULL, 0, &(chk00.alerts_set), FALSE, NULL, 0, -1},
+  {"alert_threshold", V_INT, CS_CHECK, &(chk00.alert_threshold), NULL, NULL, 0, &(chk00.alert_threshold_set), FALSE, NULL, 0, -1},
+  {"alert_repeat_every", V_INT, CS_CHECK, &(chk00.alert_repeat_every), NULL, NULL, 0,
+    &(chk00.alert_repeat_every_set), FALSE, NULL, 0, -1},
+  {"alert_repeat_max", V_INT, CS_CHECK, &(chk00.alert_repeat_max), NULL, NULL, 0, &(chk00.alert_repeat_max_set), TRUE, NULL, 0, -1},
+  {"alert_recovery", V_YESNO, CS_CHECK, &(chk00.alert_recovery), NULL, NULL, 0, &(chk00.alert_recovery_set), FALSE, NULL, 0, -1},
 
 // GENERAL
 
   {"date_format", V_STRKEY, CS_GENERAL, &g_date_format, NULL, NULL, 0, &g_date_format_set, FALSE, l_date_formats,
-    sizeof(l_date_formats) / sizeof(*l_date_formats)},
-  {"print_subst_error", V_YESNO, CS_GENERAL, &g_print_subst_error, NULL, NULL, 0, &g_print_subst_error_set, FALSE, NULL, 0},
-  {"log_usec", V_YESNO, CS_GENERAL, &g_log_usec, NULL, NULL, 0, &g_log_usec_set, FALSE, NULL, 0},
-  {"check_interval", V_INT, CS_GENERAL, &g_check_interval, NULL, NULL, 0, &g_check_interval_set, TRUE, NULL, 0},
-  {"buffer_size", V_INT, CS_GENERAL, &g_buffer_size, NULL, NULL, 0, &g_buffer_size_set, FALSE, NULL, 0},
-  {"connect_timeout", V_INT, CS_GENERAL, &g_connect_timeout, NULL, NULL, 0, &g_connect_timeout_set, FALSE, NULL, 0},
-  {"keep_last_status", V_INT, CS_GENERAL, &g_nb_keep_last_status, NULL, NULL, 0, &g_nb_keep_last_status_set, TRUE, NULL, 0},
-  {"display_name_width", V_INT, CS_GENERAL, &g_display_name_width, NULL, NULL, 0, &g_display_name_width_set, FALSE, NULL, 0},
-  {"html_refresh_interval", V_INT, CS_GENERAL, &g_html_refresh_interval, NULL, NULL, 0, &g_html_refresh_interval_set, FALSE, NULL, 0},
-  {"html_title", V_STR, CS_GENERAL, NULL, NULL, g_html_title, sizeof(g_html_title), &g_html_title_set, FALSE, NULL, 0},
-  {"html_directory", V_STR, CS_GENERAL, NULL, NULL, g_html_directory, sizeof(g_html_directory), &g_html_directory_set, FALSE, NULL, 0},
-  {"html_file", V_STR, CS_GENERAL, NULL, NULL, g_html_file, sizeof(g_html_file), &g_html_file_set, FALSE, NULL, 0},
-  {"html_nb_columns", V_INT, CS_GENERAL, &g_html_nb_columns, NULL, NULL, 0, &g_html_nb_columns_set, FALSE, NULL, 0},
-  {"webserver_on", V_YESNO, CS_GENERAL, &g_webserver_on, NULL, NULL, 0, &g_webserver_on_set, FALSE, NULL, 0},
-  {"webserver_port", V_INT, CS_GENERAL, &g_webserver_port, NULL, NULL, 0, &g_webserver_port_set, FALSE, NULL, 0},
+    sizeof(l_date_formats) / sizeof(*l_date_formats), -1},
+  {"print_subst_error", V_YESNO, CS_GENERAL, &g_print_subst_error, NULL, NULL, 0, &g_print_subst_error_set, FALSE, NULL, 0, -1},
+  {"log_usec", V_YESNO, CS_GENERAL, &g_log_usec, NULL, NULL, 0, &g_log_usec_set, FALSE, NULL, 0, -1},
+  {"check_interval", V_INT, CS_GENERAL, &g_check_interval, NULL, NULL, 0, &g_check_interval_set, TRUE, NULL, 0, -1},
+  {"buffer_size", V_INT, CS_GENERAL, &g_buffer_size, NULL, NULL, 0, &g_buffer_size_set, FALSE, NULL, 0, -1},
+  {"connect_timeout", V_INT, CS_GENERAL, &g_connect_timeout, NULL, NULL, 0, &g_connect_timeout_set, FALSE, NULL, 0, -1},
+  {"keep_last_status", V_INT, CS_GENERAL, &g_nb_keep_last_status, NULL, NULL, 0, &g_nb_keep_last_status_set, TRUE, NULL, 0, -1},
+  {"display_name_width", V_INT, CS_GENERAL, &g_display_name_width, NULL, NULL, 0, &g_display_name_width_set, FALSE, NULL, 0, -1},
+  {"html_refresh_interval", V_INT, CS_GENERAL, &g_html_refresh_interval, NULL, NULL, 0,
+    &g_html_refresh_interval_set, FALSE, NULL, 0, -1},
+  {"html_title", V_STR, CS_GENERAL, NULL, NULL, g_html_title, sizeof(g_html_title), &g_html_title_set, FALSE, NULL, 0, -1},
+  {"html_directory", V_STR, CS_GENERAL, NULL, NULL, g_html_directory, sizeof(g_html_directory),
+    &g_html_directory_set, FALSE, NULL, 0, -1},
+  {"html_file", V_STR, CS_GENERAL, NULL, NULL, g_html_file, sizeof(g_html_file), &g_html_file_set, FALSE, NULL, 0, -1},
+  {"html_nb_columns", V_INT, CS_GENERAL, &g_html_nb_columns, NULL, NULL, 0, &g_html_nb_columns_set, FALSE, NULL, 0, -1},
+  {"webserver_on", V_YESNO, CS_GENERAL, &g_webserver_on, NULL, NULL, 0, &g_webserver_on_set, FALSE, NULL, 0, -1},
+  {"webserver_port", V_INT, CS_GENERAL, &g_webserver_port, NULL, NULL, 0, &g_webserver_port_set, FALSE, NULL, 0, -1},
 
 // ALERTS
 
-  {"name", V_STR, CS_ALERT, NULL, &alrt00.name, NULL, 0, &alrt00.name_set, FALSE, NULL, 0},
+  {"name", V_STR, CS_ALERT, NULL, &alrt00.name, NULL, 0, &alrt00.name_set, FALSE, NULL, 0, -1},
   {"method", V_STRKEY, CS_ALERT, &alrt00.method, NULL, NULL, 0, &alrt00.method_set, FALSE, l_alert_methods,
-    sizeof(l_alert_methods) / sizeof(*l_alert_methods)},
-  {"threshold", V_INT, CS_ALERT, &(alrt00.threshold), NULL, NULL, 0, &(alrt00.threshold_set), FALSE, NULL, 0},
-  {"repeat_every", V_INT, CS_ALERT, &(alrt00.repeat_every), NULL, NULL, 0, &(alrt00.repeat_every_set), FALSE, NULL, 0},
-  {"repeat_max", V_INT, CS_ALERT, &(alrt00.repeat_max), NULL, NULL, 0, &(alrt00.repeat_max_set), TRUE, NULL, 0},
-  {"recovery", V_YESNO, CS_ALERT, &(alrt00.recovery), NULL, NULL, 0, &(alrt00.recovery_set), FALSE, NULL, 0},
-  {"retries", V_INT, CS_ALERT, &(alrt00.retries), NULL, NULL, 0, &(alrt00.retries_set), TRUE, NULL, 0},
+    sizeof(l_alert_methods) / sizeof(*l_alert_methods), -1},
+  {"threshold", V_INT, CS_ALERT, &(alrt00.threshold), NULL, NULL, 0, &(alrt00.threshold_set), FALSE, NULL, 0, -1},
+  {"repeat_every", V_INT, CS_ALERT, &(alrt00.repeat_every), NULL, NULL, 0, &(alrt00.repeat_every_set), FALSE, NULL, 0, -1},
+  {"repeat_max", V_INT, CS_ALERT, &(alrt00.repeat_max), NULL, NULL, 0, &(alrt00.repeat_max_set), TRUE, NULL, 0, -1},
+  {"recovery", V_YESNO, CS_ALERT, &(alrt00.recovery), NULL, NULL, 0, &(alrt00.recovery_set), FALSE, NULL, 0, -1},
+  {"retries", V_INT, CS_ALERT, &(alrt00.retries), NULL, NULL, 0, &(alrt00.retries_set), TRUE, NULL, 0, -1},
 
 // ALERTS -> SMTP method
 
   {"smtp_smart_host", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.smarthost, NULL, 0,
-    &alrt00.smtp_env.smarthost_set, FALSE, NULL, 0},
-  {"smtp_port", V_INT, CS_ALERT, &alrt00.smtp_env.port, NULL, NULL, 0, &alrt00.smtp_env.port_set, FALSE, NULL, 0},
-  {"smtp_self", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.self, NULL, 0, &alrt00.smtp_env.self_set, FALSE, NULL, 0},
-  {"smtp_sender", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.sender, NULL, 0, &alrt00.smtp_env.sender_set, TRUE, NULL, 0},
+    &alrt00.smtp_env.smarthost_set, FALSE, NULL, 0, AM_SMTP},
+  {"smtp_port", V_INT, CS_ALERT, &alrt00.smtp_env.port, NULL, NULL, 0, &alrt00.smtp_env.port_set, FALSE, NULL, 0, AM_SMTP},
+  {"smtp_self", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.self, NULL, 0, &alrt00.smtp_env.self_set, FALSE, NULL, 0, AM_SMTP},
+  {"smtp_sender", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.sender, NULL, 0, &alrt00.smtp_env.sender_set, TRUE, NULL, 0, AM_SMTP},
   {"smtp_recipients", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.recipients, NULL, 0,
-    &alrt00.smtp_env.recipients_set, FALSE, NULL, 0},
+    &alrt00.smtp_env.recipients_set, FALSE, NULL, 0, AM_SMTP},
   {"smtp_connect_timeout", V_INT, CS_ALERT, &alrt00.smtp_env.connect_timeout, NULL, NULL, 0,
-    &alrt00.smtp_env.connect_timeout_set, FALSE, NULL, 0},
+    &alrt00.smtp_env.connect_timeout_set, FALSE, NULL, 0, AM_SMTP},
 
 // ALERTS -> PROGRAM method
 
-  {"program_command", V_STR, CS_ALERT, NULL, &alrt00.prg_command, NULL, 0, &alrt00.prg_command_set, FALSE, NULL, 0},
+  {"program_command", V_STR, CS_ALERT, NULL, &alrt00.prg_command, NULL, 0, &alrt00.prg_command_set, FALSE, NULL, 0, AM_PROGRAM},
 
 // ALERTS -> LOG method
 
-  {"log_file", V_STR, CS_ALERT, NULL, &alrt00.log_file, NULL, 0, &alrt00.log_file_set, FALSE, NULL, 0},
-  {"log_string", V_STR, CS_ALERT, NULL, &alrt00.log_string, NULL, 0, &alrt00.log_string_set, FALSE, NULL, 0}
+  {"log_file", V_STR, CS_ALERT, NULL, &alrt00.log_file, NULL, 0, &alrt00.log_file_set, FALSE, NULL, 0, AM_LOG},
+  {"log_string", V_STR, CS_ALERT, NULL, &alrt00.log_string, NULL, 0, &alrt00.log_string_set, FALSE, NULL, 0, AM_LOG}
 };
 
 
@@ -450,7 +475,9 @@ void check_t_create(struct check_t *chk) {
 
   chk->is_valid = FALSE;
 
+  chk->method = CM_UNDEF;
   chk->method_set = FALSE;
+  chk->guess_method = -1;
 
   chk->display_name_set = FALSE;
   chk->display_name = NULL;
@@ -471,6 +498,10 @@ void check_t_create(struct check_t *chk) {
   chk->loop_id = NULL;
   chk->loop_id_set = FALSE;
   pop3_account_t_create(&chk->loop_pop3);
+  chk->loop_fail_delay_set = FALSE;
+  chk->loop_fail_timeout_set = FALSE;
+  chk->loop_send_every_set = FALSE;
+  chk->loop_send_countdown = -1;
 
   chk->alerts = NULL;
   chk->alerts_set = FALSE;
@@ -536,6 +567,7 @@ void alert_t_create(struct alert_t *alrt) {
 
   alrt->method = AM_UNDEF;
   alrt->method_set = FALSE;
+  alrt->guess_method = -1;
 
   alrt->threshold = 0;
   alrt->threshold_set = FALSE;
@@ -928,19 +960,22 @@ void build_email_ref(const struct check_t *chk, const time_t time_ref, char *s, 
 int loop_send_email(const struct check_t *chk, const struct subst_t *subst, int subst_len, const char *prefix) {
   int sock;
 
-  struct rfc821_enveloppe_t smtp = chk->loop_smtp;
-  char from_buf[SMALLSTRSIZE];
   int r;
-  if ((r = smtp_email_sending_pre(&smtp, prefix, &sock, from_buf, sizeof(from_buf))) != ERR_SMTP_OK) {
-    os_closesocket(sock);
-    return LOOP_STATUS_WHEN_SENDING_FAILS;
-  }
+
+  if (g_test_mode == 0) {
+    struct rfc821_enveloppe_t smtp = chk->loop_smtp;
+    char from_buf[SMALLSTRSIZE];
+    if ((r = smtp_email_sending_pre(&smtp, prefix, &sock, from_buf, sizeof(from_buf))) != ERR_SMTP_OK) {
+      os_closesocket(sock);
+      return LOOP_STATUS_WHEN_SENDING_FAILS;
+    }
 
 // Email headers
 
-  if ((r = smtp_mail_sending_stdheaders(&sock, &smtp)) != ERR_SMTP_OK) {
-    os_closesocket(sock);
-    return LOOP_STATUS_WHEN_SENDING_FAILS;
+    if ((r = smtp_mail_sending_stdheaders(&sock, &smtp)) != ERR_SMTP_OK) {
+      os_closesocket(sock);
+      return LOOP_STATUS_WHEN_SENDING_FAILS;
+    }
   }
 
   ++last_loop;
@@ -957,29 +992,37 @@ int loop_send_email(const struct check_t *chk, const struct subst_t *subst, int 
   now = *localtime(&ltime);
 
   build_email_ref(chk, ltime, loop->loop_ref, sizeof(loop->loop_ref));
-  socket_line_sendf(&sock, g_trace_network_traffic, LOOP_HEADER_REF " %s", loop->loop_ref);
 
-  socket_line_sendf(&sock, g_trace_network_traffic, "MIME-Version: 1.0");
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-Type: text/plain");
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-Transfer-Encoding: 7bit");
+  if (g_test_mode == 0) {
+      // Corresponds to LOOP_HEADER_REF
+    socket_line_sendf(&sock, g_trace_network_traffic, "subject: %s", loop->loop_ref);
+
+    socket_line_sendf(&sock, g_trace_network_traffic, "MIME-Version: 1.0");
+    socket_line_sendf(&sock, g_trace_network_traffic, "Content-Type: text/plain");
+    socket_line_sendf(&sock, g_trace_network_traffic, "Content-Transfer-Encoding: 7bit");
 
 // Email body
 
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
+    socket_line_sendf(&sock, g_trace_network_traffic, "");
 
-  socket_line_sendf(&sock, g_trace_network_traffic, "This is a loop email sent by " PACKAGE_STRING);
-  char strnow[STR_NOW];
-  get_str_now(strnow, sizeof(strnow), &now);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Sent: %s", strnow);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Refrence: '%s'", loop->loop_ref);
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
+    socket_line_sendf(&sock, g_trace_network_traffic, "This is a loop email sent by " PACKAGE_STRING);
+    char strnow[STR_NOW];
+    get_str_now(strnow, sizeof(strnow), &now);
+    socket_line_sendf(&sock, g_trace_network_traffic, "Sent: %s", strnow);
+    socket_line_sendf(&sock, g_trace_network_traffic, "Refrence: '%s'", loop->loop_ref);
+    socket_line_sendf(&sock, g_trace_network_traffic, "");
 
-// Email end
+  // Email end
 
-  char email_ref[SMALLSTRSIZE];
-  if ((r = smtp_mail_sending_post(sock, prefix, email_ref, sizeof(email_ref))) == ERR_SMTP_OK) {
+    char email_ref[SMALLSTRSIZE];
+    if ((r = smtp_mail_sending_post(sock, prefix, email_ref, sizeof(email_ref))) == ERR_SMTP_OK) {
+      loop->status = LE_SENT;
+      loop->sent_time = ltime;
+    }
+  } else {
     loop->status = LE_SENT;
     loop->sent_time = ltime;
+    r = ERR_SMTP_OK;
   }
 
   return r == ERR_SMTP_OK ? ST_OK : LOOP_STATUS_WHEN_SENDING_FAILS;
@@ -1022,7 +1065,8 @@ void loop_manage_retrieved_email(const char *reference, const char *prefix) {
       }
       loops[i].received_time = time(NULL);
       long int duration = (signed long int)loops[i].received_time - (signed long int)loops[i].sent_time;
-      my_logf(LL_VERBOSE, LP_DATETIME, "%s loop email retrieved, delay = %lis, email loop ref = '%s'", prefix, duration, reference);
+      my_logf(LL_VERBOSE, LP_DATETIME, "%s loop email retrieved, delay = %lis, email loop ref = '%s'",
+        prefix, duration, reference);
       loops[i].status = LE_RECEIVED;
       return;
     }
@@ -1037,6 +1081,9 @@ int loop_receive_emails(const struct check_t *chk, const struct subst_t *subst, 
   char h[SMALLSTRSIZE];
   int p;
   const struct pop3_account_t *pop3 = &chk->loop_pop3;
+
+  if (g_test_mode != 0)
+    return ERR_POP3_OK;
 
   if (split_hostname(pop3->server, pop3->port, pop3->port_set, DEFAULT_POP3_PORT, prefix, h, sizeof(h), &p))
     return ERR_POP3_INVALID_PORT_NUMBER;
@@ -1150,6 +1197,7 @@ int loop_receive_emails(const struct check_t *chk, const struct subst_t *subst, 
       loop_manage_retrieved_email(header_value, prefix);
 
       if ((r = socket_round_trip(sock, "+OK ", "DELE %d", I)) == SRT_SOCKET_ERROR) {
+        free(header_value);
         free(response);
         return ERR_POP3_NETIO;
       } else if (r == SRT_UNEXPECTED_ANSWER) {
@@ -1182,17 +1230,54 @@ int perform_check_loop(const struct check_t *chk, const struct subst_t *subst, i
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "Loop check(%s):", chk->display_name);
 
-/*  if (loop_count % 2 == 0) {*/
-    loop_send_email(chk, subst, subst_len, prefix);
+// 1. Send & received probe emails
+
+  int r;
+#ifdef DEBUG_LOOP
+  if (loop_count % 2 == 0) {
     loop_receive_emails(chk, subst, subst_len, prefix);
-/*  } else {*/
-/*    loop_receive_emails(chk, subst, subst_len, prefix);*/
-/*    loop_send_email(chk, subst, subst_len, prefix);*/
-/*  }*/
+    r = loop_send_email(chk, subst, subst_len, prefix);
+  } else {
+#endif
+    r = loop_send_email(chk, subst, subst_len, prefix);
+    loop_receive_emails(chk, subst, subst_len, prefix);
+#ifdef DEBUG_LOOP
+  }
+#endif
 
-// 1. Cleaning list, step 1
+  if (g_test_mode == 3)
+    os_sleep(1);
 
-  while (first_loop <= last_loop && loops[first_loop].status == LE_RECEIVED)
+// 2. Remove entries beyond timeout
+
+  time_t ltime = time(NULL);
+  signed long int timeout = chk->loop_fail_timeout_set ? chk->loop_fail_timeout : DEFAULT_LOOP_FAIL_TIMEOUT;
+  int i;
+  for (i = first_loop; i <= last_loop; ++i) {
+    if (loops[i].status != LE_NONE) {
+      signed long int age =  (signed long int)ltime - (signed long int)loops[i].sent_time;
+
+      dbg_write("age = %li, timeout = %li\n", age, timeout);
+
+      if (age < timeout)
+          // Entries are created in chronological order, if one is below timeout,
+          // next ones will be, too -> no need to continue
+        break;
+      if (g_test_mode) {
+        my_logf(LL_VERBOSE, LP_DATETIME, "%s removing loop email %d of reference '%s' (run to timeout), age = %li > timeout = %li",
+          prefix, i, "netmon:MYLOOP:1371397278-137861-187807:netmon", age, timeout);
+      } else {
+        my_logf(LL_VERBOSE, LP_DATETIME, "%s removing loop email %d of reference '%s' (run to timeout), age = %li > timeout = %li",
+          prefix, i, "netmon:MYLOOP:1371397278-137861-187807:netmon", age, timeout);
+      }
+      loops[i].status = LE_NONE;
+    }
+  }
+
+// 3. Cleaning list: first entries that are "received" (email went back)
+//    or "none" (timeout) are to be deleted.
+
+  while (first_loop <= last_loop && loops[first_loop].status != LE_SENT)
     ++first_loop;
   if (first_loop > last_loop) {
     dbg_write("No more email in the list, restarting from zero\n");
@@ -1201,7 +1286,6 @@ int perform_check_loop(const struct check_t *chk, const struct subst_t *subst, i
   }
 
 #ifdef DEBUG_LOOP
-  int i;
   dbg_write("------\n");
   for (i = first_loop; i <= last_loop; ++i) {
     char sent[STR_NOW] = "n/a";
@@ -1222,17 +1306,45 @@ int perform_check_loop(const struct check_t *chk, const struct subst_t *subst, i
   dbg_write("------\n");
 #endif
 
-  return ST_OK;
+// 4. Optimize memory: when first_loop becomes too big, move elements
+
+  if (first_loop >= LOOP_TRIGGER_OPTIMIZE_ARRAY) {
+    for (i = first_loop; i <= last_loop; ++i)
+      loops[i - first_loop] = loops[i];
+    last_loop -= first_loop;
+    first_loop = 0;
+  }
+
+// 5. Check whether there are entries beyond "delay" => fail condition
+  signed long int delay = chk->loop_fail_delay_set ? chk->loop_fail_delay : DEFAULT_LOOP_FAIL_DELAY;
+  for (i = first_loop; i <= last_loop; ++i) {
+    if (loops[i].status == LE_SENT) {
+      signed long int age =  (signed long int)ltime - (signed long int)loops[i].sent_time;
+      if (age < timeout && age >= delay) {
+        r = ST_FAIL;
+        break;
+      }
+    }
+  }
+
+  return r;
 }
 
 //
+// Get loop_count in a thread-safe manner
 //
-//
-void loop_count_to_str(char *lcstr, size_t lcstr_len) {
+long int get_loop_count() {
   my_pthread_mutex_lock(&mutex);
   long int lc = loop_count;
   my_pthread_mutex_unlock(&mutex);
-  snprintf(lcstr, lcstr_len, "%li", lc);
+  return lc;
+}
+
+//
+// Convert loop_count to a string
+//
+void loop_count_to_str(char *lcstr, size_t lcstr_len) {
+  snprintf(lcstr, lcstr_len, "%li", get_loop_count());
 }
 
 //
@@ -1892,6 +2004,17 @@ void manage_output(const struct tm *now_done, float elapsed) {
 //
 void almost_neverending_loop() {
 
+  if (g_test_mode == 3) {
+    my_logf(LL_DEBUG, LP_DATETIME, "Test mode 3: waiting to be at the middle of a second elapse to start");
+    int wday; int year; int month; int day;
+    int hour; int minute; int second; long unsigned int usec;
+    long int gmtoff;
+    while (usec >= 500000)
+      get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
+    while (usec < 500000)
+      get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
+  }
+
   while (1) {
 
     my_pthread_mutex_lock(&mutex);
@@ -1950,7 +2073,8 @@ void almost_neverending_loop() {
       }
 
 #ifdef DEBUG
-      my_logf(LL_NORMAL, LP_DATETIME, "%s -> %s (%i)", chk->display_name, ST_TO_LONGSTR_FANCY[chk->status], chk->nb_consecutive_notok);
+      my_logf(LL_NORMAL, LP_DATETIME, "%s -> %s (%i)",
+        chk->display_name, ST_TO_LONGSTR_FANCY[chk->status], chk->nb_consecutive_notok);
 #else
       my_logf(LL_NORMAL, LP_DATETIME, "%s -> %s", chk->display_name, ST_TO_LONGSTR_FANCY[chk->status]);
 #endif
@@ -2116,6 +2240,8 @@ void almost_neverending_loop() {
         break;
       else if (g_test_mode == 2 && lc == TEST2_NB_LOOPS)
         break;
+      else if (g_test_mode == 3 && lc == TEST3_NB_LOOPS)
+        break;
     }
   };
 }
@@ -2191,6 +2317,7 @@ void printhelp() {
   printf("  -C --stdout        Print status on stdout\n");
   printf("  -t --test N        Set test mode to N, 0 (default) = no test mode\n");
   printf("  -a --alert         Test the alert name written after the option and quit\n");
+  printf("     --laxist        Continue if errors are found in the ini file (default: stop)\n");
 }
 
 //
@@ -2225,6 +2352,7 @@ void parse_options(int argc, char *argv[]) {
     {"stdout", no_argument, NULL, 'C'},
     {"test", required_argument, NULL, 't'},
     {"alert", no_argument, NULL, 'a'},
+    {"laxist", no_argument, NULL, '0'},
     {0, 0, 0, 0}
   };
 
@@ -2277,6 +2405,10 @@ void parse_options(int argc, char *argv[]) {
         strncpy(g_log_file, optarg, sizeof(g_log_file));
         break;
 
+      case '0':
+        g_laxist = TRUE;
+        break;
+
       case 'p':
         g_print_log = TRUE;
         break;
@@ -2309,10 +2441,20 @@ void parse_options(int argc, char *argv[]) {
 //
 // Check a check variable
 //
-void check_t_check(struct check_t *chk, const char *cf, int line_number) {
+void check_t_check(struct check_t *chk, const char *cf, int line_number, int *nb_errors) {
   g_nb_checks++;
 
   int is_valid = TRUE;
+
+  if (chk->guess_method >= 0 && !chk->method_set) {
+    chk->method = chk->guess_method;
+    chk->method_set = TRUE;
+  }
+  if (chk->method_set && chk->method >= 0 && chk->guess_method >= 0 && chk->method != chk->guess_method) {
+    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: inconsistent methods across variables",
+      cf, line_number);
+    is_valid = FALSE;
+  }
 
   if (!chk->display_name_set) {
     my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no display_name defined, discarding check",
@@ -2349,8 +2491,10 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number) {
   }
 
   chk->is_valid = is_valid;
-  if (!chk->is_valid)
+  if (!chk->is_valid) {
+    (*nb_errors)++;
     return;
+  }
 
   ++g_nb_valid_checks;
 
@@ -2364,10 +2508,20 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number) {
 //
 // Check an alert variable
 //
-void alert_t_check(struct alert_t *alrt, const char *cf, int line_number) {
+void alert_t_check(struct alert_t *alrt, const char *cf, int line_number, int *nb_errors) {
   g_nb_alerts++;
 
   int is_valid = TRUE;
+
+  if (alrt->guess_method >= 0 && !alrt->method_set) {
+    alrt->method = alrt->guess_method;
+    alrt->method_set = TRUE;
+  }
+  if (alrt->method_set && alrt->method >= 0 && alrt->guess_method >= 0 && alrt->method != alrt->guess_method) {
+    my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: inconsistent methods across variables",
+      cf, line_number);
+    is_valid = FALSE;
+  }
 
   if (!alrt->name_set) {
     my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no name defined, discarding alert",
@@ -2417,14 +2571,17 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number) {
 
   alrt->is_valid = is_valid;
 
-  if (alrt->is_valid)
+  if (alrt->is_valid) {
     ++g_nb_valid_alerts;
+  } else {
+    (*nb_errors)++;
+  }
 }
 
 //
 // Parse the ini file
 //
-void read_configuration_file(const char *cf) {
+void read_configuration_file(const char *cf, int *nb_errors) {
   FILE *FCFG = NULL;
   if ((FCFG = fopen(cf, "r")) == NULL) {
     fatal_error("Configuration file '%s': unable to open", cf);
@@ -2468,47 +2625,49 @@ void read_configuration_file(const char *cf) {
           ++slen;
         }
         if (*e == '\0') {
+          (*nb_errors)++;
           my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: syntax error", cf, line_number);
         } else {
           char section_name[SMALLSTRSIZE + 1];
           strncpy(section_name, b + 1, SMALLSTRSIZE);
           section_name[slen] = '\0';
 
-          if (read_status == CS_PROBE) {
+          if (read_status == CS_CHECK) {
             if (section_start_line_number < 1 || cur_check < 0)
               internal_error("read_configuration_file", __FILE__, __LINE__);
             checks[cur_check] = chk00;
-            check_t_check(&checks[cur_check], cf, section_start_line_number);
+            check_t_check(&checks[cur_check], cf, section_start_line_number, nb_errors);
           } else if (read_status == CS_ALERT) {
             if (section_start_line_number < 1 || cur_alert < 0)
               internal_error("read_configuration_file", __FILE__, __LINE__);
             alerts[cur_alert] = alrt00;
-            alert_t_check(&alerts[cur_alert], cf, section_start_line_number);
+            alert_t_check(&alerts[cur_alert], cf, section_start_line_number, nb_errors);
           }
 
-          if (strcasecmp(section_name, CS_GENERAL_STR) == 0) {
+          int sec = find_string(l_sections_names, sizeof(l_sections_names) / sizeof(*l_sections_names), section_name);
+          if (sec == CS_GENERAL) {
             read_status = CS_GENERAL;
           } else {
             section_start_line_number = line_number;
             read_status = CS_NONE;
 
-            if (strcasecmp(section_name, CS_CHECK_STR) == 0) {
+            if (sec == CS_CHECK) {
               ++cur_check;
-/*              dbg_write("New check: %i\n", cur_check);*/
               if (cur_check >= sizeof(checks) / sizeof(*checks)) {
                 --cur_check;
+                (*nb_errors)++;
                 my_logf(LL_ERROR, LP_DATETIME,
                   "Configuration file '%s', line %i: reached max number of checks (%i)",
                   cf, line_number, sizeof(checks) / sizeof(*checks));
               } else {
-                read_status = CS_PROBE;
+                read_status = CS_CHECK;
                 check_t_create(&chk00);
               }
-            } else if (strcasecmp(section_name, CS_ALERT_STR) == 0) {
+            } else if (sec == CS_ALERT) {
               ++cur_alert;
-/*              dbg_write("New alert: %i\n", cur_alert);*/
               if (cur_alert >= sizeof(alerts) / sizeof(*alerts)) {
                 --cur_alert;
+                (*nb_errors)++;
                 my_logf(LL_ERROR, LP_DATETIME,
                   "Configuration file '%s', line %i: reached max number of alerts (%i)",
                   cf, line_number, sizeof(alerts) / sizeof(*alerts));
@@ -2517,6 +2676,7 @@ void read_configuration_file(const char *cf) {
                 alert_t_create(&alrt00);
               }
             } else {
+              (*nb_errors)++;
               my_logf(LL_ERROR, LP_DATETIME,
                 "Configuration file '%s', line %i: unknown section name '%s'",
                 cf, line_number, section_name);
@@ -2533,6 +2693,7 @@ void read_configuration_file(const char *cf) {
           ++slen;
         }
         if (*e == '\0') {
+          (*nb_errors)++;
           my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: syntax error", cf, line_number);
         } else {
           if (slen >= SMALLSTRSIZE)
@@ -2564,6 +2725,7 @@ void read_configuration_file(const char *cf) {
             ++value;
           }
           if (strlen(key) == 0) {
+            (*nb_errors)++;
             my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: syntax error", cf, line_number);
           } else {
             int i;
@@ -2571,78 +2733,111 @@ void read_configuration_file(const char *cf) {
             for (i = 0; (unsigned int)i < sizeof(readcfg_vars) / sizeof(*readcfg_vars); ++i) {
               if (strcasecmp(key, readcfg_vars[i].name) == 0 && read_status == readcfg_vars[i].section) {
                 match = TRUE;
-                struct readcfg_var_t cfg = readcfg_vars[i];
+                const struct readcfg_var_t const *cfg = &readcfg_vars[i];
 
                 long int n = 0;
-                if (cfg.plint_target != NULL && cfg.var_type == V_INT)
+                if (cfg->plint_target != NULL && cfg->var_type == V_INT)
                   n = atoi(value);
 
-                if (cfg.plint_target != NULL && strlen(value) == 0) {
+                if (cfg->plint_target != NULL && strlen(value) == 0) {
+                  (*nb_errors)++;
                   my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed",
                     cf, line_number);
-                } else if (cfg.plint_target != NULL && cfg.var_type == V_INT && n == 0 && !cfg.allow_null) {
+                } else if (cfg->plint_target != NULL && cfg->var_type == V_INT && n == 0 && !cfg->allow_null) {
+                  (*nb_errors)++;
                   my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: null value not allowed",
                     cf, line_number);
-                } else if ((cfg.p_pchar_target != NULL || cfg.pchar_target != NULL) &&
-                              strlen(value) == 0 && !cfg.allow_null) {
+                } else if ((cfg->p_pchar_target != NULL || cfg->pchar_target != NULL) &&
+                              strlen(value) == 0 && !cfg->allow_null) {
+                  (*nb_errors)++;
                   my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: empty value not allowed",
                     cf, line_number);
-                } else if (*cfg.pint_var_set) {
+                } else if (*cfg->pint_var_set) {
+                  (*nb_errors)++;
                   my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: variable %s already defined",
                     cf, line_number, key);
-                } else if (cfg.plint_target != NULL) {
+                } else if (cfg->plint_target != NULL) {
 
-                  if (cfg.var_type == V_INT) {
+                  if (cfg->var_type == V_INT) {
                       // Variable of type long int
-                    *cfg.plint_target = n;
-                    *cfg.pint_var_set = TRUE;
-                  } else if (cfg.var_type == V_YESNO) {
+                    *cfg->plint_target = n;
+                    *cfg->pint_var_set = TRUE;
+                  } else if (cfg->var_type == V_YESNO) {
 
                       // Variable of type long int with yes/no input
-                    int yn = find_word(l_yesno, sizeof(l_yesno) / sizeof(*l_yesno), value);
+                    int yn = find_string(l_yesno, sizeof(l_yesno) / sizeof(*l_yesno), value);
                     if (yn == FIND_STRING_NOT_FOUND) {
+                      (*nb_errors)++;
                       my_logf(LL_ERROR, LP_DATETIME,
                         "Configuration file '%s', line %i: variable %s must be set to yes or no",
                         cf, line_number, key);
                     }
-                    *cfg.plint_target = (yn == ID_YES ? TRUE : FALSE);
-                    *cfg.pint_var_set = TRUE;
+                    *cfg->plint_target = (yn == ID_YES ? TRUE : FALSE);
+                    *cfg->pint_var_set = TRUE;
 
-                  } else if (cfg.var_type == V_STRKEY) {
+                  } else if (cfg->var_type == V_STRKEY) {
 
                       // Variable of type long int with a string table key list
-                    int idx = find_word(cfg.table, cfg.table_nb_elems, value);
+                    int idx = find_string(cfg->table, cfg->table_nb_elems, value);
                     if (idx == FIND_STRING_NOT_FOUND) {
+                      (*nb_errors)++;
                       my_logf(LL_ERROR, LP_DATETIME,
                         "Configuration file '%s', line %i: unknown value '%s' for variable %s",
                         cf, line_number, value, key);
                     }
-                    *cfg.plint_target = idx;
-                    *cfg.pint_var_set = TRUE;
+                    *cfg->plint_target = idx;
+                    *cfg->pint_var_set = TRUE;
 
                   } else {
                     internal_error("read_configuration_file", __FILE__, __LINE__);
                   }
 
-                } else if (cfg.p_pchar_target != NULL) {
+                } else if (cfg->p_pchar_target != NULL) {
 
                     // Variable of type string, need to malloc
-                  if (*cfg.p_pchar_target != NULL)
+                  if (*cfg->p_pchar_target != NULL)
                     internal_error("read_configuration_file", __FILE__, __LINE__);
                   size_t nn = strlen(value) + 1;
-                  *cfg.p_pchar_target = (char *)malloc(nn);
-                  strncpy(*cfg.p_pchar_target, value, nn);
-                  *cfg.pint_var_set = TRUE;
+                  *cfg->p_pchar_target = (char *)malloc(nn);
+                  strncpy(*cfg->p_pchar_target, value, nn);
+                  *cfg->pint_var_set = TRUE;
 
-                } else if (cfg.pchar_target != NULL) {
+                } else if (cfg->pchar_target != NULL) {
 
                     // Variable of type string, no need to malloc
-                  strncpy(cfg.pchar_target, value, cfg.char_target_len);
-                  *cfg.pint_var_set = TRUE;
+                  strncpy(cfg->pchar_target, value, cfg->char_target_len);
+                  *cfg->pint_var_set = TRUE;
 
                 } else {
                   internal_error("read_configuration_file", __FILE__, __LINE__);
                 }
+
+                if (cfg->method != -1) {
+
+                  dbg_write("i = %d, cfg->method = %d\n", i, cfg->method);
+
+                  struct section_method_mgmt_t *m = &l_sections_methods[readcfg_vars[i].section];
+                  if (m == NULL)
+                    internal_error("read_configuration_file", __FILE__, __LINE__);
+
+                  if (*m->guess_method < 0)
+                    *m->guess_method = cfg->method;
+                  if (*m->method_set && *m->method >= 0 && (*m->method != cfg->method || *m->method != *m->guess_method)) {
+                    (*nb_errors)++;
+                    my_logf(LL_ERROR, LP_DATETIME,
+                      "Configuration file '%s', line %i: variable %s not compatible with method '%s'",
+                      cf, line_number, key, m->names[*m->method]);
+                  } else if (*m->guess_method != cfg->method) {
+                    (*nb_errors)++;
+                    my_logf(LL_ERROR, LP_DATETIME,
+                      "Configuration file '%s', line %i: variable %s not compatible with guessed method '%s'",
+                      cf, line_number, key, m->names[*m->guess_method]);
+                  }
+                  if (*m->method_set && *m->method >= 0) {
+                    *m->guess_method = *m->method;
+                  }
+                }
+
                 break;
               }
             }
@@ -2654,10 +2849,12 @@ void read_configuration_file(const char *cf) {
                 }
               }
               if (match) {
+                (*nb_errors)++;
                 my_logf(LL_ERROR, LP_DATETIME,
                   "Configuration file '%s', line %i: variable %s not allowed in this section",
                   cf, line_number, key);
               } else {
+                (*nb_errors)++;
                 my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', line %i: unknown variable %s",
                   cf, line_number, key);
               }
@@ -2667,18 +2864,18 @@ void read_configuration_file(const char *cf) {
       break;
     }
   }
-  if (cur_check >= 0 && read_status == CS_PROBE) {
+  if (cur_check >= 0 && read_status == CS_CHECK) {
     if (section_start_line_number < 0)
       internal_error("read_configuration_file", __FILE__, __LINE__);
     checks[cur_check] = chk00;
-    check_t_check(&checks[cur_check], cf, section_start_line_number);
+    check_t_check(&checks[cur_check], cf, section_start_line_number, nb_errors);
   }
 
   if (cur_alert >= 0 && read_status == CS_ALERT) {
     if (section_start_line_number < 0)
       internal_error("read_configuration_file", __FILE__, __LINE__);
     alerts[cur_alert] = alrt00;
-    alert_t_check(&alerts[cur_alert], cf, section_start_line_number);
+    alert_t_check(&alerts[cur_alert], cf, section_start_line_number, nb_errors);
   }
 
   if (g_nb_checks != cur_check + 1)
@@ -2691,18 +2888,6 @@ void read_configuration_file(const char *cf) {
     free(line);
 
   fclose(FCFG);
-
-  if (!g_check_interval_set) {
-    g_check_interval = DEFAULT_CHECK_INTERVAL;
-    my_logf(LL_WARNING, LP_DATETIME, "check_interval not defined, taking default = %li", g_check_interval);
-  }
-  if (g_nb_keep_last_status < 0) {
-    g_nb_keep_last_status = DEFAULT_NB_KEEP_LAST_STATUS;
-    my_logf(LL_WARNING, LP_DATETIME, "keep_last_status not defined, taking default = %li", g_nb_keep_last_status);
-  }
-  if (!g_date_format_set)
-    g_date_format = (g_date_format == FIND_STRING_NOT_FOUND ? DEFAULT_DATE_FORMAT : g_date_format);
-  g_date_df = (g_date_format == DF_FRENCH);
 
   strncpy(g_html_complete_file_name, g_html_directory, sizeof(g_html_complete_file_name));
   fs_concatene(g_html_complete_file_name, g_html_file, sizeof(g_html_complete_file_name));
@@ -2730,7 +2915,7 @@ int find_alert(const char *alert_name) {
 //
 // Identify alerts configured in checks
 //
-void identify_alerts() {
+void identify_alerts(int *nb_errors) {
   int i; int j; int k;
 
   int save_g_print_log = g_print_log;
@@ -2770,6 +2955,7 @@ void identify_alerts() {
       }
       curs = trim(curs);
       if ((k = find_alert(curs)) < 0) {
+        (*nb_errors)++;
         my_logf(LL_ERROR, LP_DATETIME, "Check '%s': unknown alert '%s'", chk->display_name, curs);
       } else {
         chk->alert_ctrl[index].idx = k;
@@ -2782,6 +2968,26 @@ void identify_alerts() {
 
   g_print_log = save_g_print_log;
 
+}
+
+//
+// Log a long int value
+//
+void d_i(const char *desc, const int is_set, const long int val) {
+  if (is_set)
+    my_logf(LL_DEBUG, LP_INDENT, "%s%i", desc, val);
+  else
+    my_logf(LL_DEBUG, LP_INDENT, "%s<unset>", desc);
+}
+
+//
+// Log a string value
+//
+void d_s(const char *desc, const int is_set, const char *val) {
+  if (is_set)
+    my_logf(LL_DEBUG, LP_INDENT, "%s%s", desc, val);
+  else
+    my_logf(LL_DEBUG, LP_INDENT, "%s<unset>", desc);
 }
 
 //
@@ -2798,67 +3004,43 @@ void checks_display() {
     } else {
       my_logf(LL_DEBUG, LP_INDENT, "!! check #%i (will be ignored)", i);
     }
-    my_logf(LL_DEBUG, LP_INDENT, "   is_valid       = %s", chk->is_valid ? "Yes" : "No");
-    my_logf(LL_DEBUG, LP_INDENT, "   display_name   = %s", chk->display_name_set ? chk->display_name : "<unset>");
-    my_logf(LL_DEBUG, LP_INDENT, "   host_name      = %s", chk->host_name_set ? chk->host_name : "<unset>");
-
-    my_logf(LL_DEBUG, LP_INDENT, "   method         = %s",
-      (chk->method_set && chk->method != FIND_STRING_NOT_FOUND) ? l_check_methods[chk->method] : "<unset>");
-
+    my_logf(LL_DEBUG, LP_INDENT,                  "   is_valid       = %s", chk->is_valid ? "Yes" : "No");
+    d_s("   display_name   = ", chk->display_name_set, chk->display_name);
+    d_s("   host_name      = ", chk->host_name_set, chk->host_name);
+    d_s("   method         = ", chk->method_set,
+      chk->method_set && chk->method != FIND_STRING_NOT_FOUND ? l_check_methods[chk->method] : "<unknown>");
     if (chk->method == CM_TCP) {
-      if (chk->tcp_port_set)
-        my_logf(LL_DEBUG, LP_INDENT, "   TCP/port                   = %i", chk->tcp_port);
-      else
-        my_logf(LL_DEBUG, LP_INDENT, "   TCP/port                   = <unset>");
-
-      my_logf(LL_DEBUG, LP_INDENT, "   TCP/expect                 = %s", chk->tcp_expect_set ? chk->tcp_expect : "<unset>");
+      d_i("   TCP/port                   = ", chk->tcp_port_set, chk->tcp_port);
+      d_s("   TCP/expect                 = ", chk->tcp_expect_set, chk->tcp_expect);
     } else if (chk->method == CM_PROGRAM) {
-      my_logf(LL_DEBUG, LP_INDENT, "   PROGRAM/command            = %s", chk->prg_command_set ? chk->prg_command : "<unset>");
+      d_s("   PROGRAM/command            = ", chk->prg_command_set, chk->prg_command);
     } else if (chk->method == CM_LOOP) {
-      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/smarthost        = %s", chk->loop_smtp.smarthost_set ? chk->loop_smtp.smarthost : "<unset>");
-      if (chk->loop_smtp.port_set)
-        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/port             = %i", chk->loop_smtp.port);
-      else
-        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/port             = <unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/self             = %s", chk->loop_smtp.self_set ? chk->loop_smtp.self : "<unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/sender           = %s", chk->loop_smtp.sender_set ? chk->loop_smtp.sender : "<unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/recipients       = %s", chk->loop_smtp.recipients_set ? chk->loop_smtp.recipients : "<unset>");
-      if (chk->loop_smtp.connect_timeout_set)
-        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/connect_timeout  = %i", chk->loop_smtp.connect_timeout);
-      else
-        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/smtp/connect_timeout  = <unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/server           = %s", chk->loop_pop3.server_set ? chk->loop_pop3.server : "<unset>");
-      if (chk->loop_pop3.port_set)
-        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/port             = %i", chk->loop_pop3.port);
-      else
-        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/port             = <unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/user             = %s", chk->loop_pop3.user_set ? chk->loop_pop3.user : "<unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/password         = %s", chk->loop_pop3.password_set ? "*****" : "<unset>");
-      if (chk->loop_pop3.connect_timeout_set)
-        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/connect_timeout  = %i", chk->loop_pop3.connect_timeout);
-      else
-        my_logf(LL_DEBUG, LP_INDENT, "   LOOP/pop3/connect_timeout  = <unset>");
+      d_i("   LOOP/fail delay            = ", chk->loop_fail_delay_set, chk->loop_fail_delay);
+      d_i("   LOOP/fail timeout          = ", chk->loop_fail_timeout_set, chk->loop_fail_timeout);
+      d_i("   LOOP/send every            = ", chk->loop_send_every_set, chk->loop_send_every);
+      d_s("   LOOP/smtp/smarthost        = ", chk->loop_smtp.smarthost_set, chk->loop_smtp.smarthost);
+      d_i("   LOOP/smtp/port             = ", chk->loop_smtp.port_set, chk->loop_smtp.port);
+      d_s("   LOOP/smtp/self             = ", chk->loop_smtp.self_set, chk->loop_smtp.self);
+      d_s("   LOOP/smtp/sender           = ", chk->loop_smtp.sender_set, chk->loop_smtp.sender);
+      d_s("   LOOP/smtp/recipients       = ", chk->loop_smtp.recipients_set, chk->loop_smtp.recipients);
+      d_i("   LOOP/smtp/connect_timeout  = ", chk->loop_smtp.connect_timeout_set, chk->loop_smtp.connect_timeout);
+      d_s("   LOOP/pop3/server           = ", chk->loop_pop3.server_set, chk->loop_pop3.server);
+      d_i("   LOOP/pop3/port             = ", chk->loop_pop3.port_set, chk->loop_pop3.port);
+      d_s("   LOOP/pop3/user             = ", chk->loop_pop3.user_set, chk->loop_pop3.user);
+      d_s("   LOOP/pop3/password         = ", chk->loop_pop3.password_set, "*****");
+      d_i("   LOOP/pop3/connect_timeout  = ", chk->loop_pop3.connect_timeout_set, chk->loop_pop3.connect_timeout);
     }
 
-    my_logf(LL_DEBUG, LP_INDENT, "   alerts         = %s", chk->alerts_set ? chk->alerts : "<unset>");
-    my_logf(LL_DEBUG, LP_INDENT, "   nb alerts      = %i", chk->nb_alerts);
+    d_s("   alerts         = ", chk->alerts_set, chk->alerts);
+    d_i("   nb alerts      = ", TRUE, chk->nb_alerts);
     int j;
     for (j = 0; j < chk->nb_alerts; ++j) {
       my_logf(LL_DEBUG, LP_INDENT, "     alert:     = #%i -> %s",
         j, alerts[chk->alert_ctrl[j].idx].name);
     }
-    if (chk->alert_threshold_set)
-      my_logf(LL_DEBUG, LP_INDENT, "   alert_threshold    = %d", chk->alert_threshold);
-    else
-      my_logf(LL_DEBUG, LP_INDENT, "   alert_threshold    = <unset>");
-    if (chk->alert_repeat_every_set)
-      my_logf(LL_DEBUG, LP_INDENT, "   alert_repeat_every = %d", chk->alert_repeat_every);
-    else
-      my_logf(LL_DEBUG, LP_INDENT, "   alert_repeat_every = <unset>");
-    if (chk->alert_repeat_max_set)
-      my_logf(LL_DEBUG, LP_INDENT, "   alert_repeat_max   = %d", chk->alert_repeat_max);
-    else
-      my_logf(LL_DEBUG, LP_INDENT, "   alert_repeat_max   = <unset>");
+    d_i("   alert_threshold    = ", chk->alert_threshold_set, chk->alert_threshold);
+    d_i("   alert_repeat_every = ", chk->alert_repeat_every_set, chk->alert_repeat_every);
+    d_i("   alert_repeat_max   = ", chk->alert_repeat_max_set, chk->alert_repeat_max);
   }
   if (c != g_nb_valid_checks)
     internal_error("main", __FILE__, __LINE__);
@@ -2879,42 +3061,24 @@ void alerts_display() {
       my_logf(LL_DEBUG, LP_INDENT, "!! alert #%i (will be ignored)", i);
     }
     my_logf(LL_DEBUG, LP_INDENT, "   is_valid          = %s", alrt->is_valid ? "Yes" : "No");
-    my_logf(LL_DEBUG, LP_INDENT, "   name              = %s", alrt->name_set ? alrt->name : "<unset>");
-    my_logf(LL_DEBUG, LP_INDENT, "   method            = %s",
-      (alrt->method_set && alrt->method != FIND_STRING_NOT_FOUND) ? l_alert_methods[alrt->method] : "<unset>");
-    if (alrt->threshold_set)
-      my_logf(LL_DEBUG, LP_INDENT, "   threshold         = %li", alrt->threshold);
-    else
-      my_logf(LL_DEBUG, LP_INDENT, "   threshold         = <unset>");
-    if (alrt->repeat_every_set)
-      my_logf(LL_DEBUG, LP_INDENT, "   repeat_every      = %li", alrt->repeat_every);
-    else
-      my_logf(LL_DEBUG, LP_INDENT, "   repeat_every      = <unset>");
-    if (alrt->repeat_max_set)
-      my_logf(LL_DEBUG, LP_INDENT, "   repeat_max        = %li", alrt->repeat_max);
-    else
-      my_logf(LL_DEBUG, LP_INDENT, "   repeat_max        = <unset>");
-    if (alrt->retries_set)
-      my_logf(LL_DEBUG, LP_INDENT, "   retries           = %li", alrt->retries);
-    else
-      my_logf(LL_DEBUG, LP_INDENT, "   retries           = <unset>");
+    d_s("   name              = ", alrt->name_set, alrt->name);
+    d_s("   method            = ", alrt->method_set,
+      alrt->method_set && alrt->method != FIND_STRING_NOT_FOUND ? l_alert_methods[alrt->method] : "<unknown>");
+    d_i("   threshold         = ", alrt->threshold_set, alrt->threshold);
+    d_i("   repeat_every      = ", alrt->repeat_every_set, alrt->repeat_every);
+    d_i("   repeat_max        = ", alrt->repeat_max_set, alrt->repeat_max);
+    d_i("   retries           = ", alrt->retries_set, alrt->retries);
     if (alrt->method == AM_SMTP) {
-      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/smart host = %s", alrt->smtp_env.smarthost_set ? alrt->smtp_env.smarthost : "<unset>");
-      if (alrt->smtp_env.port_set)
-        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/port       = %li", alrt->smtp_env.port);
-      else
-        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/port       = <unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/self       = %s", alrt->smtp_env.self_set ? alrt->smtp_env.self : "<unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/sender     = %s", alrt->smtp_env.sender_set ? alrt->smtp_env.sender : "<unset>");
-      my_logf(LL_DEBUG, LP_INDENT, "   SMTP/recipients = %s", alrt->smtp_env.recipients_set ? alrt->smtp_env.recipients : "<unset>");
-      if (alrt->smtp_env.connect_timeout_set)
-        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/timeout    = %li", alrt->smtp_env.connect_timeout);
-      else
-        my_logf(LL_DEBUG, LP_INDENT, "   SMTP/timeout    = <unset>");
+      d_s("   SMTP/smart host = ", alrt->smtp_env.smarthost_set, alrt->smtp_env.smarthost);
+      d_i("   SMTP/port       = ", alrt->smtp_env.port_set, alrt->smtp_env.port);
+      d_s("   SMTP/self       = ", alrt->smtp_env.self_set, alrt->smtp_env.self);
+      d_s("   SMTP/sender     = ", alrt->smtp_env.sender_set, alrt->smtp_env.sender);
+      d_s("   SMTP/recipients = ", alrt->smtp_env.recipients_set, alrt->smtp_env.recipients);
+      d_i("   SMTP/timeout    = ", alrt->smtp_env.connect_timeout_set, alrt->smtp_env.connect_timeout);
     } else if (alrt->method == AM_PROGRAM) {
-      my_logf(LL_DEBUG, LP_INDENT, "   program/command   = %s", alrt->prg_command_set ? alrt->prg_command : "<unset>");
+      d_s("   program/command   = ", alrt->prg_command_set, alrt->prg_command);
     } else if (alrt->method == AM_LOG) {
-      my_logf(LL_DEBUG, LP_INDENT, "   log/log_file      = %s", alrt->log_file_set ? alrt->log_file : "<unset>");
+      d_s("   log/log_file      = ", alrt->log_file_set, alrt->log_file);
     }
   }
   if (c != g_nb_valid_alerts)
@@ -2959,7 +3123,37 @@ void config_display() {
   }
 }
 
+//
+// Test one alert
+//
+void test_alert() {
+  int a = find_alert(g_test_alert);
+  if (a < 0) {
+    printf("Unknown alert '%s'\n", g_test_alert);
+    my_log_close();
+    exit(EXIT_FAILURE);
+  }
+  char desc[SMALLSTRSIZE];
+  snprintf(desc, sizeof(desc), "[TEST] alert for alert %s", alerts[a].name);
+
+  struct alert_ctrl_t alert_ctrl = {a, AS_NOTHING, 0, 0};
+  struct tm my_now;
+  set_current_tm(&my_now);
+  struct tm alert_info;
+  time_t ltime = time(NULL) - 30 * 60;
+  alert_info = *localtime(&ltime);
+  struct exec_alert_t exec_alert = {ST_UNDEF, AS_NOTHING, &alerts[a], &alert_ctrl, 0, &my_now, &alert_info, &alert_info,
+    1, "Test alert display name", "Test alert host name", NULL, 0, desc};
+  int r = execute_alert(&exec_alert);
+  my_logf(LL_NORMAL, LP_DATETIME, "Alert returned code %d", r);
+
+  my_log_close();
+  exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char *argv[]) {
+
+  dbg_write("** DEBUG ACTIVATED **\n");
 
     // rand() function used by get_unique_mime_boundary()
   srand(time(NULL));
@@ -2973,10 +3167,28 @@ int main(int argc, char *argv[]) {
   my_logs(LL_NORMAL, LP_NOTHING, "");
   my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_STRING " start");
 
-  read_configuration_file(g_cfg_file);
+  int nb_errors = 0;
+  read_configuration_file(g_cfg_file, &nb_errors);
     // Match alerts as written in the alerts option of checks (checks[]) with
     // defined alerts (alerts[])
-  identify_alerts();
+  identify_alerts(&nb_errors);
+  if (nb_errors >=1 && g_laxist) {
+    my_logf(LL_WARNING, LP_DATETIME, "%d error(s) in the ini file, continuing", nb_errors);
+  } else if (nb_errors >=1 && !g_laxist) {
+    fprintf(stderr, "%d error(s) found in the ini file, stopping (use --laxist option to continue)\n", nb_errors);
+    exit(EXIT_FAILURE);
+  }
+  if (!g_check_interval_set) {
+    g_check_interval = DEFAULT_CHECK_INTERVAL;
+    my_logf(LL_WARNING, LP_DATETIME, "check_interval not defined, taking default = %li", g_check_interval);
+  }
+  if (g_nb_keep_last_status < 0) {
+    g_nb_keep_last_status = DEFAULT_NB_KEEP_LAST_STATUS;
+    my_logf(LL_WARNING, LP_DATETIME, "keep_last_status not defined, taking default = %li", g_nb_keep_last_status);
+  }
+  if (!g_date_format_set)
+    g_date_format = (g_date_format == FIND_STRING_NOT_FOUND ? DEFAULT_DATE_FORMAT : g_date_format);
+  g_date_df = (g_date_format == DF_FRENCH);
 
   int ii;
   for (ii = 0; ii < g_nb_checks; ++ii) {
@@ -2984,31 +3196,8 @@ int main(int argc, char *argv[]) {
     check_t_getready(chk);
   }
 
-  if (strlen(g_test_alert) >= 1) {
-    int a = find_alert(g_test_alert);
-    if (a < 0) {
-      printf("Unknown alert '%s'\n", g_test_alert);
-      exit(EXIT_FAILURE);
-    }
-    char desc[SMALLSTRSIZE];
-    snprintf(desc, sizeof(desc), "[TEST] alert for alert %s", alerts[a].name);
-
-
-
-    struct alert_ctrl_t alert_ctrl = {a, AS_NOTHING, 0, 0};
-    struct tm my_now;
-    set_current_tm(&my_now);
-    struct tm alert_info;
-    time_t ltime = time(NULL) - 30 * 60;
-    alert_info = *localtime(&ltime);
-    struct exec_alert_t exec_alert = {ST_UNDEF, AS_NOTHING, &alerts[a], &alert_ctrl, 0, &my_now, &alert_info, &alert_info,
-      1, "Test alert display name", "Test alert host name", NULL, 0, desc};
-    int r = execute_alert(&exec_alert);
-    my_logf(LL_NORMAL, LP_DATETIME, "Alert returned code %d", r);
-
-    my_log_close();
-    exit(EXIT_SUCCESS);
-  }
+  if (strlen(g_test_alert) >= 1)
+    test_alert();
 
   checks_display();
   alerts_display();

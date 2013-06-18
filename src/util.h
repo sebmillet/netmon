@@ -30,6 +30,9 @@ enum {DF_FRENCH = 0, DF_ENGLISH = 1};
 
 #define LOG_AFTER_TIMESTAMP "  "
 
+  // Used by find_word function
+#define FIND_STRING_NOT_FOUND -1
+
 #ifdef DEBUG
 void dbg_write(const char *fmt, ...);
 #else

@@ -1,0 +1,265 @@
+
+netmon 1.0 start
+Reading configuration from 'netmon.ini'
+Configuration file 'netmon.ini', line 12: empty value not allowed
+Configuration file 'netmon.ini', line 12: variable program_command not compatible with guessed method 'tcp'
+Configuration file 'netmon.ini', line 19: variable loop_id not compatible with guessed method 'tcp'
+Configuration file 'netmon.ini', line 26: variable log_string not compatible with method 'smtp'
+Configuration file 'netmon.ini', section of line 28: inconsistent methods across variables
+Configuration file 'netmon.ini', section of line 28: no log file defined, discarding alert
+Configuration file 'netmon.ini', line 38: unknown value 'bla' for variable method
+Configuration file 'netmon.ini', section of line 34: unknown method, discarding alert
+Configuration file 'netmon.ini', line 43: variable smtp_smart_host not compatible with guessed method 'program'
+Configuration file 'netmon.ini', line 48: empty value not allowed
+Configuration file 'netmon.ini', section of line 45: no command defined, discarding alert
+Configuration file 'netmon.ini', section of line 49: no command defined, discarding alert
+Configuration file 'netmon.ini', section of line 55: inconsistent methods across variables
+Configuration file 'netmon.ini', section of line 55: no command defined, discarding check
+Configuration file 'netmon.ini', line 62: unknown value 'bla' for variable method
+Configuration file 'netmon.ini', section of line 61: no name defined, discarding alert
+Configuration file 'netmon.ini', section of line 61: unknown method, discarding alert
+Configuration file 'netmon.ini', section of line 63: no method defined, discarding alert
+Configuration file 'netmon.ini', section of line 66: inconsistent methods across variables
+Configuration file 'netmon.ini', section of line 66: no log file defined, discarding alert
+Configuration file 'netmon.ini', line 72: empty value not allowed
+Configuration file 'netmon.ini', section of line 70: no log file defined, discarding alert
+Configuration file 'netmon.ini', section of line 73: no log file defined, discarding alert
+Check 'Test avec nom inconnu': unknown alert 'youpi'
+20 error(s) in the ini file, continuing
+keep_last_status not defined, taking default = 15
+== CHECK #0
+   is_valid       = Yes
+   display_name   = Local FTP
+   host_name      = Localhost
+   method         = tcp
+   TCP/port                   = 21
+   TCP/expect                 = <unset>
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
+== CHECK #1
+   is_valid       = Yes
+   display_name   = Local HTTP
+   host_name      = 127.0.0.1
+   method         = tcp
+   TCP/port                   = 80
+   TCP/expect                 = <unset>
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
+!! check #2 (will be ignored)
+   is_valid       = No
+   display_name   = Local SMTP
+   host_name      = My SMTP
+   method         = program
+   PROGRAM/command            = <unset>
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
+== CHECK #3
+   is_valid       = Yes
+   display_name   = My POP3
+   host_name      = localhost
+   method         = tcp
+   TCP/port                   = 13529
+   TCP/expect                 = +OK 
+   alerts         = <unset>
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
+== CHECK #4
+   is_valid       = Yes
+   display_name   = Test avec nom inconnu
+   host_name      = a.b.c
+   method         = tcp
+   TCP/port                   = 25
+   TCP/expect                 = <unset>
+   alerts         = youpi
+   nb alerts      = 0
+   alert_threshold    = <unset>
+   alert_repeat_every = <unset>
+   alert_repeat_max   = <unset>
+== ALERT #0
+   is_valid          = Yes
+   name              = critical
+   method            = smtp
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+   SMTP/smart host = localhost
+   SMTP/port       = <unset>
+   SMTP/self       = <unset>
+   SMTP/sender     = <unset>
+   SMTP/recipients = root
+   SMTP/timeout    = <unset>
+!! alert #1 (will be ignored)
+   is_valid          = No
+   name              = critical2
+   method            = log
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+   log/log_file      = <unset>
+!! alert #2 (will be ignored)
+   is_valid          = No
+   name              = criticalz
+   method            = <unknown>
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+== ALERT #3
+   is_valid          = Yes
+   name              = prgtest1
+   method            = program
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+   program/command   = allo
+!! alert #4 (will be ignored)
+   is_valid          = No
+   name              = prgtest2
+   method            = program
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+   program/command   = <unset>
+!! alert #5 (will be ignored)
+   is_valid          = No
+   name              = prgtest3
+   method            = program
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+   program/command   = <unset>
+== ALERT #6
+   is_valid          = Yes
+   name              = prgtest4
+   method            = program
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+   program/command   = allo
+!! alert #7 (will be ignored)
+   is_valid          = No
+   name              = <unset>
+   method            = <unknown>
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+!! alert #8 (will be ignored)
+   is_valid          = No
+   name              = fake
+   method            = <unset>
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+!! alert #9 (will be ignored)
+   is_valid          = No
+   name              = log1
+   method            = log
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+   log/log_file      = <unset>
+!! alert #10 (will be ignored)
+   is_valid          = No
+   name              = log2
+   method            = log
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+   log/log_file      = <unset>
+!! alert #11 (will be ignored)
+   is_valid          = No
+   name              = log3
+   method            = log
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+   log/log_file      = <unset>
+== ALERT #12
+   is_valid          = Yes
+   name              = log4
+   method            = log
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+   log/log_file      = eslog
+== ALERT #13
+   is_valid          = Yes
+   name              = sms
+   method            = smtp
+   threshold         = <unset>
+   repeat_every      = <unset>
+   repeat_max        = <unset>
+   retries           = <unset>
+   SMTP/smart host = localhost
+   SMTP/port       = 25
+   SMTP/self       = <unset>
+   SMTP/sender     = 
+   SMTP/recipients = root@localhost
+   SMTP/timeout    = <unset>
+check_interval = 0
+keep_last_status = 15
+display_name_width = 20
+html_directory = ../www
+html_file = netmon.html
+html_title = netmon 1.0
+html_refresh_interval = 20
+Valid check(s) defined: 4
+Run web server: no
+To check: 'Local FTP' [Localhost:21], no expect, no alert
+To check: 'Local HTTP' [127.0.0.1:80], no expect, no alert
+To check: 'My POP3' [localhost:13529], expect "+OK ", no alert
+To check: 'Test avec nom inconnu' [a.b.c:25], no expect, alerts: 
+Will create image files in html directory
+Starting check...
+Performing check tcp(Local FTP)
+TCP check(Local FTP): connecting to Localhost:21...
+Running gethosbyname() on Localhost
+Will connect to Localhost:21, timeout = 5
+Connected to Localhost:21
+TCP check(Local FTP): disconnected from Localhost:21
+Local FTP -> ok
+Performing check tcp(Local HTTP)
+TCP check(Local HTTP): connecting to 127.0.0.1:80...
+Running gethosbyname() on 127.0.0.1
+Will connect to 127.0.0.1:80, timeout = 5
+Connected to 127.0.0.1:80
+TCP check(Local HTTP): disconnected from 127.0.0.1:80
+Local HTTP -> ok
+Performing check tcp(My POP3)
+TCP check(My POP3): connecting to localhost:13529...
+Running gethosbyname() on localhost
+Will connect to localhost:13529, timeout = 5
+Socket error connecting to localhost:13529, code=111 (Connection refused)
+TCP check(My POP3): disconnected from localhost:13529
+My POP3 -> ** KO **
+Performing check tcp(Test avec nom inconnu)
+TCP check(Test avec nom inconnu): connecting to a.b.c:25...
+Running gethosbyname() on a.b.c
+Unknown host a.b.c, code=110 (Connection timed out)
+TCP check(Test avec nom inconnu): disconnected from a.b.c:25
+Test avec nom inconnu -> ** ?? **
+Check done in 0.123450s
+netmon end

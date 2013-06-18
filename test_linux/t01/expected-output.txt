@@ -23,14 +23,14 @@ Configuration file 'netmon.ini', section of line 37: no display_name defined, di
 Configuration file 'netmon.ini', section of line 37: no method defined, discarding check
 Configuration file 'netmon.ini', line 50: empty value not allowed
 Configuration file 'netmon.ini', line 51: null value not allowed
-Configuration file 'netmon.ini', section of line 46: no method defined, discarding check
+Configuration file 'netmon.ini', section of line 46: no port defined, discarding check
 Configuration file 'netmon.ini', line 53: unknown section name 'abc'
 Configuration file 'netmon.ini', line 54: unknown section name 'chec'
 Configuration file 'netmon.ini', line 55: unknown section name 'checks'
 Configuration file 'netmon.ini', line 56: variable method not allowed in this section
 Configuration file 'netmon.ini', line 58: null value not allowed
 Configuration file 'netmon.ini', line 61: empty value not allowed
-Configuration file 'netmon.ini', section of line 57: no method defined, discarding check
+Configuration file 'netmon.ini', section of line 57: no port defined, discarding check
 Configuration file 'netmon.ini', line 66: syntax error
 Configuration file 'netmon.ini', section of line 63: no command defined, discarding check
 30 error(s) in the ini file, continuing
@@ -85,7 +85,9 @@ keep_last_status not defined, taking default = 15
    is_valid       = No
    display_name   = bla r
    host_name      = bla r
-   method         = <unset>
+   method         = tcp
+   TCP/port                   = <unset>
+   TCP/expect                 = <unset>
    alerts         = <unset>
    nb alerts      = 0
    alert_threshold    = <unset>
@@ -95,7 +97,9 @@ keep_last_status not defined, taking default = 15
    is_valid       = No
    display_name   = bla y
    host_name      = bla y
-   method         = <unset>
+   method         = tcp
+   TCP/port                   = <unset>
+   TCP/expect                 = <unset>
    alerts         = <unset>
    nb alerts      = 0
    alert_threshold    = <unset>

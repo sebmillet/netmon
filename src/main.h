@@ -110,6 +110,7 @@ struct check_t {
   int is_valid;
 
   long int method;
+  int guess_method;
   char *display_name;
   char *host_name;
   int method_set;
@@ -133,6 +134,13 @@ struct check_t {
   int loop_id_set;
   struct rfc821_enveloppe_t loop_smtp;
   struct pop3_account_t loop_pop3;
+  long int loop_fail_delay;
+  int loop_fail_delay_set;
+  long int loop_fail_timeout;
+  int loop_fail_timeout_set;
+  long int loop_send_every;
+  int loop_send_every_set;
+  int loop_send_countdown;
 
     // Common to all methods
   char *alerts;
@@ -168,6 +176,7 @@ struct alert_t {
 
   char *name;
   long int method;
+  int guess_method;
 
   int name_set;
   int method_set;
@@ -197,7 +206,7 @@ struct alert_t {
   int log_string_set;
 };
 
-enum {CS_NONE, CS_GENERAL, CS_PROBE, CS_ALERT};
+  // Used to read ini file
 enum {V_STR, V_INT, V_YESNO, V_STRKEY};
 struct readcfg_var_t {
   const char *name;
@@ -211,6 +220,14 @@ struct readcfg_var_t {
   int allow_null;
   const char **table;
   int table_nb_elems;
+  int method;
+};
+  // Used in confunction with readcfg_var_t to read ini file
+struct section_method_mgmt_t {
+  const char **names;
+  int *guess_method;
+  long int *method;
+  int *method_set;
 };
 
 struct exec_alert_t {

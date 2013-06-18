@@ -289,13 +289,13 @@ void fs_concatene(char *dst, const char *src, size_t dst_len) {
 // Finds a word in a table, return index found or -1 if not found.
 // Case insensitive search
 //
-int find_word(const char **table, int n, const char *elem) {
+int find_string(const char **table, int n, const char *elem) {
   int i;
   for (i = 0; i < n; ++i) {
     if (strcasecmp(table[i], elem) == 0)
       return i;
   }
-  return -1;
+  return FIND_STRING_NOT_FOUND;
 }
 
 //

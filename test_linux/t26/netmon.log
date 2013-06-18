@@ -1,0 +1,1829 @@
+  
+16/06/13 17:39:17.070243  netmon 1.0 start
+16/06/13 17:39:17.070325  Reading configuration from 'netmon.ini'
+16/06/13 17:39:17.070542  keep_last_status not defined, taking default = 15
+                          == CHECK #0
+                             is_valid       = Yes
+                             display_name   = My prog probe
+                             host_name      = non
+                             method         = program
+                             PROGRAM/command            = ./check.sh ${LOOP_COUNT}
+                             alerts         = <unset>
+                             nb alerts      = 0
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == CHECK #1
+                             is_valid       = Yes
+                             display_name   = My loop
+                             host_name      = 
+                             method         = loop
+                             LOOP/fail delay            = 5
+                             LOOP/fail timeout          = 8
+                             LOOP/send every            = <unset>
+                             LOOP/smtp/smarthost        = mysmtp
+                             LOOP/smtp/port             = <unset>
+                             LOOP/smtp/self             = <unset>
+                             LOOP/smtp/sender           = mysender
+                             LOOP/smtp/recipients       = myrec
+                             LOOP/smtp/connect_timeout  = <unset>
+                             LOOP/pop3/server           = mypop
+                             LOOP/pop3/port             = <unset>
+                             LOOP/pop3/user             = myemail
+                             LOOP/pop3/password         = *****
+                             LOOP/pop3/connect_timeout  = <unset>
+                             alerts         = <unset>
+                             nb alerts      = 0
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == ALERT #0
+                             is_valid          = Yes
+                             name              = print
+                             method            = program
+                             threshold         = <unset>
+                             repeat_every      = <unset>
+                             repeat_max        = <unset>
+                             retries           = <unset>
+                             program/command   = ./printargs.sh "${DISPLAY_NAME}" "${HOST_NAME}" "${STATUS}" ${ALERT_TIMESTAMP}
+16/06/13 17:39:17.072212  check_interval = 0
+16/06/13 17:39:17.072253  keep_last_status = 15
+16/06/13 17:39:17.072289  display_name_width = 20
+16/06/13 17:39:17.072322  html_directory = ../www
+16/06/13 17:39:17.072357  html_file = netmon.html
+16/06/13 17:39:17.072390  html_title = netmon 1.0
+16/06/13 17:39:17.072423  html_refresh_interval = 20
+16/06/13 17:39:17.072458  Valid check(s) defined: 2
+16/06/13 17:39:17.072491  Run web server: no
+16/06/13 17:39:17.072527  To check: 'My prog probe' [non:0], no expect, no alert
+16/06/13 17:39:17.072565  To check: 'My loop' [:0], no expect, no alert
+16/06/13 17:39:17.072604  Will create image files in html directory
+16/06/13 17:39:17.073285  Starting check...
+16/06/13 17:39:17.073343  Performing check program(My prog probe)
+16/06/13 17:39:17.073403  Program check(My prog probe): will execute the command:
+                          ./check.sh 1
+16/06/13 17:39:17.075359  Program check(My prog probe): return code: 127
+16/06/13 17:39:17.075439  My prog probe -> ** ?? ** (1)
+16/06/13 17:39:17.075464  Performing check loop(My loop)
+16/06/13 17:39:18.075753  My loop -> ok (0)
+16/06/13 17:39:18.075804  Check done in 0.123450s
+16/06/13 17:39:18.075844  Starting check...
+16/06/13 17:39:18.075864  Performing check program(My prog probe)
+16/06/13 17:39:18.075899  Program check(My prog probe): will execute the command:
+                          ./check.sh 2
+16/06/13 17:39:18.077781  Program check(My prog probe): return code: 127
+16/06/13 17:39:18.077850  My prog probe -> ** ?? ** (2)
+16/06/13 17:39:18.077874  Performing check loop(My loop)
+16/06/13 17:39:19.078165  My loop -> ok (0)
+16/06/13 17:39:19.078213  Check done in 0.123450s
+16/06/13 17:39:19.078240  Starting check...
+16/06/13 17:39:19.078260  Performing check program(My prog probe)
+16/06/13 17:39:19.078295  Program check(My prog probe): will execute the command:
+                          ./check.sh 3
+16/06/13 17:39:19.080212  Program check(My prog probe): return code: 127
+16/06/13 17:39:19.080281  My prog probe -> ** ?? ** (3)
+16/06/13 17:39:19.080305  Performing check loop(My loop)
+16/06/13 17:39:20.080566  My loop -> ok (0)
+16/06/13 17:39:20.080615  Check done in 0.123450s
+16/06/13 17:39:20.080647  Starting check...
+16/06/13 17:39:20.080667  Performing check program(My prog probe)
+16/06/13 17:39:20.080702  Program check(My prog probe): will execute the command:
+                          ./check.sh 4
+16/06/13 17:39:20.082635  Program check(My prog probe): return code: 127
+16/06/13 17:39:20.082705  My prog probe -> ** ?? ** (4)
+16/06/13 17:39:20.082730  Performing check loop(My loop)
+16/06/13 17:39:21.083038  My loop -> ok (0)
+16/06/13 17:39:21.083087  Check done in 0.123450s
+16/06/13 17:39:21.083114  Starting check...
+16/06/13 17:39:21.083135  Performing check program(My prog probe)
+16/06/13 17:39:21.083169  Program check(My prog probe): will execute the command:
+                          ./check.sh 5
+16/06/13 17:39:21.085116  Program check(My prog probe): return code: 127
+16/06/13 17:39:21.085181  My prog probe -> ** ?? ** (5)
+16/06/13 17:39:21.085205  Performing check loop(My loop)
+16/06/13 17:39:22.085555  My loop -> ** KO ** (1)
+16/06/13 17:39:22.085609  Check done in 0.123450s
+16/06/13 17:39:22.085653  Starting check...
+16/06/13 17:39:22.085674  Performing check program(My prog probe)
+16/06/13 17:39:22.085710  Program check(My prog probe): will execute the command:
+                          ./check.sh 6
+16/06/13 17:39:22.087666  Program check(My prog probe): return code: 127
+16/06/13 17:39:22.087738  My prog probe -> ** ?? ** (6)
+16/06/13 17:39:22.087763  Performing check loop(My loop)
+16/06/13 17:39:23.088107  My loop -> ** KO ** (2)
+16/06/13 17:39:23.088159  Check done in 0.123450s
+16/06/13 17:39:23.088185  Starting check...
+16/06/13 17:39:23.088206  Performing check program(My prog probe)
+16/06/13 17:39:23.088240  Program check(My prog probe): will execute the command:
+                          ./check.sh 7
+16/06/13 17:39:23.090350  Program check(My prog probe): return code: 127
+16/06/13 17:39:23.090423  My prog probe -> ** ?? ** (7)
+16/06/13 17:39:23.090448  Performing check loop(My loop)
+16/06/13 17:39:24.090809  My loop -> ** KO ** (3)
+16/06/13 17:39:24.090865  Check done in 0.123450s
+16/06/13 17:39:24.090892  Starting check...
+16/06/13 17:39:24.090912  Performing check program(My prog probe)
+16/06/13 17:39:24.090947  Program check(My prog probe): will execute the command:
+                          ./check.sh 8
+16/06/13 17:39:24.092857  Program check(My prog probe): return code: 127
+16/06/13 17:39:24.092929  My prog probe -> ** ?? ** (8)
+16/06/13 17:39:24.092954  Performing check loop(My loop)
+16/06/13 17:39:25.093192  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397157-115868-194552:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:25.093351  My loop -> ** KO ** (4)
+16/06/13 17:39:25.093385  Check done in 0.123450s
+16/06/13 17:39:25.093410  Starting check...
+16/06/13 17:39:25.093430  Performing check program(My prog probe)
+16/06/13 17:39:25.093464  Program check(My prog probe): will execute the command:
+                          ./check.sh 9
+16/06/13 17:39:25.095588  Program check(My prog probe): return code: 127
+16/06/13 17:39:25.095662  My prog probe -> ** ?? ** (9)
+16/06/13 17:39:25.095687  Performing check loop(My loop)
+16/06/13 17:39:26.095930  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397158-147688-141790:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:26.096114  My loop -> ** KO ** (5)
+16/06/13 17:39:26.096145  Check done in 0.123450s
+16/06/13 17:39:26.096171  Starting check...
+16/06/13 17:39:26.096218  Performing check program(My prog probe)
+16/06/13 17:39:26.096253  Program check(My prog probe): will execute the command:
+                          ./check.sh 10
+16/06/13 17:39:26.098177  Program check(My prog probe): return code: 127
+16/06/13 17:39:26.098247  My prog probe -> ** ?? ** (10)
+16/06/13 17:39:26.098277  Performing check loop(My loop)
+16/06/13 17:39:27.098502  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397159-105975-114169:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:27.098686  My loop -> ** KO ** (6)
+16/06/13 17:39:27.098845  Check done in 0.123450s
+16/06/13 17:39:27.098875  Starting check...
+16/06/13 17:39:27.098895  Performing check program(My prog probe)
+16/06/13 17:39:27.098932  Program check(My prog probe): will execute the command:
+                          ./check.sh 11
+16/06/13 17:39:27.100814  Program check(My prog probe): return code: 127
+16/06/13 17:39:27.100889  My prog probe -> ** ?? ** (11)
+16/06/13 17:39:27.100914  Performing check loop(My loop)
+16/06/13 17:39:28.101153  Loop check(My loop): removing loop email 3 of reference 'netmon:MYLOOP:1371397160-138766-208226:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:28.101321  My loop -> ** KO ** (7)
+16/06/13 17:39:28.101351  Check done in 0.123450s
+16/06/13 17:39:28.101376  Starting check...
+16/06/13 17:39:28.101396  Performing check program(My prog probe)
+16/06/13 17:39:28.101435  Program check(My prog probe): will execute the command:
+                          ./check.sh 12
+16/06/13 17:39:28.103344  Program check(My prog probe): return code: 127
+16/06/13 17:39:28.103416  My prog probe -> ** ?? ** (12)
+16/06/13 17:39:28.103440  Performing check loop(My loop)
+16/06/13 17:39:29.103672  Loop check(My loop): removing loop email 4 of reference 'netmon:MYLOOP:1371397161-199299-158276:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:29.103835  My loop -> ** KO ** (8)
+16/06/13 17:39:29.103865  Check done in 0.123450s
+16/06/13 17:39:29.103891  Starting check...
+16/06/13 17:39:29.103911  Performing check program(My prog probe)
+16/06/13 17:39:29.103946  Program check(My prog probe): will execute the command:
+                          ./check.sh 13
+16/06/13 17:39:29.105830  Program check(My prog probe): return code: 127
+16/06/13 17:39:29.105905  My prog probe -> ** ?? ** (13)
+16/06/13 17:39:29.105930  Performing check loop(My loop)
+16/06/13 17:39:30.106174  Loop check(My loop): removing loop email 5 of reference 'netmon:MYLOOP:1371397162-191168-128648:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:30.106340  My loop -> ** KO ** (9)
+16/06/13 17:39:30.106371  Check done in 0.123450s
+16/06/13 17:39:30.106396  Starting check...
+16/06/13 17:39:30.106416  Performing check program(My prog probe)
+16/06/13 17:39:30.106450  Program check(My prog probe): will execute the command:
+                          ./check.sh 14
+16/06/13 17:39:30.108307  Program check(My prog probe): return code: 127
+16/06/13 17:39:30.108374  My prog probe -> ** ?? ** (14)
+16/06/13 17:39:30.108398  Performing check loop(My loop)
+16/06/13 17:39:31.108600  Loop check(My loop): removing loop email 6 of reference 'netmon:MYLOOP:1371397163-116592-177540:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:31.108764  My loop -> ** KO ** (10)
+16/06/13 17:39:31.108794  Check done in 0.123450s
+16/06/13 17:39:31.108820  Starting check...
+16/06/13 17:39:31.108840  Performing check program(My prog probe)
+16/06/13 17:39:31.108874  Program check(My prog probe): will execute the command:
+                          ./check.sh 15
+16/06/13 17:39:31.111003  Program check(My prog probe): return code: 127
+16/06/13 17:39:31.111072  My prog probe -> ** ?? ** (15)
+16/06/13 17:39:31.111097  Performing check loop(My loop)
+16/06/13 17:39:32.111338  Loop check(My loop): removing loop email 7 of reference 'netmon:MYLOOP:1371397164-156566-168458:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:32.111557  My loop -> ** KO ** (11)
+16/06/13 17:39:32.111856  Check done in 0.123450s
+16/06/13 17:39:32.111889  Starting check...
+16/06/13 17:39:32.111909  Performing check program(My prog probe)
+16/06/13 17:39:32.111943  Program check(My prog probe): will execute the command:
+                          ./check.sh 16
+16/06/13 17:39:32.113824  Program check(My prog probe): return code: 127
+16/06/13 17:39:32.113893  My prog probe -> ** ?? ** (16)
+16/06/13 17:39:32.113918  Performing check loop(My loop)
+16/06/13 17:39:33.114154  Loop check(My loop): removing loop email 8 of reference 'netmon:MYLOOP:1371397165-443021-348731:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:33.114315  My loop -> ** KO ** (12)
+16/06/13 17:39:33.114346  Check done in 0.123450s
+16/06/13 17:39:33.114371  Starting check...
+16/06/13 17:39:33.114392  Performing check program(My prog probe)
+16/06/13 17:39:33.114426  Program check(My prog probe): will execute the command:
+                          ./check.sh 17
+16/06/13 17:39:33.116517  Program check(My prog probe): return code: 127
+16/06/13 17:39:33.116589  My prog probe -> ** ?? ** (17)
+16/06/13 17:39:33.116614  Performing check loop(My loop)
+16/06/13 17:39:34.116846  Loop check(My loop): removing loop email 9 of reference 'netmon:MYLOOP:1371397166-141697-145781:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:34.117012  My loop -> ** KO ** (13)
+16/06/13 17:39:34.117042  Check done in 0.123450s
+16/06/13 17:39:34.117067  Starting check...
+16/06/13 17:39:34.117088  Performing check program(My prog probe)
+16/06/13 17:39:34.117122  Program check(My prog probe): will execute the command:
+                          ./check.sh 18
+16/06/13 17:39:34.118994  Program check(My prog probe): return code: 127
+16/06/13 17:39:34.119064  My prog probe -> ** ?? ** (18)
+16/06/13 17:39:34.119088  Performing check loop(My loop)
+16/06/13 17:39:35.119322  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397167-129733-193788:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:35.119480  My loop -> ** KO ** (14)
+16/06/13 17:39:35.119515  Check done in 0.123450s
+16/06/13 17:39:35.119541  Starting check...
+16/06/13 17:39:35.119561  Performing check program(My prog probe)
+16/06/13 17:39:35.119595  Program check(My prog probe): will execute the command:
+                          ./check.sh 19
+16/06/13 17:39:35.121493  Program check(My prog probe): return code: 127
+16/06/13 17:39:35.121564  My prog probe -> ** ?? ** (19)
+16/06/13 17:39:35.121588  Performing check loop(My loop)
+16/06/13 17:39:36.121825  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397168-829961-206268:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:36.121989  My loop -> ** KO ** (15)
+16/06/13 17:39:36.122042  Check done in 0.123450s
+16/06/13 17:39:36.122068  Starting check...
+16/06/13 17:39:36.122088  Performing check program(My prog probe)
+16/06/13 17:39:36.122122  Program check(My prog probe): will execute the command:
+                          ./check.sh 20
+16/06/13 17:39:36.123971  Program check(My prog probe): return code: 127
+16/06/13 17:39:36.124039  My prog probe -> ** ?? ** (20)
+16/06/13 17:39:36.124068  Performing check loop(My loop)
+16/06/13 17:39:37.124311  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397169-104374-561698:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:39:37.124477  My loop -> ** KO ** (16)
+16/06/13 17:39:37.124663  Check done in 0.123450s
+16/06/13 17:39:37.124695  netmon end
+  
+16/06/13 17:40:27.686173  netmon 1.0 start
+16/06/13 17:40:27.686231  Reading configuration from 'netmon.ini'
+16/06/13 17:40:27.686403  keep_last_status not defined, taking default = 15
+                          == CHECK #0
+                             is_valid       = Yes
+                             display_name   = My prog probe
+                             host_name      = non
+                             method         = program
+                             PROGRAM/command            = ./check.sh ${LOOP_COUNT}
+                             alerts         = <unset>
+                             nb alerts      = 0
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == CHECK #1
+                             is_valid       = Yes
+                             display_name   = My loop
+                             host_name      = 
+                             method         = loop
+                             LOOP/fail delay            = 5
+                             LOOP/fail timeout          = 8
+                             LOOP/send every            = <unset>
+                             LOOP/smtp/smarthost        = mysmtp
+                             LOOP/smtp/port             = <unset>
+                             LOOP/smtp/self             = <unset>
+                             LOOP/smtp/sender           = mysender
+                             LOOP/smtp/recipients       = myrec
+                             LOOP/smtp/connect_timeout  = <unset>
+                             LOOP/pop3/server           = mypop
+                             LOOP/pop3/port             = <unset>
+                             LOOP/pop3/user             = myemail
+                             LOOP/pop3/password         = *****
+                             LOOP/pop3/connect_timeout  = <unset>
+                             alerts         = <unset>
+                             nb alerts      = 0
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == ALERT #0
+                             is_valid          = Yes
+                             name              = print
+                             method            = program
+                             threshold         = <unset>
+                             repeat_every      = <unset>
+                             repeat_max        = <unset>
+                             retries           = <unset>
+                             program/command   = ./printargs.sh "${DISPLAY_NAME}" "${HOST_NAME}" "${STATUS}" ${ALERT_TIMESTAMP}
+16/06/13 17:40:27.688132  check_interval = 0
+16/06/13 17:40:27.688164  keep_last_status = 15
+16/06/13 17:40:27.688197  display_name_width = 20
+16/06/13 17:40:27.688230  html_directory = ../www
+16/06/13 17:40:27.688265  html_file = netmon.html
+16/06/13 17:40:27.688300  html_title = netmon 1.0
+16/06/13 17:40:27.688336  html_refresh_interval = 20
+16/06/13 17:40:27.688368  Valid check(s) defined: 2
+16/06/13 17:40:27.688403  Run web server: no
+16/06/13 17:40:27.688438  To check: 'My prog probe' [non:0], no expect, no alert
+16/06/13 17:40:27.688476  To check: 'My loop' [:0], no expect, no alert
+16/06/13 17:40:27.688517  Will create image files in html directory
+16/06/13 17:40:27.689227  Starting check...
+16/06/13 17:40:27.689289  Performing check program(My prog probe)
+16/06/13 17:40:27.689343  Program check(My prog probe): will execute the command:
+                          ./check.sh 1
+16/06/13 17:40:27.691310  Program check(My prog probe): return code: 127
+16/06/13 17:40:27.691388  My prog probe -> ** ?? **
+16/06/13 17:40:27.691412  Performing check loop(My loop)
+16/06/13 17:40:28.691689  My loop -> ok
+16/06/13 17:40:28.691759  Check done in 0.123450s
+16/06/13 17:40:28.691807  Starting check...
+16/06/13 17:40:28.691827  Performing check program(My prog probe)
+16/06/13 17:40:28.691861  Program check(My prog probe): will execute the command:
+                          ./check.sh 2
+16/06/13 17:40:28.693733  Program check(My prog probe): return code: 127
+16/06/13 17:40:28.693797  My prog probe -> ** ?? **
+16/06/13 17:40:28.693821  Performing check loop(My loop)
+16/06/13 17:40:29.694036  My loop -> ok
+16/06/13 17:40:29.694106  Check done in 0.123450s
+16/06/13 17:40:29.694152  Starting check...
+16/06/13 17:40:29.694175  Performing check program(My prog probe)
+16/06/13 17:40:29.694209  Program check(My prog probe): will execute the command:
+                          ./check.sh 3
+16/06/13 17:40:29.696034  Program check(My prog probe): return code: 127
+16/06/13 17:40:29.696097  My prog probe -> ** ?? **
+16/06/13 17:40:29.696120  Performing check loop(My loop)
+16/06/13 17:40:30.696361  My loop -> ok
+16/06/13 17:40:30.696433  Check done in 0.123450s
+16/06/13 17:40:30.696461  Starting check...
+16/06/13 17:40:30.696481  Performing check program(My prog probe)
+16/06/13 17:40:30.696515  Program check(My prog probe): will execute the command:
+                          ./check.sh 4
+16/06/13 17:40:30.698610  Program check(My prog probe): return code: 127
+16/06/13 17:40:30.698679  My prog probe -> ** ?? **
+16/06/13 17:40:30.698703  Performing check loop(My loop)
+16/06/13 17:40:31.698935  My loop -> ok
+16/06/13 17:40:31.699002  Check done in 0.123450s
+16/06/13 17:40:31.699031  Starting check...
+16/06/13 17:40:31.699052  Performing check program(My prog probe)
+16/06/13 17:40:31.699086  Program check(My prog probe): will execute the command:
+                          ./check.sh 5
+16/06/13 17:40:31.701157  Program check(My prog probe): return code: 127
+16/06/13 17:40:31.701227  My prog probe -> ** ?? **
+16/06/13 17:40:31.701251  Performing check loop(My loop)
+16/06/13 17:40:32.701494  My loop -> ** KO **
+16/06/13 17:40:32.701573  Check done in 0.123450s
+16/06/13 17:40:32.701613  Starting check...
+16/06/13 17:40:32.701634  Performing check program(My prog probe)
+16/06/13 17:40:32.701673  Program check(My prog probe): will execute the command:
+                          ./check.sh 6
+16/06/13 17:40:32.703648  Program check(My prog probe): return code: 127
+16/06/13 17:40:32.703712  My prog probe -> ** ?? **
+16/06/13 17:40:32.703735  Performing check loop(My loop)
+16/06/13 17:40:33.704017  My loop -> ** KO **
+16/06/13 17:40:33.704089  Check done in 0.123450s
+16/06/13 17:40:33.704117  Starting check...
+16/06/13 17:40:33.704137  Performing check program(My prog probe)
+16/06/13 17:40:33.704171  Program check(My prog probe): will execute the command:
+                          ./check.sh 7
+16/06/13 17:40:33.706193  Program check(My prog probe): return code: 127
+16/06/13 17:40:33.706264  My prog probe -> ** ?? **
+16/06/13 17:40:33.706289  Performing check loop(My loop)
+16/06/13 17:40:34.706507  My loop -> ** KO **
+16/06/13 17:40:34.706580  Check done in 0.123450s
+16/06/13 17:40:34.706608  Starting check...
+16/06/13 17:40:34.706628  Performing check program(My prog probe)
+16/06/13 17:40:34.706663  Program check(My prog probe): will execute the command:
+                          ./check.sh 8
+16/06/13 17:40:34.708742  Program check(My prog probe): return code: 127
+16/06/13 17:40:34.708807  My prog probe -> ** ?? **
+16/06/13 17:40:34.708832  Performing check loop(My loop)
+16/06/13 17:40:35.709074  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397227-136017-292522:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:35.709146  My loop -> ** KO **
+16/06/13 17:40:35.709180  Check done in 0.123450s
+16/06/13 17:40:35.709206  Starting check...
+16/06/13 17:40:35.709226  Performing check program(My prog probe)
+16/06/13 17:40:35.709259  Program check(My prog probe): will execute the command:
+                          ./check.sh 9
+16/06/13 17:40:35.711156  Program check(My prog probe): return code: 127
+16/06/13 17:40:35.711221  My prog probe -> ** ?? **
+16/06/13 17:40:35.711244  Performing check loop(My loop)
+16/06/13 17:40:36.711485  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397228-562843-123794:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:36.711564  My loop -> ** KO **
+16/06/13 17:40:36.711593  Check done in 0.123450s
+16/06/13 17:40:36.711619  Starting check...
+16/06/13 17:40:36.711639  Performing check program(My prog probe)
+16/06/13 17:40:36.711672  Program check(My prog probe): will execute the command:
+                          ./check.sh 10
+16/06/13 17:40:36.713765  Program check(My prog probe): return code: 127
+16/06/13 17:40:36.713833  My prog probe -> ** ?? **
+16/06/13 17:40:36.713857  Performing check loop(My loop)
+16/06/13 17:40:37.714076  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397229-201990-107134:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:37.714157  My loop -> ** KO **
+16/06/13 17:40:37.714199  Check done in 0.123450s
+16/06/13 17:40:37.714228  Starting check...
+16/06/13 17:40:37.714272  Performing check program(My prog probe)
+16/06/13 17:40:37.714308  Program check(My prog probe): will execute the command:
+                          ./check.sh 11
+16/06/13 17:40:37.716392  Program check(My prog probe): return code: 127
+16/06/13 17:40:37.716462  My prog probe -> ** ?? **
+16/06/13 17:40:37.716487  Performing check loop(My loop)
+16/06/13 17:40:38.716699  Loop check(My loop): removing loop email 3 of reference 'netmon:MYLOOP:1371397230-918939-135796:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:38.716775  My loop -> ** KO **
+16/06/13 17:40:38.716804  Check done in 0.123450s
+16/06/13 17:40:38.716830  Starting check...
+16/06/13 17:40:38.716850  Performing check program(My prog probe)
+16/06/13 17:40:38.716888  Program check(My prog probe): will execute the command:
+                          ./check.sh 12
+16/06/13 17:40:38.718839  Program check(My prog probe): return code: 127
+16/06/13 17:40:38.718901  My prog probe -> ** ?? **
+16/06/13 17:40:38.718924  Performing check loop(My loop)
+16/06/13 17:40:39.719171  Loop check(My loop): removing loop email 4 of reference 'netmon:MYLOOP:1371397231-696148-378954:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:39.719245  My loop -> ** KO **
+16/06/13 17:40:39.719274  Check done in 0.123450s
+16/06/13 17:40:39.719300  Starting check...
+16/06/13 17:40:39.719320  Performing check program(My prog probe)
+16/06/13 17:40:39.719354  Program check(My prog probe): will execute the command:
+                          ./check.sh 13
+16/06/13 17:40:39.721219  Program check(My prog probe): return code: 127
+16/06/13 17:40:39.721282  My prog probe -> ** ?? **
+16/06/13 17:40:39.721305  Performing check loop(My loop)
+16/06/13 17:40:40.721515  Loop check(My loop): removing loop email 5 of reference 'netmon:MYLOOP:1371397232-142197-194792:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:40.721594  My loop -> ** KO **
+16/06/13 17:40:40.721624  Check done in 0.123450s
+16/06/13 17:40:40.721653  Starting check...
+16/06/13 17:40:40.721673  Performing check program(My prog probe)
+16/06/13 17:40:40.721706  Program check(My prog probe): will execute the command:
+                          ./check.sh 14
+16/06/13 17:40:40.723589  Program check(My prog probe): return code: 127
+16/06/13 17:40:40.723656  My prog probe -> ** ?? **
+16/06/13 17:40:40.723680  Performing check loop(My loop)
+16/06/13 17:40:41.723919  Loop check(My loop): removing loop email 6 of reference 'netmon:MYLOOP:1371397233-321408-207689:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:41.723997  My loop -> ** KO **
+16/06/13 17:40:41.724026  Check done in 0.123450s
+16/06/13 17:40:41.724057  Starting check...
+16/06/13 17:40:41.724076  Performing check program(My prog probe)
+16/06/13 17:40:41.724110  Program check(My prog probe): will execute the command:
+                          ./check.sh 15
+16/06/13 17:40:41.726048  Program check(My prog probe): return code: 127
+16/06/13 17:40:41.726119  My prog probe -> ** ?? **
+16/06/13 17:40:41.726143  Performing check loop(My loop)
+16/06/13 17:40:42.726366  Loop check(My loop): removing loop email 7 of reference 'netmon:MYLOOP:1371397234-341275-102505:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:42.726448  My loop -> ** KO **
+16/06/13 17:40:42.726491  Check done in 0.123450s
+16/06/13 17:40:42.726520  Starting check...
+16/06/13 17:40:42.726545  Performing check program(My prog probe)
+16/06/13 17:40:42.726581  Program check(My prog probe): will execute the command:
+                          ./check.sh 16
+16/06/13 17:40:42.728643  Program check(My prog probe): return code: 127
+16/06/13 17:40:42.728714  My prog probe -> ** ?? **
+16/06/13 17:40:42.728739  Performing check loop(My loop)
+16/06/13 17:40:43.728958  Loop check(My loop): removing loop email 8 of reference 'netmon:MYLOOP:1371397235-543953-391537:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:43.729031  My loop -> ** KO **
+16/06/13 17:40:43.729061  Check done in 0.123450s
+16/06/13 17:40:43.729088  Starting check...
+16/06/13 17:40:43.729108  Performing check program(My prog probe)
+16/06/13 17:40:43.729146  Program check(My prog probe): will execute the command:
+                          ./check.sh 17
+16/06/13 17:40:43.731027  Program check(My prog probe): return code: 127
+16/06/13 17:40:43.731095  My prog probe -> ** ?? **
+16/06/13 17:40:43.731118  Performing check loop(My loop)
+16/06/13 17:40:44.731341  Loop check(My loop): removing loop email 9 of reference 'netmon:MYLOOP:1371397236-250074-707170:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:44.731415  My loop -> ** KO **
+16/06/13 17:40:44.731447  Check done in 0.123450s
+16/06/13 17:40:44.731473  Starting check...
+16/06/13 17:40:44.731493  Performing check program(My prog probe)
+16/06/13 17:40:44.731527  Program check(My prog probe): will execute the command:
+                          ./check.sh 18
+16/06/13 17:40:44.733398  Program check(My prog probe): return code: 127
+16/06/13 17:40:44.733462  My prog probe -> ** ?? **
+16/06/13 17:40:44.733487  Performing check loop(My loop)
+16/06/13 17:40:45.733706  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397237-149242-899123:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:45.733781  My loop -> ** KO **
+16/06/13 17:40:45.733811  Check done in 0.123450s
+16/06/13 17:40:45.733837  Starting check...
+16/06/13 17:40:45.733857  Performing check program(My prog probe)
+16/06/13 17:40:45.733893  Program check(My prog probe): will execute the command:
+                          ./check.sh 19
+16/06/13 17:40:45.735732  Program check(My prog probe): return code: 127
+16/06/13 17:40:45.735796  My prog probe -> ** ?? **
+16/06/13 17:40:45.735819  Performing check loop(My loop)
+16/06/13 17:40:46.736037  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397238-132031-100832:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:46.736114  My loop -> ** KO **
+16/06/13 17:40:46.736144  Check done in 0.123450s
+16/06/13 17:40:46.736170  Starting check...
+16/06/13 17:40:46.736190  Performing check program(My prog probe)
+16/06/13 17:40:46.736224  Program check(My prog probe): will execute the command:
+                          ./check.sh 20
+16/06/13 17:40:46.738070  Program check(My prog probe): return code: 127
+16/06/13 17:40:46.738136  My prog probe -> ** ?? **
+16/06/13 17:40:46.738160  Performing check loop(My loop)
+16/06/13 17:40:47.738383  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397239-128375-182824:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:40:47.738465  My loop -> ** KO **
+16/06/13 17:40:47.738509  Check done in 0.123450s
+16/06/13 17:40:47.738537  netmon end
+  
+16/06/13 17:41:08.534226  netmon 1.0 start
+16/06/13 17:41:08.534304  Reading configuration from 'netmon.ini'
+16/06/13 17:41:08.534480  keep_last_status not defined, taking default = 15
+                          == CHECK #0
+                             is_valid       = Yes
+                             display_name   = My prog probe
+                             host_name      = non
+                             method         = program
+                             PROGRAM/command            = ./check.sh ${LOOP_COUNT}
+                             alerts         = <unset>
+                             nb alerts      = 0
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == CHECK #1
+                             is_valid       = Yes
+                             display_name   = My loop
+                             host_name      = 
+                             method         = loop
+                             LOOP/fail delay            = 5
+                             LOOP/fail timeout          = 8
+                             LOOP/send every            = <unset>
+                             LOOP/smtp/smarthost        = mysmtp
+                             LOOP/smtp/port             = <unset>
+                             LOOP/smtp/self             = <unset>
+                             LOOP/smtp/sender           = mysender
+                             LOOP/smtp/recipients       = myrec
+                             LOOP/smtp/connect_timeout  = <unset>
+                             LOOP/pop3/server           = mypop
+                             LOOP/pop3/port             = <unset>
+                             LOOP/pop3/user             = myemail
+                             LOOP/pop3/password         = *****
+                             LOOP/pop3/connect_timeout  = <unset>
+                             alerts         = <unset>
+                             nb alerts      = 0
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == ALERT #0
+                             is_valid          = Yes
+                             name              = print
+                             method            = program
+                             threshold         = <unset>
+                             repeat_every      = <unset>
+                             repeat_max        = <unset>
+                             retries           = <unset>
+                             program/command   = ./printargs.sh "${DISPLAY_NAME}" "${HOST_NAME}" "${STATUS}" ${ALERT_TIMESTAMP}
+16/06/13 17:41:08.536175  check_interval = 0
+16/06/13 17:41:08.536208  keep_last_status = 15
+16/06/13 17:41:08.536241  display_name_width = 20
+16/06/13 17:41:08.536278  html_directory = ../www
+16/06/13 17:41:08.536314  html_file = netmon.html
+16/06/13 17:41:08.536349  html_title = netmon 1.0
+16/06/13 17:41:08.536385  html_refresh_interval = 20
+16/06/13 17:41:08.536421  Valid check(s) defined: 2
+16/06/13 17:41:08.536457  Run web server: no
+16/06/13 17:41:08.536493  To check: 'My prog probe' [non:0], no expect, no alert
+16/06/13 17:41:08.536531  To check: 'My loop' [:0], no expect, no alert
+16/06/13 17:41:08.536574  Will create image files in html directory
+16/06/13 17:41:08.537237  Starting check...
+16/06/13 17:41:08.537292  Performing check program(My prog probe)
+16/06/13 17:41:08.537347  Program check(My prog probe): will execute the command:
+                          ./check.sh 1
+16/06/13 17:41:08.540329  Program check(My prog probe): return code: 0
+16/06/13 17:41:08.540428  My prog probe -> ok
+16/06/13 17:41:08.540468  Performing check loop(My loop)
+16/06/13 17:41:09.540751  My loop -> ok
+16/06/13 17:41:09.540832  Check done in 0.123450s
+16/06/13 17:41:09.540895  Starting check...
+16/06/13 17:41:09.540917  Performing check program(My prog probe)
+16/06/13 17:41:09.541018  Program check(My prog probe): will execute the command:
+                          ./check.sh 2
+16/06/13 17:41:09.544156  Program check(My prog probe): return code: 0
+16/06/13 17:41:09.544251  My prog probe -> ok
+16/06/13 17:41:09.544296  Performing check loop(My loop)
+16/06/13 17:41:10.544515  My loop -> ok
+16/06/13 17:41:10.544586  Check done in 0.123450s
+16/06/13 17:41:10.544619  Starting check...
+16/06/13 17:41:10.544639  Performing check program(My prog probe)
+16/06/13 17:41:10.544673  Program check(My prog probe): will execute the command:
+                          ./check.sh 3
+16/06/13 17:41:10.547683  Program check(My prog probe): return code: 0
+16/06/13 17:41:10.547778  My prog probe -> ok
+16/06/13 17:41:10.547818  Performing check loop(My loop)
+16/06/13 17:41:11.548064  My loop -> ok
+16/06/13 17:41:11.548135  Check done in 0.123450s
+16/06/13 17:41:11.548164  Starting check...
+16/06/13 17:41:11.548202  Performing check program(My prog probe)
+16/06/13 17:41:11.548236  Program check(My prog probe): will execute the command:
+                          ./check.sh 4
+16/06/13 17:41:11.551188  Program check(My prog probe): return code: 0
+16/06/13 17:41:11.551287  My prog probe -> ok
+16/06/13 17:41:11.551326  Performing check loop(My loop)
+16/06/13 17:41:12.551509  My loop -> ok
+16/06/13 17:41:12.551585  Check done in 0.123450s
+16/06/13 17:41:12.551614  Starting check...
+16/06/13 17:41:12.551633  Performing check program(My prog probe)
+16/06/13 17:41:12.551670  Program check(My prog probe): will execute the command:
+                          ./check.sh 5
+16/06/13 17:41:12.554615  Program check(My prog probe): return code: 2
+16/06/13 17:41:12.554733  My prog probe -> ** KO **
+16/06/13 17:41:12.554809  Performing check loop(My loop)
+16/06/13 17:41:13.555065  My loop -> ** KO **
+16/06/13 17:41:13.555130  Check done in 0.123450s
+16/06/13 17:41:13.555157  Starting check...
+16/06/13 17:41:13.555182  Performing check program(My prog probe)
+16/06/13 17:41:13.555216  Program check(My prog probe): will execute the command:
+                          ./check.sh 6
+16/06/13 17:41:13.558172  Program check(My prog probe): return code: 2
+16/06/13 17:41:13.558278  My prog probe -> ** KO **
+16/06/13 17:41:13.558317  Performing check loop(My loop)
+16/06/13 17:41:14.558531  My loop -> ** KO **
+16/06/13 17:41:14.558629  Check done in 0.123450s
+16/06/13 17:41:14.558684  Starting check...
+16/06/13 17:41:14.558724  Performing check program(My prog probe)
+16/06/13 17:41:14.558774  Program check(My prog probe): will execute the command:
+                          ./check.sh 7
+16/06/13 17:41:14.561707  Program check(My prog probe): return code: 2
+16/06/13 17:41:14.561810  My prog probe -> ** KO **
+16/06/13 17:41:14.561881  Performing check loop(My loop)
+16/06/13 17:41:15.562130  My loop -> ** KO **
+16/06/13 17:41:15.562198  Check done in 0.123450s
+16/06/13 17:41:15.562225  Starting check...
+16/06/13 17:41:15.562247  Performing check program(My prog probe)
+16/06/13 17:41:15.562281  Program check(My prog probe): will execute the command:
+                          ./check.sh 8
+16/06/13 17:41:15.565192  Program check(My prog probe): return code: 2
+16/06/13 17:41:15.565292  My prog probe -> ** KO **
+16/06/13 17:41:15.565336  Performing check loop(My loop)
+16/06/13 17:41:16.565544  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397268-176031-948578:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:16.565619  My loop -> ** KO **
+16/06/13 17:41:16.565653  Check done in 0.123450s
+16/06/13 17:41:16.565679  Starting check...
+16/06/13 17:41:16.565699  Performing check program(My prog probe)
+16/06/13 17:41:16.565733  Program check(My prog probe): will execute the command:
+                          ./check.sh 9
+16/06/13 17:41:16.568767  Program check(My prog probe): return code: 2
+16/06/13 17:41:16.568868  My prog probe -> ** KO **
+16/06/13 17:41:16.568936  Performing check loop(My loop)
+16/06/13 17:41:17.569168  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397269-351945-413200:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:17.569245  My loop -> ** KO **
+16/06/13 17:41:17.569276  Check done in 0.123450s
+16/06/13 17:41:17.569301  Starting check...
+16/06/13 17:41:17.569324  Performing check program(My prog probe)
+16/06/13 17:41:17.569358  Program check(My prog probe): will execute the command:
+                          ./check.sh 10
+16/06/13 17:41:17.572297  Program check(My prog probe): return code: 2
+16/06/13 17:41:17.572396  My prog probe -> ** KO **
+16/06/13 17:41:17.572437  Performing check loop(My loop)
+16/06/13 17:41:18.572667  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397270-155934-116939:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:18.572764  My loop -> ** KO **
+16/06/13 17:41:18.572809  Check done in 0.123450s
+16/06/13 17:41:18.572853  Starting check...
+16/06/13 17:41:18.572920  Performing check program(My prog probe)
+16/06/13 17:41:18.573008  Program check(My prog probe): will execute the command:
+                          ./check.sh 11
+16/06/13 17:41:18.575969  Program check(My prog probe): return code: 2
+16/06/13 17:41:18.576071  My prog probe -> ** KO **
+16/06/13 17:41:18.576111  Performing check loop(My loop)
+16/06/13 17:41:19.576342  Loop check(My loop): removing loop email 3 of reference 'netmon:MYLOOP:1371397271-154582-465478:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:19.576425  My loop -> ** KO **
+16/06/13 17:41:19.576469  Check done in 0.123450s
+16/06/13 17:41:19.576497  Starting check...
+16/06/13 17:41:19.576518  Performing check program(My prog probe)
+16/06/13 17:41:19.576562  Program check(My prog probe): will execute the command:
+                          ./check.sh 12
+16/06/13 17:41:19.579535  Program check(My prog probe): return code: 2
+16/06/13 17:41:19.579637  My prog probe -> ** KO **
+16/06/13 17:41:19.579677  Performing check loop(My loop)
+16/06/13 17:41:20.579910  Loop check(My loop): removing loop email 4 of reference 'netmon:MYLOOP:1371397272-180319-293054:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:20.579990  My loop -> ** KO **
+16/06/13 17:41:20.580019  Check done in 0.123450s
+16/06/13 17:41:20.580045  Starting check...
+16/06/13 17:41:20.580065  Performing check program(My prog probe)
+16/06/13 17:41:20.580099  Program check(My prog probe): will execute the command:
+                          ./check.sh 13
+16/06/13 17:41:20.583090  Program check(My prog probe): return code: 2
+16/06/13 17:41:20.583194  My prog probe -> ** KO **
+16/06/13 17:41:20.583233  Performing check loop(My loop)
+16/06/13 17:41:21.583477  Loop check(My loop): removing loop email 5 of reference 'netmon:MYLOOP:1371397273-946091-717661:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:21.583554  My loop -> ** KO **
+16/06/13 17:41:21.583584  Check done in 0.123450s
+16/06/13 17:41:21.583610  Starting check...
+16/06/13 17:41:21.583629  Performing check program(My prog probe)
+16/06/13 17:41:21.583664  Program check(My prog probe): will execute the command:
+                          ./check.sh 14
+16/06/13 17:41:21.586615  Program check(My prog probe): return code: 2
+16/06/13 17:41:21.586714  My prog probe -> ** KO **
+16/06/13 17:41:21.586754  Performing check loop(My loop)
+16/06/13 17:41:22.587013  Loop check(My loop): removing loop email 6 of reference 'netmon:MYLOOP:1371397274-193290-157898:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:22.587092  My loop -> ** KO **
+16/06/13 17:41:22.587122  Check done in 0.123450s
+16/06/13 17:41:22.587148  Starting check...
+16/06/13 17:41:22.587168  Performing check program(My prog probe)
+16/06/13 17:41:22.587203  Program check(My prog probe): will execute the command:
+                          ./check.sh 15
+16/06/13 17:41:22.590145  Program check(My prog probe): return code: 2
+16/06/13 17:41:22.590244  My prog probe -> ** KO **
+16/06/13 17:41:22.590286  Performing check loop(My loop)
+16/06/13 17:41:23.590502  Loop check(My loop): removing loop email 7 of reference 'netmon:MYLOOP:1371397275-646513-659260:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:23.590578  My loop -> ** KO **
+16/06/13 17:41:23.590608  Check done in 0.123450s
+16/06/13 17:41:23.590634  Starting check...
+16/06/13 17:41:23.590653  Performing check program(My prog probe)
+16/06/13 17:41:23.590692  Program check(My prog probe): will execute the command:
+                          ./check.sh 16
+16/06/13 17:41:23.593588  Program check(My prog probe): return code: 2
+16/06/13 17:41:23.593687  My prog probe -> ** KO **
+16/06/13 17:41:23.593726  Performing check loop(My loop)
+16/06/13 17:41:24.593982  Loop check(My loop): removing loop email 8 of reference 'netmon:MYLOOP:1371397276-146064-188861:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:24.594085  My loop -> ** KO **
+16/06/13 17:41:24.594134  Check done in 0.123450s
+16/06/13 17:41:24.594163  Starting check...
+16/06/13 17:41:24.594203  Performing check program(My prog probe)
+16/06/13 17:41:24.594243  Program check(My prog probe): will execute the command:
+                          ./check.sh 17
+16/06/13 17:41:24.597127  Program check(My prog probe): return code: 2
+16/06/13 17:41:24.597227  My prog probe -> ** KO **
+16/06/13 17:41:24.597268  Performing check loop(My loop)
+16/06/13 17:41:25.597529  Loop check(My loop): removing loop email 9 of reference 'netmon:MYLOOP:1371397277-477955-314442:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:25.597602  My loop -> ** KO **
+16/06/13 17:41:25.597637  Check done in 0.123450s
+16/06/13 17:41:25.597663  Starting check...
+16/06/13 17:41:25.597683  Performing check program(My prog probe)
+16/06/13 17:41:25.597718  Program check(My prog probe): will execute the command:
+                          ./check.sh 18
+16/06/13 17:41:25.600652  Program check(My prog probe): return code: 2
+16/06/13 17:41:25.600753  My prog probe -> ** KO **
+16/06/13 17:41:25.600793  Performing check loop(My loop)
+16/06/13 17:41:26.601029  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:26.601109  My loop -> ** KO **
+16/06/13 17:41:26.601139  Check done in 0.123450s
+16/06/13 17:41:26.601165  Starting check...
+16/06/13 17:41:26.601185  Performing check program(My prog probe)
+16/06/13 17:41:26.601219  Program check(My prog probe): will execute the command:
+                          ./check.sh 19
+16/06/13 17:41:26.604159  Program check(My prog probe): return code: 2
+16/06/13 17:41:26.604258  My prog probe -> ** KO **
+16/06/13 17:41:26.604297  Performing check loop(My loop)
+16/06/13 17:41:27.604526  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397279-194307-346701:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:27.604604  My loop -> ** KO **
+16/06/13 17:41:27.604634  Check done in 0.123450s
+16/06/13 17:41:27.604660  Starting check...
+16/06/13 17:41:27.604680  Performing check program(My prog probe)
+16/06/13 17:41:27.604714  Program check(My prog probe): will execute the command:
+                          ./check.sh 20
+16/06/13 17:41:27.607694  Program check(My prog probe): return code: 0
+16/06/13 17:41:27.607797  My prog probe -> ok
+16/06/13 17:41:27.607836  Performing check loop(My loop)
+16/06/13 17:41:28.608086  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397280-105543-101652:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:41:28.608164  My loop -> ** KO **
+16/06/13 17:41:28.608194  Check done in 0.123450s
+16/06/13 17:41:28.608220  netmon end
+  
+16/06/13 17:43:20.334235  netmon 1.0 start
+16/06/13 17:43:20.334290  Reading configuration from 'netmon.ini'
+16/06/13 17:43:20.334470  keep_last_status not defined, taking default = 15
+                          == CHECK #0
+                             is_valid       = Yes
+                             display_name   = My prog probe
+                             host_name      = non
+                             method         = program
+                             PROGRAM/command            = ./check.sh ${LOOP_COUNT}
+                             alerts         = <unset>
+                             nb alerts      = 0
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == CHECK #1
+                             is_valid       = Yes
+                             display_name   = My loop
+                             host_name      = 
+                             method         = loop
+                             LOOP/fail delay            = 5
+                             LOOP/fail timeout          = 8
+                             LOOP/send every            = <unset>
+                             LOOP/smtp/smarthost        = mysmtp
+                             LOOP/smtp/port             = <unset>
+                             LOOP/smtp/self             = <unset>
+                             LOOP/smtp/sender           = mysender
+                             LOOP/smtp/recipients       = myrec
+                             LOOP/smtp/connect_timeout  = <unset>
+                             LOOP/pop3/server           = mypop
+                             LOOP/pop3/port             = <unset>
+                             LOOP/pop3/user             = myemail
+                             LOOP/pop3/password         = *****
+                             LOOP/pop3/connect_timeout  = <unset>
+                             alerts         = <unset>
+                             nb alerts      = 0
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == ALERT #0
+                             is_valid          = Yes
+                             name              = print
+                             method            = program
+                             threshold         = <unset>
+                             repeat_every      = <unset>
+                             repeat_max        = <unset>
+                             retries           = <unset>
+                             program/command   = ./printargs.sh "${DISPLAY_NAME}" "${HOST_NAME}" "${STATUS}" ${ALERT_TIMESTAMP}
+16/06/13 17:43:20.336234  check_interval = 0
+16/06/13 17:43:20.336269  keep_last_status = 15
+16/06/13 17:43:20.336302  display_name_width = 20
+16/06/13 17:43:20.336334  html_directory = ../www
+16/06/13 17:43:20.336368  html_file = netmon.html
+16/06/13 17:43:20.336400  html_title = netmon 1.0
+16/06/13 17:43:20.336433  html_refresh_interval = 20
+16/06/13 17:43:20.336465  Valid check(s) defined: 2
+16/06/13 17:43:20.336500  Run web server: no
+16/06/13 17:43:20.336534  To check: 'My prog probe' [non:0], no expect, no alert
+16/06/13 17:43:20.336570  To check: 'My loop' [:0], no expect, no alert
+16/06/13 17:43:20.336608  Will create image files in html directory
+16/06/13 17:43:20.337271  Starting check...
+16/06/13 17:43:20.337331  Performing check program(My prog probe)
+16/06/13 17:43:20.337382  Program check(My prog probe): will execute the command:
+                          ./check.sh 1
+16/06/13 17:43:20.340315  Program check(My prog probe): return code: 0
+16/06/13 17:43:20.340416  My prog probe -> ok
+16/06/13 17:43:20.340456  Performing check loop(My loop)
+16/06/13 17:43:21.340715  My loop -> ok
+16/06/13 17:43:21.340787  Check done in 0.123450s
+16/06/13 17:43:21.340831  Starting check...
+16/06/13 17:43:21.340851  Performing check program(My prog probe)
+16/06/13 17:43:21.340888  Program check(My prog probe): will execute the command:
+                          ./check.sh 2
+16/06/13 17:43:21.343899  Program check(My prog probe): return code: 0
+16/06/13 17:43:21.344001  My prog probe -> ok
+16/06/13 17:43:21.344041  Performing check loop(My loop)
+16/06/13 17:43:22.344272  My loop -> ok
+16/06/13 17:43:22.344344  Check done in 0.123450s
+16/06/13 17:43:22.344371  Starting check...
+16/06/13 17:43:22.344391  Performing check program(My prog probe)
+16/06/13 17:43:22.344428  Program check(My prog probe): will execute the command:
+                          ./check.sh 3
+16/06/13 17:43:22.347403  Program check(My prog probe): return code: 0
+16/06/13 17:43:22.347500  My prog probe -> ok
+16/06/13 17:43:22.347539  Performing check loop(My loop)
+16/06/13 17:43:23.347783  My loop -> ok
+16/06/13 17:43:23.347860  Check done in 0.123450s
+16/06/13 17:43:23.347888  Starting check...
+16/06/13 17:43:23.347908  Performing check program(My prog probe)
+16/06/13 17:43:23.347943  Program check(My prog probe): will execute the command:
+                          ./check.sh 4
+16/06/13 17:43:23.350951  Program check(My prog probe): return code: 0
+16/06/13 17:43:23.351052  My prog probe -> ok
+16/06/13 17:43:23.351091  Performing check loop(My loop)
+16/06/13 17:43:24.351359  My loop -> ok
+16/06/13 17:43:24.351425  Check done in 0.123450s
+16/06/13 17:43:24.351453  Starting check...
+16/06/13 17:43:24.351475  Performing check program(My prog probe)
+16/06/13 17:43:24.351508  Program check(My prog probe): will execute the command:
+                          ./check.sh 5
+16/06/13 17:43:24.354416  Program check(My prog probe): return code: 2
+16/06/13 17:43:24.354534  My prog probe -> ** KO **
+16/06/13 17:43:24.354609  Performing check loop(My loop)
+16/06/13 17:43:25.354849  My loop -> ** KO **
+16/06/13 17:43:25.354923  Check done in 0.123450s
+16/06/13 17:43:25.354950  Starting check...
+16/06/13 17:43:25.354970  Performing check program(My prog probe)
+16/06/13 17:43:25.355003  Program check(My prog probe): will execute the command:
+                          ./check.sh 6
+16/06/13 17:43:25.357972  Program check(My prog probe): return code: 2
+16/06/13 17:43:25.358137  My prog probe -> ** KO **
+16/06/13 17:43:25.358179  Performing check loop(My loop)
+16/06/13 17:43:26.358429  My loop -> ** KO **
+16/06/13 17:43:26.358502  Check done in 0.123450s
+16/06/13 17:43:26.358531  Starting check...
+16/06/13 17:43:26.358551  Performing check program(My prog probe)
+16/06/13 17:43:26.358584  Program check(My prog probe): will execute the command:
+                          ./check.sh 7
+16/06/13 17:43:26.361474  Program check(My prog probe): return code: 2
+16/06/13 17:43:26.361575  My prog probe -> ** KO **
+16/06/13 17:43:26.361618  Performing check loop(My loop)
+16/06/13 17:43:27.361887  My loop -> ** KO **
+16/06/13 17:43:27.361961  Check done in 0.123450s
+16/06/13 17:43:27.361988  Starting check...
+16/06/13 17:43:27.362031  Performing check program(My prog probe)
+16/06/13 17:43:27.362067  Program check(My prog probe): will execute the command:
+                          ./check.sh 8
+16/06/13 17:43:27.365082  Program check(My prog probe): return code: 2
+16/06/13 17:43:27.365187  My prog probe -> ** KO **
+16/06/13 17:43:27.365260  Performing check loop(My loop)
+16/06/13 17:43:28.365497  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:28.365580  My loop -> ** KO **
+16/06/13 17:43:28.365621  Check done in 0.123450s
+16/06/13 17:43:28.365649  Starting check...
+16/06/13 17:43:28.365688  Performing check program(My prog probe)
+16/06/13 17:43:28.365722  Program check(My prog probe): will execute the command:
+                          ./check.sh 9
+16/06/13 17:43:28.368619  Program check(My prog probe): return code: 2
+16/06/13 17:43:28.368721  My prog probe -> ** KO **
+16/06/13 17:43:28.368789  Performing check loop(My loop)
+16/06/13 17:43:29.369024  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:29.369101  My loop -> ** KO **
+16/06/13 17:43:29.369132  Check done in 0.123450s
+16/06/13 17:43:29.369157  Starting check...
+16/06/13 17:43:29.369176  Performing check program(My prog probe)
+16/06/13 17:43:29.369214  Program check(My prog probe): will execute the command:
+                          ./check.sh 10
+16/06/13 17:43:29.372245  Program check(My prog probe): return code: 2
+16/06/13 17:43:29.372347  My prog probe -> ** KO **
+16/06/13 17:43:29.372387  Performing check loop(My loop)
+16/06/13 17:43:30.372560  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:30.372638  My loop -> ** KO **
+16/06/13 17:43:30.372668  Check done in 0.123450s
+16/06/13 17:43:30.372693  Starting check...
+16/06/13 17:43:30.372713  Performing check program(My prog probe)
+16/06/13 17:43:30.372751  Program check(My prog probe): will execute the command:
+                          ./check.sh 11
+16/06/13 17:43:30.375675  Program check(My prog probe): return code: 2
+16/06/13 17:43:30.375777  My prog probe -> ** KO **
+16/06/13 17:43:30.375821  Performing check loop(My loop)
+16/06/13 17:43:31.376066  Loop check(My loop): removing loop email 3 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:31.376141  My loop -> ** KO **
+16/06/13 17:43:31.376174  Check done in 0.123450s
+16/06/13 17:43:31.376200  Starting check...
+16/06/13 17:43:31.376238  Performing check program(My prog probe)
+16/06/13 17:43:31.376271  Program check(My prog probe): will execute the command:
+                          ./check.sh 12
+16/06/13 17:43:31.379159  Program check(My prog probe): return code: 2
+16/06/13 17:43:31.379263  My prog probe -> ** KO **
+16/06/13 17:43:31.379303  Performing check loop(My loop)
+16/06/13 17:43:32.379547  Loop check(My loop): removing loop email 4 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:32.379641  My loop -> ** KO **
+16/06/13 17:43:32.379689  Check done in 0.123450s
+16/06/13 17:43:32.379730  Starting check...
+16/06/13 17:43:32.379763  Performing check program(My prog probe)
+16/06/13 17:43:32.379811  Program check(My prog probe): will execute the command:
+                          ./check.sh 13
+16/06/13 17:43:32.382845  Program check(My prog probe): return code: 2
+16/06/13 17:43:32.382950  My prog probe -> ** KO **
+16/06/13 17:43:32.382989  Performing check loop(My loop)
+16/06/13 17:43:33.383228  Loop check(My loop): removing loop email 5 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:33.383307  My loop -> ** KO **
+16/06/13 17:43:33.383359  Check done in 0.123450s
+16/06/13 17:43:33.383387  Starting check...
+16/06/13 17:43:33.383407  Performing check program(My prog probe)
+16/06/13 17:43:33.383445  Program check(My prog probe): will execute the command:
+                          ./check.sh 14
+16/06/13 17:43:33.386467  Program check(My prog probe): return code: 2
+16/06/13 17:43:33.386571  My prog probe -> ** KO **
+16/06/13 17:43:33.386611  Performing check loop(My loop)
+16/06/13 17:43:34.386851  Loop check(My loop): removing loop email 6 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:34.386925  My loop -> ** KO **
+16/06/13 17:43:34.386959  Check done in 0.123450s
+16/06/13 17:43:34.386984  Starting check...
+16/06/13 17:43:34.387004  Performing check program(My prog probe)
+16/06/13 17:43:34.387037  Program check(My prog probe): will execute the command:
+                          ./check.sh 15
+16/06/13 17:43:34.389981  Program check(My prog probe): return code: 2
+16/06/13 17:43:34.390109  My prog probe -> ** KO **
+16/06/13 17:43:34.390148  Performing check loop(My loop)
+16/06/13 17:43:35.390385  Loop check(My loop): removing loop email 7 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:35.390458  My loop -> ** KO **
+16/06/13 17:43:35.390488  Check done in 0.123450s
+16/06/13 17:43:35.390518  Starting check...
+16/06/13 17:43:35.390538  Performing check program(My prog probe)
+16/06/13 17:43:35.390571  Program check(My prog probe): will execute the command:
+                          ./check.sh 16
+16/06/13 17:43:35.393461  Program check(My prog probe): return code: 2
+16/06/13 17:43:35.393561  My prog probe -> ** KO **
+16/06/13 17:43:35.393601  Performing check loop(My loop)
+16/06/13 17:43:36.393848  Loop check(My loop): removing loop email 8 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:36.393928  My loop -> ** KO **
+16/06/13 17:43:36.393958  Check done in 0.123450s
+16/06/13 17:43:36.393983  Starting check...
+16/06/13 17:43:36.394030  Performing check program(My prog probe)
+16/06/13 17:43:36.394065  Program check(My prog probe): will execute the command:
+                          ./check.sh 17
+16/06/13 17:43:36.396937  Program check(My prog probe): return code: 2
+16/06/13 17:43:36.397042  My prog probe -> ** KO **
+16/06/13 17:43:36.397115  Performing check loop(My loop)
+16/06/13 17:43:37.397286  Loop check(My loop): removing loop email 9 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:37.397377  My loop -> ** KO **
+16/06/13 17:43:37.397411  Check done in 0.123450s
+16/06/13 17:43:37.397442  Starting check...
+16/06/13 17:43:37.397484  Performing check program(My prog probe)
+16/06/13 17:43:37.397520  Program check(My prog probe): will execute the command:
+                          ./check.sh 18
+16/06/13 17:43:37.400688  Program check(My prog probe): return code: 2
+16/06/13 17:43:37.400791  My prog probe -> ** KO **
+16/06/13 17:43:37.400831  Performing check loop(My loop)
+16/06/13 17:43:38.401077  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:38.401157  My loop -> ** KO **
+16/06/13 17:43:38.401428  Check done in 0.123450s
+16/06/13 17:43:38.401461  Starting check...
+16/06/13 17:43:38.401482  Performing check program(My prog probe)
+16/06/13 17:43:38.401516  Program check(My prog probe): will execute the command:
+                          ./check.sh 19
+16/06/13 17:43:38.404364  Program check(My prog probe): return code: 2
+16/06/13 17:43:38.404463  My prog probe -> ** KO **
+16/06/13 17:43:38.404504  Performing check loop(My loop)
+16/06/13 17:43:39.404740  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:39.404835  My loop -> ** KO **
+16/06/13 17:43:39.404880  Check done in 0.123450s
+16/06/13 17:43:39.404921  Starting check...
+16/06/13 17:43:39.404987  Performing check program(My prog probe)
+16/06/13 17:43:39.405044  Program check(My prog probe): will execute the command:
+                          ./check.sh 20
+16/06/13 17:43:39.408001  Program check(My prog probe): return code: 0
+16/06/13 17:43:39.408106  My prog probe -> ok
+16/06/13 17:43:39.408151  Performing check loop(My loop)
+16/06/13 17:43:40.408396  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:43:40.408493  My loop -> ** KO **
+16/06/13 17:43:40.408538  Check done in 0.123450s
+16/06/13 17:43:40.408615  netmon end
+  
+16/06/13 17:44:15.486218  netmon 1.0 start
+16/06/13 17:44:15.486273  Reading configuration from 'netmon.ini'
+16/06/13 17:44:15.486465  keep_last_status not defined, taking default = 15
+                          == CHECK #0
+                             is_valid       = Yes
+                             display_name   = My prog probe
+                             host_name      = non
+                             method         = program
+                             PROGRAM/command            = ./check.sh ${LOOP_COUNT}
+                             alerts         = print
+                             nb alerts      = 1
+                               alert:     = #0 -> print
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == CHECK #1
+                             is_valid       = Yes
+                             display_name   = My loop
+                             host_name      = 
+                             method         = loop
+                             LOOP/fail delay            = 5
+                             LOOP/fail timeout          = 8
+                             LOOP/send every            = <unset>
+                             LOOP/smtp/smarthost        = mysmtp
+                             LOOP/smtp/port             = <unset>
+                             LOOP/smtp/self             = <unset>
+                             LOOP/smtp/sender           = mysender
+                             LOOP/smtp/recipients       = myrec
+                             LOOP/smtp/connect_timeout  = <unset>
+                             LOOP/pop3/server           = mypop
+                             LOOP/pop3/port             = <unset>
+                             LOOP/pop3/user             = myemail
+                             LOOP/pop3/password         = *****
+                             LOOP/pop3/connect_timeout  = <unset>
+                             alerts         = print
+                             nb alerts      = 1
+                               alert:     = #0 -> print
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == ALERT #0
+                             is_valid          = Yes
+                             name              = print
+                             method            = program
+                             threshold         = <unset>
+                             repeat_every      = <unset>
+                             repeat_max        = <unset>
+                             retries           = <unset>
+                             program/command   = ./printargs.sh "${DISPLAY_NAME}" "${HOST_NAME}" "${STATUS}" ${ALERT_TIMESTAMP}
+16/06/13 17:44:15.488320  check_interval = 0
+16/06/13 17:44:15.488357  keep_last_status = 15
+16/06/13 17:44:15.488392  display_name_width = 20
+16/06/13 17:44:15.488426  html_directory = ../www
+16/06/13 17:44:15.488458  html_file = netmon.html
+16/06/13 17:44:15.488491  html_title = netmon 1.0
+16/06/13 17:44:15.488524  html_refresh_interval = 20
+16/06/13 17:44:15.488557  Valid check(s) defined: 2
+16/06/13 17:44:15.488589  Run web server: no
+16/06/13 17:44:15.488623  To check: 'My prog probe' [non:0], no expect, alerts: print
+16/06/13 17:44:15.488661  To check: 'My loop' [:0], no expect, alerts: print
+16/06/13 17:44:15.488702  Will create image files in html directory
+16/06/13 17:44:15.489414  Starting check...
+16/06/13 17:44:15.489474  Performing check program(My prog probe)
+16/06/13 17:44:15.489528  Program check(My prog probe): will execute the command:
+                          ./check.sh 1
+16/06/13 17:44:15.492578  Program check(My prog probe): return code: 0
+16/06/13 17:44:15.492678  My prog probe -> ok
+16/06/13 17:44:15.492719  Performing check loop(My loop)
+16/06/13 17:44:16.492986  My loop -> ok
+16/06/13 17:44:16.493057  Check done in 0.123450s
+16/06/13 17:44:16.493103  Starting check...
+16/06/13 17:44:16.493123  Performing check program(My prog probe)
+16/06/13 17:44:16.493157  Program check(My prog probe): will execute the command:
+                          ./check.sh 2
+16/06/13 17:44:16.496154  Program check(My prog probe): return code: 0
+16/06/13 17:44:16.496252  My prog probe -> ok
+16/06/13 17:44:16.496295  Performing check loop(My loop)
+16/06/13 17:44:17.496533  My loop -> ok
+16/06/13 17:44:17.496612  Check done in 0.123450s
+16/06/13 17:44:17.496654  Starting check...
+16/06/13 17:44:17.496676  Performing check program(My prog probe)
+16/06/13 17:44:17.496714  Program check(My prog probe): will execute the command:
+                          ./check.sh 3
+16/06/13 17:44:17.499856  Program check(My prog probe): return code: 0
+16/06/13 17:44:17.499955  My prog probe -> ok
+16/06/13 17:44:17.499995  Performing check loop(My loop)
+16/06/13 17:44:18.500230  My loop -> ok
+16/06/13 17:44:18.500304  Check done in 0.123450s
+16/06/13 17:44:18.500332  Starting check...
+16/06/13 17:44:18.500352  Performing check program(My prog probe)
+16/06/13 17:44:18.500385  Program check(My prog probe): will execute the command:
+                          ./check.sh 4
+16/06/13 17:44:18.503304  Program check(My prog probe): return code: 0
+16/06/13 17:44:18.503404  My prog probe -> ok
+16/06/13 17:44:18.503446  Performing check loop(My loop)
+16/06/13 17:44:19.503674  My loop -> ok
+16/06/13 17:44:19.503743  Check done in 0.123450s
+16/06/13 17:44:19.503771  Starting check...
+16/06/13 17:44:19.503791  Performing check program(My prog probe)
+16/06/13 17:44:19.503824  Program check(My prog probe): will execute the command:
+                          ./check.sh 5
+16/06/13 17:44:19.506852  Program check(My prog probe): return code: 2
+16/06/13 17:44:19.506970  My prog probe -> ** KO **
+16/06/13 17:44:19.507043  Performing check loop(My loop)
+16/06/13 17:44:20.507303  My loop -> ** KO **
+16/06/13 17:44:20.507374  Check done in 0.123450s
+16/06/13 17:44:20.507402  Starting check...
+16/06/13 17:44:20.507422  Performing check program(My prog probe)
+16/06/13 17:44:20.507456  Program check(My prog probe): will execute the command:
+                          ./check.sh 6
+16/06/13 17:44:20.510456  Program check(My prog probe): return code: 2
+16/06/13 17:44:20.510561  My prog probe -> ** KO **
+16/06/13 17:44:20.510600  Performing check loop(My loop)
+16/06/13 17:44:21.510861  My loop -> ** KO **
+16/06/13 17:44:21.510932  Check done in 0.123450s
+16/06/13 17:44:21.510962  Starting check...
+16/06/13 17:44:21.510982  Performing check program(My prog probe)
+16/06/13 17:44:21.511015  Program check(My prog probe): will execute the command:
+                          ./check.sh 7
+16/06/13 17:44:21.513914  Program check(My prog probe): return code: 2
+16/06/13 17:44:21.514043  My prog probe -> ** KO **
+16/06/13 17:44:21.514118  program(print) -> display_name = 'My prog probe', host_name = 'non', status = '3'
+16/06/13 17:44:21.514201  Program alert(print): will execute the command:
+                          ./printargs.sh "My prog probe" "non" "Fail" 16/06/13 17:44:19
+16/06/13 17:44:21.517332  Program alert(print): return code: 0
+16/06/13 17:44:21.517415  Executed alert, result = 0
+16/06/13 17:44:21.517475  Performing check loop(My loop)
+16/06/13 17:44:22.517724  My loop -> ** KO **
+16/06/13 17:44:22.517792  program(print) -> display_name = 'My loop', host_name = '', status = '3'
+16/06/13 17:44:22.517856  Program alert(print): will execute the command:
+                          ./printargs.sh "My loop" "" "Fail" 16/06/13 17:44:20
+16/06/13 17:44:22.520892  Program alert(print): return code: 0
+16/06/13 17:44:22.520974  Executed alert, result = 0
+16/06/13 17:44:22.521041  Check done in 0.123450s
+16/06/13 17:44:22.521082  Starting check...
+16/06/13 17:44:22.521129  Performing check program(My prog probe)
+16/06/13 17:44:22.521187  Program check(My prog probe): will execute the command:
+                          ./check.sh 8
+16/06/13 17:44:22.524008  Program check(My prog probe): return code: 2
+16/06/13 17:44:22.524110  My prog probe -> ** KO **
+16/06/13 17:44:22.524150  Performing check loop(My loop)
+16/06/13 17:44:23.524414  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:23.524508  My loop -> ** KO **
+16/06/13 17:44:23.524558  Check done in 0.123450s
+16/06/13 17:44:23.524599  Starting check...
+16/06/13 17:44:23.524669  Performing check program(My prog probe)
+16/06/13 17:44:23.524731  Program check(My prog probe): will execute the command:
+                          ./check.sh 9
+16/06/13 17:44:23.527650  Program check(My prog probe): return code: 2
+16/06/13 17:44:23.527751  My prog probe -> ** KO **
+16/06/13 17:44:23.527793  Performing check loop(My loop)
+16/06/13 17:44:24.528023  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:24.528102  My loop -> ** KO **
+16/06/13 17:44:24.528132  Check done in 0.123450s
+16/06/13 17:44:24.528158  Starting check...
+16/06/13 17:44:24.528178  Performing check program(My prog probe)
+16/06/13 17:44:24.528211  Program check(My prog probe): will execute the command:
+                          ./check.sh 10
+16/06/13 17:44:24.531255  Program check(My prog probe): return code: 2
+16/06/13 17:44:24.531355  My prog probe -> ** KO **
+16/06/13 17:44:24.531400  Performing check loop(My loop)
+16/06/13 17:44:25.531591  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:25.531665  My loop -> ** KO **
+16/06/13 17:44:25.531696  Check done in 0.123450s
+16/06/13 17:44:25.531722  Starting check...
+16/06/13 17:44:25.531741  Performing check program(My prog probe)
+16/06/13 17:44:25.531774  Program check(My prog probe): will execute the command:
+                          ./check.sh 11
+16/06/13 17:44:25.534753  Program check(My prog probe): return code: 2
+16/06/13 17:44:25.534856  My prog probe -> ** KO **
+16/06/13 17:44:25.534898  Performing check loop(My loop)
+16/06/13 17:44:26.535176  Loop check(My loop): removing loop email 3 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:26.535257  My loop -> ** KO **
+16/06/13 17:44:26.535288  Check done in 0.123450s
+16/06/13 17:44:26.535314  Starting check...
+16/06/13 17:44:26.535334  Performing check program(My prog probe)
+16/06/13 17:44:26.535368  Program check(My prog probe): will execute the command:
+                          ./check.sh 12
+16/06/13 17:44:26.538342  Program check(My prog probe): return code: 2
+16/06/13 17:44:26.538441  My prog probe -> ** KO **
+16/06/13 17:44:26.538482  Performing check loop(My loop)
+16/06/13 17:44:27.538715  Loop check(My loop): removing loop email 4 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:27.538797  My loop -> ** KO **
+16/06/13 17:44:27.538839  Check done in 0.123450s
+16/06/13 17:44:27.538873  Starting check...
+16/06/13 17:44:27.538910  Performing check program(My prog probe)
+16/06/13 17:44:27.538944  Program check(My prog probe): will execute the command:
+                          ./check.sh 13
+16/06/13 17:44:27.541859  Program check(My prog probe): return code: 2
+16/06/13 17:44:27.541962  My prog probe -> ** KO **
+16/06/13 17:44:27.542076  Performing check loop(My loop)
+16/06/13 17:44:28.542320  Loop check(My loop): removing loop email 5 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:28.542393  My loop -> ** KO **
+16/06/13 17:44:28.542424  Check done in 0.123450s
+16/06/13 17:44:28.542449  Starting check...
+16/06/13 17:44:28.542469  Performing check program(My prog probe)
+16/06/13 17:44:28.542507  Program check(My prog probe): will execute the command:
+                          ./check.sh 14
+16/06/13 17:44:28.545485  Program check(My prog probe): return code: 2
+16/06/13 17:44:28.545587  My prog probe -> ** KO **
+16/06/13 17:44:28.545628  Performing check loop(My loop)
+16/06/13 17:44:29.545849  Loop check(My loop): removing loop email 6 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:29.545919  My loop -> ** KO **
+16/06/13 17:44:29.545949  Check done in 0.123450s
+16/06/13 17:44:29.545975  Starting check...
+16/06/13 17:44:29.545994  Performing check program(My prog probe)
+16/06/13 17:44:29.546089  Program check(My prog probe): will execute the command:
+                          ./check.sh 15
+16/06/13 17:44:29.549038  Program check(My prog probe): return code: 2
+16/06/13 17:44:29.549142  My prog probe -> ** KO **
+16/06/13 17:44:29.549208  Performing check loop(My loop)
+16/06/13 17:44:30.549460  Loop check(My loop): removing loop email 7 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:30.549534  My loop -> ** KO **
+16/06/13 17:44:30.549568  Check done in 0.123450s
+16/06/13 17:44:30.549594  Starting check...
+16/06/13 17:44:30.549614  Performing check program(My prog probe)
+16/06/13 17:44:30.549647  Program check(My prog probe): will execute the command:
+                          ./check.sh 16
+16/06/13 17:44:30.552555  Program check(My prog probe): return code: 2
+16/06/13 17:44:30.552657  My prog probe -> ** KO **
+16/06/13 17:44:30.552699  Performing check loop(My loop)
+16/06/13 17:44:31.552930  Loop check(My loop): removing loop email 8 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:31.553009  My loop -> ** KO **
+16/06/13 17:44:31.553040  Check done in 0.123450s
+16/06/13 17:44:31.553066  Starting check...
+16/06/13 17:44:31.553090  Performing check program(My prog probe)
+16/06/13 17:44:31.553123  Program check(My prog probe): will execute the command:
+                          ./check.sh 17
+16/06/13 17:44:31.556054  Program check(My prog probe): return code: 2
+16/06/13 17:44:31.556155  My prog probe -> ** KO **
+16/06/13 17:44:31.556201  Performing check loop(My loop)
+16/06/13 17:44:32.556384  Loop check(My loop): removing loop email 9 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:32.556496  My loop -> ** KO **
+16/06/13 17:44:32.556552  Check done in 0.123450s
+16/06/13 17:44:32.556581  Starting check...
+16/06/13 17:44:32.556606  Performing check program(My prog probe)
+16/06/13 17:44:32.556641  Program check(My prog probe): will execute the command:
+                          ./check.sh 18
+16/06/13 17:44:32.559835  Program check(My prog probe): return code: 2
+16/06/13 17:44:32.559942  My prog probe -> ** KO **
+16/06/13 17:44:32.559982  Performing check loop(My loop)
+16/06/13 17:44:33.560247  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:33.560321  My loop -> ** KO **
+16/06/13 17:44:33.560352  Check done in 0.123450s
+16/06/13 17:44:33.560382  Starting check...
+16/06/13 17:44:33.560401  Performing check program(My prog probe)
+16/06/13 17:44:33.560434  Program check(My prog probe): will execute the command:
+                          ./check.sh 19
+16/06/13 17:44:33.563397  Program check(My prog probe): return code: 2
+16/06/13 17:44:33.563500  My prog probe -> ** KO **
+16/06/13 17:44:33.563540  Performing check loop(My loop)
+16/06/13 17:44:34.563773  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:34.563849  My loop -> ** KO **
+16/06/13 17:44:34.563880  Check done in 0.123450s
+16/06/13 17:44:34.563906  Starting check...
+16/06/13 17:44:34.563925  Performing check program(My prog probe)
+16/06/13 17:44:34.563958  Program check(My prog probe): will execute the command:
+                          ./check.sh 20
+16/06/13 17:44:34.566908  Program check(My prog probe): return code: 0
+16/06/13 17:44:34.567011  My prog probe -> ok
+16/06/13 17:44:34.567053  program(print) -> display_name = 'My prog probe', host_name = 'non', status = '2'
+16/06/13 17:44:34.567117  Program alert(print): will execute the command:
+                          ./printargs.sh "My prog probe" "non" "Ok" 16/06/13 17:44:34
+16/06/13 17:44:34.570221  Program alert(print): return code: 0
+16/06/13 17:44:34.570305  Executed alert, result = 0
+16/06/13 17:44:34.570343  Performing check loop(My loop)
+16/06/13 17:44:35.570554  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:44:35.570638  My loop -> ** KO **
+16/06/13 17:44:35.570669  Check done in 0.123450s
+16/06/13 17:44:35.570695  netmon end
+  
+16/06/13 17:45:20.070173  netmon 1.0 start
+16/06/13 17:45:20.070233  Reading configuration from 'netmon.ini'
+16/06/13 17:45:20.070413  keep_last_status not defined, taking default = 15
+                          == CHECK #0
+                             is_valid       = Yes
+                             display_name   = My prog probe
+                             host_name      = none
+                             method         = program
+                             PROGRAM/command            = ./check.sh ${LOOP_COUNT}
+                             alerts         = print
+                             nb alerts      = 1
+                               alert:     = #0 -> print
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == CHECK #1
+                             is_valid       = Yes
+                             display_name   = My loop
+                             host_name      = 
+                             method         = loop
+                             LOOP/fail delay            = 5
+                             LOOP/fail timeout          = 8
+                             LOOP/send every            = <unset>
+                             LOOP/smtp/smarthost        = mysmtp
+                             LOOP/smtp/port             = <unset>
+                             LOOP/smtp/self             = <unset>
+                             LOOP/smtp/sender           = mysender
+                             LOOP/smtp/recipients       = myrec
+                             LOOP/smtp/connect_timeout  = <unset>
+                             LOOP/pop3/server           = mypop
+                             LOOP/pop3/port             = <unset>
+                             LOOP/pop3/user             = myemail
+                             LOOP/pop3/password         = *****
+                             LOOP/pop3/connect_timeout  = <unset>
+                             alerts         = print
+                             nb alerts      = 1
+                               alert:     = #0 -> print
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == ALERT #0
+                             is_valid          = Yes
+                             name              = print
+                             method            = program
+                             threshold         = <unset>
+                             repeat_every      = <unset>
+                             repeat_max        = <unset>
+                             retries           = <unset>
+                             program/command   = ./printargs.sh "${DISPLAY_NAME}" "${HOST_NAME}" "${STATUS}"
+16/06/13 17:45:20.072227  check_interval = 0
+16/06/13 17:45:20.072260  keep_last_status = 15
+16/06/13 17:45:20.072295  display_name_width = 20
+16/06/13 17:45:20.072332  html_directory = ../www
+16/06/13 17:45:20.072368  html_file = netmon.html
+16/06/13 17:45:20.072406  html_title = netmon 1.0
+16/06/13 17:45:20.072441  html_refresh_interval = 20
+16/06/13 17:45:20.072474  Valid check(s) defined: 2
+16/06/13 17:45:20.072508  Run web server: no
+16/06/13 17:45:20.072548  To check: 'My prog probe' [none:0], no expect, alerts: print
+16/06/13 17:45:20.072584  To check: 'My loop' [:0], no expect, alerts: print
+16/06/13 17:45:20.072623  Will create image files in html directory
+16/06/13 17:45:20.073299  Starting check...
+16/06/13 17:45:20.073359  Performing check program(My prog probe)
+16/06/13 17:45:20.073411  Program check(My prog probe): will execute the command:
+                          ./check.sh 1
+16/06/13 17:45:20.076354  Program check(My prog probe): return code: 0
+16/06/13 17:45:20.076450  My prog probe -> ok
+16/06/13 17:45:20.076490  Performing check loop(My loop)
+16/06/13 17:45:21.076765  My loop -> ok
+16/06/13 17:45:21.076833  Check done in 0.123450s
+16/06/13 17:45:21.076880  Starting check...
+16/06/13 17:45:21.076900  Performing check program(My prog probe)
+16/06/13 17:45:21.076934  Program check(My prog probe): will execute the command:
+                          ./check.sh 2
+16/06/13 17:45:21.079892  Program check(My prog probe): return code: 0
+16/06/13 17:45:21.079993  My prog probe -> ok
+16/06/13 17:45:21.080033  Performing check loop(My loop)
+16/06/13 17:45:22.080271  My loop -> ok
+16/06/13 17:45:22.080339  Check done in 0.123450s
+16/06/13 17:45:22.080371  Starting check...
+16/06/13 17:45:22.080391  Performing check program(My prog probe)
+16/06/13 17:45:22.080425  Program check(My prog probe): will execute the command:
+                          ./check.sh 3
+16/06/13 17:45:22.083358  Program check(My prog probe): return code: 0
+16/06/13 17:45:22.083447  My prog probe -> ok
+16/06/13 17:45:22.083489  Performing check loop(My loop)
+16/06/13 17:45:23.083724  My loop -> ok
+16/06/13 17:45:23.083796  Check done in 0.123450s
+16/06/13 17:45:23.083849  Starting check...
+16/06/13 17:45:23.083870  Performing check program(My prog probe)
+16/06/13 17:45:23.083909  Program check(My prog probe): will execute the command:
+                          ./check.sh 4
+16/06/13 17:45:23.086982  Program check(My prog probe): return code: 0
+16/06/13 17:45:23.087077  My prog probe -> ok
+16/06/13 17:45:23.087119  Performing check loop(My loop)
+16/06/13 17:45:24.087350  My loop -> ok
+16/06/13 17:45:24.087414  Check done in 0.123450s
+16/06/13 17:45:24.087465  Starting check...
+16/06/13 17:45:24.087485  Performing check program(My prog probe)
+16/06/13 17:45:24.087518  Program check(My prog probe): will execute the command:
+                          ./check.sh 5
+16/06/13 17:45:24.090484  Program check(My prog probe): return code: 2
+16/06/13 17:45:24.090599  My prog probe -> ** KO **
+16/06/13 17:45:24.090672  Performing check loop(My loop)
+16/06/13 17:45:25.090938  My loop -> ** KO **
+16/06/13 17:45:25.091013  Check done in 0.123450s
+16/06/13 17:45:25.091040  Starting check...
+16/06/13 17:45:25.091060  Performing check program(My prog probe)
+16/06/13 17:45:25.091094  Program check(My prog probe): will execute the command:
+                          ./check.sh 6
+16/06/13 17:45:25.094045  Program check(My prog probe): return code: 2
+16/06/13 17:45:25.094141  My prog probe -> ** KO **
+16/06/13 17:45:25.094186  Performing check loop(My loop)
+16/06/13 17:45:26.094457  My loop -> ** KO **
+16/06/13 17:45:26.094532  Check done in 0.123450s
+16/06/13 17:45:26.094559  Starting check...
+16/06/13 17:45:26.094579  Performing check program(My prog probe)
+16/06/13 17:45:26.094612  Program check(My prog probe): will execute the command:
+                          ./check.sh 7
+16/06/13 17:45:26.097475  Program check(My prog probe): return code: 2
+16/06/13 17:45:26.097575  My prog probe -> ** KO **
+16/06/13 17:45:26.097616  program(print) -> display_name = 'My prog probe', host_name = 'none', status = '3'
+16/06/13 17:45:26.097680  Program alert(print): will execute the command:
+                          ./printargs.sh "My prog probe" "none" "Fail"
+16/06/13 17:45:26.100778  Program alert(print): return code: 0
+16/06/13 17:45:26.100857  Executed alert, result = 0
+16/06/13 17:45:26.100893  Performing check loop(My loop)
+16/06/13 17:45:27.101164  My loop -> ** KO **
+16/06/13 17:45:27.101232  program(print) -> display_name = 'My loop', host_name = '', status = '3'
+16/06/13 17:45:27.101277  Program alert(print): will execute the command:
+                          ./printargs.sh "My loop" "" "Fail"
+16/06/13 17:45:27.104324  Program alert(print): return code: 0
+16/06/13 17:45:27.104408  Executed alert, result = 0
+16/06/13 17:45:27.104453  Check done in 0.123450s
+16/06/13 17:45:27.104494  Starting check...
+16/06/13 17:45:27.104554  Performing check program(My prog probe)
+16/06/13 17:45:27.104614  Program check(My prog probe): will execute the command:
+                          ./check.sh 8
+16/06/13 17:45:27.107483  Program check(My prog probe): return code: 2
+16/06/13 17:45:27.107581  My prog probe -> ** KO **
+16/06/13 17:45:27.107622  Performing check loop(My loop)
+16/06/13 17:45:28.107855  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:28.107953  My loop -> ** KO **
+16/06/13 17:45:28.108368  Check done in 0.123450s
+16/06/13 17:45:28.108415  Starting check...
+16/06/13 17:45:28.108471  Performing check program(My prog probe)
+16/06/13 17:45:28.108532  Program check(My prog probe): will execute the command:
+                          ./check.sh 9
+16/06/13 17:45:28.111469  Program check(My prog probe): return code: 2
+16/06/13 17:45:28.111569  My prog probe -> ** KO **
+16/06/13 17:45:28.111608  Performing check loop(My loop)
+16/06/13 17:45:29.111842  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:29.111935  My loop -> ** KO **
+16/06/13 17:45:29.111981  Check done in 0.123450s
+16/06/13 17:45:29.112021  Starting check...
+16/06/13 17:45:29.112085  Performing check program(My prog probe)
+16/06/13 17:45:29.112145  Program check(My prog probe): will execute the command:
+                          ./check.sh 10
+16/06/13 17:45:29.115130  Program check(My prog probe): return code: 2
+16/06/13 17:45:29.115226  My prog probe -> ** KO **
+16/06/13 17:45:29.115268  Performing check loop(My loop)
+16/06/13 17:45:30.115524  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:30.115622  My loop -> ** KO **
+16/06/13 17:45:30.115652  Check done in 0.123450s
+16/06/13 17:45:30.115681  Starting check...
+16/06/13 17:45:30.115700  Performing check program(My prog probe)
+16/06/13 17:45:30.115733  Program check(My prog probe): will execute the command:
+                          ./check.sh 11
+16/06/13 17:45:30.118712  Program check(My prog probe): return code: 2
+16/06/13 17:45:30.118810  My prog probe -> ** KO **
+16/06/13 17:45:30.118850  Performing check loop(My loop)
+16/06/13 17:45:31.119076  Loop check(My loop): removing loop email 3 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:31.119153  My loop -> ** KO **
+16/06/13 17:45:31.119183  Check done in 0.123450s
+16/06/13 17:45:31.119211  Starting check...
+16/06/13 17:45:31.119231  Performing check program(My prog probe)
+16/06/13 17:45:31.119264  Program check(My prog probe): will execute the command:
+                          ./check.sh 12
+16/06/13 17:45:31.122292  Program check(My prog probe): return code: 2
+16/06/13 17:45:31.122387  My prog probe -> ** KO **
+16/06/13 17:45:31.122430  Performing check loop(My loop)
+16/06/13 17:45:32.122622  Loop check(My loop): removing loop email 4 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:32.122698  My loop -> ** KO **
+16/06/13 17:45:32.122728  Check done in 0.123450s
+16/06/13 17:45:32.122754  Starting check...
+16/06/13 17:45:32.122773  Performing check program(My prog probe)
+16/06/13 17:45:32.122807  Program check(My prog probe): will execute the command:
+                          ./check.sh 13
+16/06/13 17:45:32.125701  Program check(My prog probe): return code: 2
+16/06/13 17:45:32.125798  My prog probe -> ** KO **
+16/06/13 17:45:32.125840  Performing check loop(My loop)
+16/06/13 17:45:33.126082  Loop check(My loop): removing loop email 5 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:33.126163  My loop -> ** KO **
+16/06/13 17:45:33.126205  Check done in 0.123450s
+16/06/13 17:45:33.126233  Starting check...
+16/06/13 17:45:33.126269  Performing check program(My prog probe)
+16/06/13 17:45:33.126303  Program check(My prog probe): will execute the command:
+                          ./check.sh 14
+16/06/13 17:45:33.129272  Program check(My prog probe): return code: 2
+16/06/13 17:45:33.129371  My prog probe -> ** KO **
+16/06/13 17:45:33.129441  Performing check loop(My loop)
+16/06/13 17:45:34.129620  Loop check(My loop): removing loop email 6 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:34.129693  My loop -> ** KO **
+16/06/13 17:45:34.129723  Check done in 0.123450s
+16/06/13 17:45:34.129749  Starting check...
+16/06/13 17:45:34.129768  Performing check program(My prog probe)
+16/06/13 17:45:34.129801  Program check(My prog probe): will execute the command:
+                          ./check.sh 15
+16/06/13 17:45:34.132702  Program check(My prog probe): return code: 2
+16/06/13 17:45:34.132805  My prog probe -> ** KO **
+16/06/13 17:45:34.132880  Performing check loop(My loop)
+16/06/13 17:45:35.133114  Loop check(My loop): removing loop email 7 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:35.133207  My loop -> ** KO **
+16/06/13 17:45:35.133252  Check done in 0.123450s
+16/06/13 17:45:35.133293  Starting check...
+16/06/13 17:45:35.133327  Performing check program(My prog probe)
+16/06/13 17:45:35.133403  Program check(My prog probe): will execute the command:
+                          ./check.sh 16
+16/06/13 17:45:35.136371  Program check(My prog probe): return code: 2
+16/06/13 17:45:35.136471  My prog probe -> ** KO **
+16/06/13 17:45:35.136514  Performing check loop(My loop)
+16/06/13 17:45:36.136747  Loop check(My loop): removing loop email 8 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:36.136833  My loop -> ** KO **
+16/06/13 17:45:36.136867  Check done in 0.123450s
+16/06/13 17:45:36.136893  Starting check...
+16/06/13 17:45:36.136912  Performing check program(My prog probe)
+16/06/13 17:45:36.136945  Program check(My prog probe): will execute the command:
+                          ./check.sh 17
+16/06/13 17:45:36.139969  Program check(My prog probe): return code: 2
+16/06/13 17:45:36.140070  My prog probe -> ** KO **
+16/06/13 17:45:36.140110  Performing check loop(My loop)
+16/06/13 17:45:37.140278  Loop check(My loop): removing loop email 9 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:37.140360  My loop -> ** KO **
+16/06/13 17:45:37.140398  Check done in 0.123450s
+16/06/13 17:45:37.140425  Starting check...
+16/06/13 17:45:37.140446  Performing check program(My prog probe)
+16/06/13 17:45:37.140480  Program check(My prog probe): will execute the command:
+                          ./check.sh 18
+16/06/13 17:45:37.143677  Program check(My prog probe): return code: 2
+16/06/13 17:45:37.143778  My prog probe -> ** KO **
+16/06/13 17:45:37.143821  Performing check loop(My loop)
+16/06/13 17:45:38.144052  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:38.144132  My loop -> ** KO **
+16/06/13 17:45:38.144173  Check done in 0.123450s
+16/06/13 17:45:38.144201  Starting check...
+16/06/13 17:45:38.144221  Performing check program(My prog probe)
+16/06/13 17:45:38.144267  Program check(My prog probe): will execute the command:
+                          ./check.sh 19
+16/06/13 17:45:38.147162  Program check(My prog probe): return code: 2
+16/06/13 17:45:38.147264  My prog probe -> ** KO **
+16/06/13 17:45:38.147304  Performing check loop(My loop)
+16/06/13 17:45:39.147551  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:39.147624  My loop -> ** KO **
+16/06/13 17:45:39.147655  Check done in 0.123450s
+16/06/13 17:45:39.147685  Starting check...
+16/06/13 17:45:39.147705  Performing check program(My prog probe)
+16/06/13 17:45:39.147737  Program check(My prog probe): will execute the command:
+                          ./check.sh 20
+16/06/13 17:45:39.150645  Program check(My prog probe): return code: 0
+16/06/13 17:45:39.150748  My prog probe -> ok
+16/06/13 17:45:39.150789  program(print) -> display_name = 'My prog probe', host_name = 'none', status = '2'
+16/06/13 17:45:39.150848  Program alert(print): will execute the command:
+                          ./printargs.sh "My prog probe" "none" "Ok"
+16/06/13 17:45:39.153835  Program alert(print): return code: 0
+16/06/13 17:45:39.153914  Executed alert, result = 0
+16/06/13 17:45:39.153989  Performing check loop(My loop)
+16/06/13 17:45:40.154265  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:45:40.154348  My loop -> ** KO **
+16/06/13 17:45:40.154378  Check done in 0.123450s
+16/06/13 17:45:40.154404  netmon end
+  
+16/06/13 17:53:14.606412  netmon 1.0 start
+16/06/13 17:53:14.607709  Reading configuration from 'netmon.ini'
+16/06/13 17:53:14.607901  keep_last_status not defined, taking default = 15
+                          == CHECK #0
+                             is_valid       = Yes
+                             display_name   = My prog probe
+                             host_name      = none
+                             method         = program
+                             PROGRAM/command            = ./check.sh ${LOOP_COUNT}
+                             alerts         = print
+                             nb alerts      = 1
+                               alert:     = #0 -> print
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == CHECK #1
+                             is_valid       = Yes
+                             display_name   = My loop
+                             host_name      = 
+                             method         = loop
+                             LOOP/fail delay            = 5
+                             LOOP/fail timeout          = 8
+                             LOOP/send every            = <unset>
+                             LOOP/smtp/smarthost        = mysmtp
+                             LOOP/smtp/port             = <unset>
+                             LOOP/smtp/self             = <unset>
+                             LOOP/smtp/sender           = mysender
+                             LOOP/smtp/recipients       = myrec
+                             LOOP/smtp/connect_timeout  = <unset>
+                             LOOP/pop3/server           = mypop
+                             LOOP/pop3/port             = <unset>
+                             LOOP/pop3/user             = myemail
+                             LOOP/pop3/password         = *****
+                             LOOP/pop3/connect_timeout  = <unset>
+                             alerts         = print
+                             nb alerts      = 1
+                               alert:     = #0 -> print
+                             alert_threshold    = <unset>
+                             alert_repeat_every = <unset>
+                             alert_repeat_max   = <unset>
+                          == ALERT #0
+                             is_valid          = Yes
+                             name              = print
+                             method            = program
+                             threshold         = <unset>
+                             repeat_every      = <unset>
+                             repeat_max        = <unset>
+                             retries           = <unset>
+                             program/command   = ./printargs.sh "${DISPLAY_NAME}" "${HOST_NAME}" "${STATUS}"
+16/06/13 17:53:14.608873  check_interval = 0
+16/06/13 17:53:14.608895  keep_last_status = 15
+16/06/13 17:53:14.608914  display_name_width = 20
+16/06/13 17:53:14.608933  html_directory = ../www
+16/06/13 17:53:14.608952  html_file = netmon.html
+16/06/13 17:53:14.608971  html_title = netmon 1.0
+16/06/13 17:53:14.608990  html_refresh_interval = 20
+16/06/13 17:53:14.609008  Valid check(s) defined: 2
+16/06/13 17:53:14.609026  Run web server: no
+16/06/13 17:53:14.609046  To check: 'My prog probe' [none:0], no expect, alerts: print
+16/06/13 17:53:14.609068  To check: 'My loop' [:0], no expect, alerts: print
+16/06/13 17:53:14.609092  Will create image files in html directory
+16/06/13 17:53:14.609656  Starting check...
+16/06/13 17:53:14.609691  Performing check program(My prog probe)
+16/06/13 17:53:14.609726  Program check(My prog probe): will execute the command:
+                          ./check.sh 1
+16/06/13 17:53:14.612591  Program check(My prog probe): return code: 0
+16/06/13 17:53:14.612692  My prog probe -> ok
+16/06/13 17:53:14.612732  Performing check loop(My loop)
+16/06/13 17:53:15.613009  My loop -> ok
+16/06/13 17:53:15.613088  Check done in 0.123450s
+16/06/13 17:53:15.613130  Starting check...
+16/06/13 17:53:15.613149  Performing check program(My prog probe)
+16/06/13 17:53:15.613183  Program check(My prog probe): will execute the command:
+                          ./check.sh 2
+16/06/13 17:53:15.616163  Program check(My prog probe): return code: 0
+16/06/13 17:53:15.616259  My prog probe -> ok
+16/06/13 17:53:15.616304  Performing check loop(My loop)
+16/06/13 17:53:16.616569  My loop -> ok
+16/06/13 17:53:16.616660  Check done in 0.123450s
+16/06/13 17:53:16.616689  Starting check...
+16/06/13 17:53:16.616709  Performing check program(My prog probe)
+16/06/13 17:53:16.616742  Program check(My prog probe): will execute the command:
+                          ./check.sh 3
+16/06/13 17:53:16.619679  Program check(My prog probe): return code: 0
+16/06/13 17:53:16.619771  My prog probe -> ok
+16/06/13 17:53:16.619811  Performing check loop(My loop)
+16/06/13 17:53:17.620113  My loop -> ok
+16/06/13 17:53:17.620192  Check done in 0.123450s
+16/06/13 17:53:17.620220  Starting check...
+16/06/13 17:53:17.620240  Performing check program(My prog probe)
+16/06/13 17:53:17.620278  Program check(My prog probe): will execute the command:
+                          ./check.sh 4
+16/06/13 17:53:17.623265  Program check(My prog probe): return code: 0
+16/06/13 17:53:17.623361  My prog probe -> ok
+16/06/13 17:53:17.623401  Performing check loop(My loop)
+16/06/13 17:53:18.623641  My loop -> ok
+16/06/13 17:53:18.623745  Check done in 0.123450s
+16/06/13 17:53:18.623793  Starting check...
+16/06/13 17:53:18.623827  Performing check program(My prog probe)
+16/06/13 17:53:18.623910  Program check(My prog probe): will execute the command:
+                          ./check.sh 5
+16/06/13 17:53:18.626866  Program check(My prog probe): return code: 2
+16/06/13 17:53:18.626981  My prog probe -> ** KO **
+16/06/13 17:53:18.627049  Performing check loop(My loop)
+16/06/13 17:53:19.627278  My loop -> ** KO **
+16/06/13 17:53:19.627368  Check done in 0.123450s
+16/06/13 17:53:19.627414  Starting check...
+16/06/13 17:53:19.627435  Performing check program(My prog probe)
+16/06/13 17:53:19.627470  Program check(My prog probe): will execute the command:
+                          ./check.sh 6
+16/06/13 17:53:19.630472  Program check(My prog probe): return code: 2
+16/06/13 17:53:19.630570  My prog probe -> ** KO **
+16/06/13 17:53:19.630610  Performing check loop(My loop)
+16/06/13 17:53:20.630888  My loop -> ** KO **
+16/06/13 17:53:20.630976  Check done in 0.123450s
+16/06/13 17:53:20.631005  Starting check...
+16/06/13 17:53:20.631025  Performing check program(My prog probe)
+16/06/13 17:53:20.631058  Program check(My prog probe): will execute the command:
+                          ./check.sh 7
+16/06/13 17:53:20.634109  Program check(My prog probe): return code: 2
+16/06/13 17:53:20.634213  My prog probe -> ** KO **
+16/06/13 17:53:20.634254  program(print) -> display_name = 'My prog probe', host_name = 'none', status = '3'
+16/06/13 17:53:20.634326  Program alert(print): will execute the command:
+                          ./printargs.sh "My prog probe" "none" "Fail"
+16/06/13 17:53:20.637379  Program alert(print): return code: 0
+16/06/13 17:53:20.637461  Executed alert, result = 0
+16/06/13 17:53:20.637516  Performing check loop(My loop)
+16/06/13 17:53:21.637747  My loop -> ** KO **
+16/06/13 17:53:21.637815  program(print) -> display_name = 'My loop', host_name = '', status = '3'
+16/06/13 17:53:21.637860  Program alert(print): will execute the command:
+                          ./printargs.sh "My loop" "" "Fail"
+16/06/13 17:53:21.640895  Program alert(print): return code: 0
+16/06/13 17:53:21.640978  Executed alert, result = 0
+16/06/13 17:53:21.641046  Check done in 0.123450s
+16/06/13 17:53:21.641100  Starting check...
+16/06/13 17:53:21.641135  Performing check program(My prog probe)
+16/06/13 17:53:21.641195  Program check(My prog probe): will execute the command:
+                          ./check.sh 8
+16/06/13 17:53:21.644014  Program check(My prog probe): return code: 2
+16/06/13 17:53:21.644111  My prog probe -> ** KO **
+16/06/13 17:53:21.644152  Performing check loop(My loop)
+16/06/13 17:53:22.644341  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:22.644416  My loop -> ** KO **
+16/06/13 17:53:22.644460  Check done in 0.123450s
+16/06/13 17:53:22.644487  Starting check...
+16/06/13 17:53:22.644507  Performing check program(My prog probe)
+16/06/13 17:53:22.644545  Program check(My prog probe): will execute the command:
+                          ./check.sh 9
+16/06/13 17:53:22.647859  Program check(My prog probe): return code: 2
+16/06/13 17:53:22.648098  My prog probe -> ** KO **
+16/06/13 17:53:22.648145  Performing check loop(My loop)
+16/06/13 17:53:23.648413  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:23.648510  My loop -> ** KO **
+16/06/13 17:53:23.648551  Check done in 0.123450s
+16/06/13 17:53:23.648578  Starting check...
+16/06/13 17:53:23.648597  Performing check program(My prog probe)
+16/06/13 17:53:23.648630  Program check(My prog probe): will execute the command:
+                          ./check.sh 10
+16/06/13 17:53:23.651573  Program check(My prog probe): return code: 2
+16/06/13 17:53:23.651676  My prog probe -> ** KO **
+16/06/13 17:53:23.651717  Performing check loop(My loop)
+16/06/13 17:53:24.651969  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:24.652051  My loop -> ** KO **
+16/06/13 17:53:24.652099  Check done in 0.123450s
+16/06/13 17:53:24.652127  Starting check...
+16/06/13 17:53:24.652147  Performing check program(My prog probe)
+16/06/13 17:53:24.652183  Program check(My prog probe): will execute the command:
+                          ./check.sh 11
+16/06/13 17:53:24.655296  Program check(My prog probe): return code: 2
+16/06/13 17:53:24.655395  My prog probe -> ** KO **
+16/06/13 17:53:24.655435  Performing check loop(My loop)
+16/06/13 17:53:25.655654  Loop check(My loop): removing loop email 3 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:25.655740  My loop -> ** KO **
+16/06/13 17:53:25.655776  Check done in 0.123450s
+16/06/13 17:53:25.655803  Starting check...
+16/06/13 17:53:25.655822  Performing check program(My prog probe)
+16/06/13 17:53:25.655855  Program check(My prog probe): will execute the command:
+                          ./check.sh 12
+16/06/13 17:53:25.658831  Program check(My prog probe): return code: 2
+16/06/13 17:53:25.658931  My prog probe -> ** KO **
+16/06/13 17:53:25.658971  Performing check loop(My loop)
+16/06/13 17:53:26.659205  Loop check(My loop): removing loop email 4 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:26.659286  My loop -> ** KO **
+16/06/13 17:53:26.659324  Check done in 0.123450s
+16/06/13 17:53:26.659354  Starting check...
+16/06/13 17:53:26.659374  Performing check program(My prog probe)
+16/06/13 17:53:26.659407  Program check(My prog probe): will execute the command:
+                          ./check.sh 13
+16/06/13 17:53:26.662447  Program check(My prog probe): return code: 2
+16/06/13 17:53:26.662548  My prog probe -> ** KO **
+16/06/13 17:53:26.662588  Performing check loop(My loop)
+16/06/13 17:53:27.662832  Loop check(My loop): removing loop email 5 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:27.662911  My loop -> ** KO **
+16/06/13 17:53:27.662948  Check done in 0.123450s
+16/06/13 17:53:27.662974  Starting check...
+16/06/13 17:53:27.662993  Performing check program(My prog probe)
+16/06/13 17:53:27.663026  Program check(My prog probe): will execute the command:
+                          ./check.sh 14
+16/06/13 17:53:27.665919  Program check(My prog probe): return code: 2
+16/06/13 17:53:27.666050  My prog probe -> ** KO **
+16/06/13 17:53:27.666133  Performing check loop(My loop)
+16/06/13 17:53:28.666312  Loop check(My loop): removing loop email 6 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:28.666386  My loop -> ** KO **
+16/06/13 17:53:28.666425  Check done in 0.123450s
+16/06/13 17:53:28.666452  Starting check...
+16/06/13 17:53:28.666471  Performing check program(My prog probe)
+16/06/13 17:53:28.666503  Program check(My prog probe): will execute the command:
+                          ./check.sh 15
+16/06/13 17:53:28.669367  Program check(My prog probe): return code: 2
+16/06/13 17:53:28.669463  My prog probe -> ** KO **
+16/06/13 17:53:28.669504  Performing check loop(My loop)
+16/06/13 17:53:29.669682  Loop check(My loop): removing loop email 7 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:29.669766  My loop -> ** KO **
+16/06/13 17:53:29.669855  Check done in 0.123450s
+16/06/13 17:53:29.669885  Starting check...
+16/06/13 17:53:29.669910  Performing check program(My prog probe)
+16/06/13 17:53:29.669943  Program check(My prog probe): will execute the command:
+                          ./check.sh 16
+16/06/13 17:53:29.672812  Program check(My prog probe): return code: 2
+16/06/13 17:53:29.672914  My prog probe -> ** KO **
+16/06/13 17:53:29.672983  Performing check loop(My loop)
+16/06/13 17:53:30.673246  Loop check(My loop): removing loop email 8 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:30.673321  My loop -> ** KO **
+16/06/13 17:53:30.673363  Check done in 0.123450s
+16/06/13 17:53:30.673390  Starting check...
+16/06/13 17:53:30.673409  Performing check program(My prog probe)
+16/06/13 17:53:30.673442  Program check(My prog probe): will execute the command:
+                          ./check.sh 17
+16/06/13 17:53:30.678833  Program check(My prog probe): return code: 2
+16/06/13 17:53:30.679135  My prog probe -> ** KO **
+16/06/13 17:53:30.679337  Performing check loop(My loop)
+16/06/13 17:53:31.679681  Loop check(My loop): removing loop email 9 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:31.679761  My loop -> ** KO **
+16/06/13 17:53:31.679799  Check done in 0.123450s
+16/06/13 17:53:31.679825  Starting check...
+16/06/13 17:53:31.679847  Performing check program(My prog probe)
+16/06/13 17:53:31.679880  Program check(My prog probe): will execute the command:
+                          ./check.sh 18
+16/06/13 17:53:31.682784  Program check(My prog probe): return code: 2
+16/06/13 17:53:31.682886  My prog probe -> ** KO **
+16/06/13 17:53:31.682930  Performing check loop(My loop)
+16/06/13 17:53:32.683163  Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:32.683237  My loop -> ** KO **
+16/06/13 17:53:32.683275  Check done in 0.123450s
+16/06/13 17:53:32.683301  Starting check...
+16/06/13 17:53:32.683320  Performing check program(My prog probe)
+16/06/13 17:53:32.683353  Program check(My prog probe): will execute the command:
+                          ./check.sh 19
+16/06/13 17:53:32.686302  Program check(My prog probe): return code: 2
+16/06/13 17:53:32.686400  My prog probe -> ** KO **
+16/06/13 17:53:32.686440  Performing check loop(My loop)
+16/06/13 17:53:33.686643  Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:33.686728  My loop -> ** KO **
+16/06/13 17:53:33.686765  Check done in 0.123450s
+16/06/13 17:53:33.686795  Starting check...
+16/06/13 17:53:33.686814  Performing check program(My prog probe)
+16/06/13 17:53:33.686847  Program check(My prog probe): will execute the command:
+                          ./check.sh 20
+16/06/13 17:53:33.689764  Program check(My prog probe): return code: 0
+16/06/13 17:53:33.689866  My prog probe -> ok
+16/06/13 17:53:33.689906  program(print) -> display_name = 'My prog probe', host_name = 'none', status = '2'
+16/06/13 17:53:33.689969  Program alert(print): will execute the command:
+                          ./printargs.sh "My prog probe" "none" "Ok"
+16/06/13 17:53:33.693036  Program alert(print): return code: 0
+16/06/13 17:53:33.693115  Executed alert, result = 0
+16/06/13 17:53:33.693152  Performing check loop(My loop)
+16/06/13 17:53:34.693405  Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+16/06/13 17:53:34.693496  My loop -> ** KO **
+16/06/13 17:53:34.693797  Check done in 0.123450s
+16/06/13 17:53:34.693829  netmon end
