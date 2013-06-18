@@ -34,7 +34,6 @@ Configuration file 'netmon.ini', section of line 83: no method defined, discardi
 Configuration file 'netmon.ini', line 93: empty value not allowed
 Configuration file 'netmon.ini', section of line 90: no log file defined, discarding alert
 Configuration file 'netmon.ini', section of line 94: no log file defined, discarding alert
-keep_last_status not defined, taking default = 15
 Check 'Local FTP': unknown alert 'email'
 Check 'Local FTP': unknown alert ''
 Check 'Local FTP': unknown alert ''
@@ -42,6 +41,8 @@ Check 'Local FTP': unknown alert ''
 Check 'Local FTP': unknown alert ''
 Check 'Local FTP': unknown alert 'sms2'
 Check 'Test avec nom inconnu': unknown alert 'youpi'
+39 error(s) in the ini file, continuing
+keep_last_status not defined, taking default = 15
 == CHECK #0
    is_valid       = Yes
    display_name   = Local FTP
@@ -172,7 +173,7 @@ Check 'Test avec nom inconnu': unknown alert 'youpi'
 !! alert #6 (will be ignored)
    is_valid          = No
    name              = <unset>
-   method            = <unset>
+   method            = <unknown>
    threshold         = <unset>
    repeat_every      = <unset>
    repeat_max        = <unset>

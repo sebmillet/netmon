@@ -33,6 +33,7 @@ Configuration file 'netmon.ini', line 61: empty value not allowed
 Configuration file 'netmon.ini', section of line 57: no method defined, discarding check
 Configuration file 'netmon.ini', line 66: syntax error
 Configuration file 'netmon.ini', section of line 63: no command defined, discarding check
+30 error(s) in the ini file, continuing
 keep_last_status not defined, taking default = 15
 !! check #0 (will be ignored)
    is_valid       = No
@@ -63,8 +64,6 @@ keep_last_status not defined, taking default = 15
    display_name   = <unset>
    host_name      = <unset>
    method         = <unset>
-   TCP/port                   = <unset>
-   TCP/expect                 = <unset>
    alerts         = <unset>
    nb alerts      = 0
    alert_threshold    = <unset>
@@ -87,8 +86,6 @@ keep_last_status not defined, taking default = 15
    display_name   = bla r
    host_name      = bla r
    method         = <unset>
-   TCP/port                   = <unset>
-   TCP/expect                 = <unset>
    alerts         = <unset>
    nb alerts      = 0
    alert_threshold    = <unset>
@@ -99,8 +96,6 @@ keep_last_status not defined, taking default = 15
    display_name   = bla y
    host_name      = bla y
    method         = <unset>
-   TCP/port                   = <unset>
-   TCP/expect                 = <unset>
    alerts         = <unset>
    nb alerts      = 0
    alert_threshold    = <unset>

@@ -13,7 +13,7 @@ if [ "$5" = "--batch" ]; then
   shift
 fi
 
-$PRG -pvvvt 1 -l "" -c $INI $5 $6 > $OUTPUT
+$PRG --laxist -pvvvt 1 -l "" -c $INI $5 $6 > $OUTPUT
 
 REP=$(pwd | sed 's/.*\///')
 
