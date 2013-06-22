@@ -19,9 +19,10 @@ keep_last_status not defined, taking default = 15
    display_name   = My loop
    host_name      = 
    method         = loop
+   LOOP/id                    = MYLOOP
    LOOP/fail delay            = 5
    LOOP/fail timeout          = 8
-   LOOP/send every            = <unset>
+   LOOP/send every            = 1
    LOOP/smtp/smarthost        = mysmtp
    LOOP/smtp/port             = <unset>
    LOOP/smtp/self             = <unset>
@@ -68,6 +69,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 0
 My prog probe -> ok
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 My loop -> ok
 Check done in 0.123450s
 Starting check...
@@ -77,6 +80,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 0
 My prog probe -> ok
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 My loop -> ok
 Check done in 0.123450s
 Starting check...
@@ -86,6 +91,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 0
 My prog probe -> ok
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 My loop -> ok
 Check done in 0.123450s
 Starting check...
@@ -95,6 +102,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 0
 My prog probe -> ok
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 My loop -> ok
 Check done in 0.123450s
 Starting check...
@@ -104,6 +113,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 My loop -> ** KO **
 Check done in 0.123450s
 Starting check...
@@ -113,6 +124,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 My loop -> ** KO **
 Check done in 0.123450s
 Starting check...
@@ -131,6 +144,8 @@ $3='Fail'
 Program alert(print): return code: 0
 Executed alert, result = 0
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 My loop -> ** KO **
 program(print) -> display_name = 'My loop', host_name = '', status = '3'
 Program alert(print): will execute the command:
@@ -147,6 +162,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -157,6 +174,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -167,6 +186,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -177,6 +198,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 3 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -187,6 +210,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 4 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -197,6 +222,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 5 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -207,6 +234,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 6 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -217,6 +246,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 7 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -227,6 +258,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 8 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -237,6 +270,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 9 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -247,6 +282,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 0 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -257,6 +294,8 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 1 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
@@ -276,6 +315,8 @@ $3='Ok'
 Program alert(print): return code: 0
 Executed alert, result = 0
 Performing check loop(My loop)
+Loop check(My loop): sending probe email
+Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 2 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
