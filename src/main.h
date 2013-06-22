@@ -256,9 +256,9 @@ int execute_alert_smtp(const struct exec_alert_t *exec_alert);
 int execute_alert_program(const struct exec_alert_t *exec_alert);
 int execute_alert_log(const struct exec_alert_t *exec_alert);
 
-int perform_check_tcp(const struct check_t *chk, const struct subst_t *subst, int subst_len);
-int perform_check_program(const struct check_t *chk, const struct subst_t *subst, int subst_len);
-int perform_check_loop(const struct check_t *chk, const struct subst_t *subst, int subst_len);
+int perform_check_tcp(struct check_t *chk, const struct subst_t *subst, int subst_len);
+int perform_check_program(struct check_t *chk, const struct subst_t *subst, int subst_len);
+int perform_check_loop(struct check_t *chk, const struct subst_t *subst, int subst_len);
 
   // From webserver.c
 void *webserver(void *p);

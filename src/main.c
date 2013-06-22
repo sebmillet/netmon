@@ -30,9 +30,12 @@
 #define DEFAULT_ALERT_LOG_STRING "${NOW_TIMESTAMP}  ${DESCRIPTION}"
 #define DEFAULT_CONNECT_TIMEOUT 5
 #define DEFAULT_LOOP_SMTP_SELF  PACKAGE_TARNAME
+  // 4 hours during which the status will be "fail" when an email gets lost
 #define DEFAULT_LOOP_FAIL_TIMEOUT (60 * 60 * 4)
+  // If an email has not "come back" after 10 minutes the loop enters the status "fail"
 #define DEFAULT_LOOP_FAIL_DELAY (60 * 10)
 #define DEFAULT_LOOP_ID "NMNM"
+#define DEFAULT_LOOP_SEND_EVERY  2
 #define LOOP_STATUS_WHEN_SENDING_FAILS  ST_UNKNOWN
 #define LOOP_TRIGGER_OPTIMIZE_ARRAY 10
 #define LOOP_PREFIX     PACKAGE_NAME
@@ -209,7 +212,7 @@ const char *l_check_methods[] = {
   "program",  // CM_PROGRAM
   "loop"      // CM_LOOP
 };
-int (*check_func[]) (const struct check_t *, const struct subst_t *, int) = {
+int (*check_func[]) (struct check_t *, const struct subst_t *, int) = {
   perform_check_tcp,      // CM_TCP
   perform_check_program,  // CM_PROGRAM
   perform_check_loop      // CM_LOOP
@@ -894,7 +897,7 @@ int establish_connection(const char *host_name, int port, const char *expect, in
 //
 //
 //
-int perform_check_tcp(const struct check_t *chk, const struct subst_t *subst, int subst_len) {
+int perform_check_tcp(struct check_t *chk, const struct subst_t *subst, int subst_len) {
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "TCP check(%s):", chk->display_name);
 
@@ -913,7 +916,7 @@ int perform_check_tcp(const struct check_t *chk, const struct subst_t *subst, in
 //
 //
 //
-int perform_check_program(const struct check_t *chk, const struct subst_t *subst, int subst_len) {
+int perform_check_program(struct check_t *chk, const struct subst_t *subst, int subst_len) {
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "Program check(%s):", chk->display_name);
 
@@ -958,6 +961,8 @@ void build_email_ref(const struct check_t *chk, const time_t time_ref, char *s, 
 //
 //
 int loop_send_email(const struct check_t *chk, const struct subst_t *subst, int subst_len, const char *prefix) {
+  my_logf(LL_VERBOSE, LP_DATETIME, "%s sending probe email", prefix);
+
   int sock;
 
   int r;
@@ -1078,6 +1083,8 @@ void loop_manage_retrieved_email(const char *reference, const char *prefix) {
 //
 //
 int loop_receive_emails(const struct check_t *chk, const struct subst_t *subst, int subst_len, const char *prefix) {
+  my_logf(LL_VERBOSE, LP_DATETIME, "%s retrieving probe email(s)", prefix);
+
   char h[SMALLSTRSIZE];
   int p;
   const struct pop3_account_t *pop3 = &chk->loop_pop3;
@@ -1226,21 +1233,32 @@ int loop_receive_emails(const struct check_t *chk, const struct subst_t *subst, 
 //
 //
 //
-int perform_check_loop(const struct check_t *chk, const struct subst_t *subst, int subst_len) {
+int perform_check_loop(struct check_t *chk, const struct subst_t *subst, int subst_len) {
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "Loop check(%s):", chk->display_name);
 
 // 1. Send & received probe emails
 
-  int r;
+  int r = ST_OK;
 #ifdef DEBUG_LOOP
   if (loop_count % 2 == 0) {
     loop_receive_emails(chk, subst, subst_len, prefix);
     r = loop_send_email(chk, subst, subst_len, prefix);
   } else {
 #endif
-    r = loop_send_email(chk, subst, subst_len, prefix);
+
+// loop send & receive emails -> production code below
+
+    if (--chk->loop_send_countdown <= 0) {
+      r = loop_send_email(chk, subst, subst_len, prefix);
+      chk->loop_send_countdown = chk->loop_send_every_set ? chk->loop_send_every : DEFAULT_LOOP_SEND_EVERY;
+    } else {
+      my_logf(LL_VERBOSE, LP_DATETIME, "%s skipping email sending, countdown = %d", prefix, chk->loop_send_countdown);
+    }
     loop_receive_emails(chk, subst, subst_len, prefix);
+
+// loop send & receive emails -> production code above
+
 #ifdef DEBUG_LOOP
   }
 #endif
@@ -1350,7 +1368,7 @@ void loop_count_to_str(char *lcstr, size_t lcstr_len) {
 //
 //
 //
-int perform_check(const struct check_t *chk) {
+int perform_check(struct check_t *chk) {
   my_logf(LL_VERBOSE, LP_DATETIME, "Performing check %s(%s)", l_check_methods[chk->method], chk->display_name);
 
   struct tm my_now;
@@ -1728,7 +1746,7 @@ int execute_alert_program(const struct exec_alert_t *exec_alert) {
   struct alert_t *alrt = exec_alert->alrt;
 
   char prefix[SMALLSTRSIZE];
-  snprintf(prefix, sizeof(prefix), "Program alert(%s):", alrt->name);
+  snprintf(prefix, sizeof(prefix), "program alert(%s):", alrt->name);
 
   char *s_substitued = dollar_subst_alloc(alrt->prg_command, exec_alert->subst, exec_alert->subst_len);
   my_logf(LL_VERBOSE, LP_DATETIME, "%s will execute the command:", prefix);
@@ -1748,7 +1766,7 @@ int execute_alert_log(const struct exec_alert_t *exec_alert) {
   struct tm *now = exec_alert->my_now;
 
   char prefix[SMALLSTRSIZE];
-  snprintf(prefix, sizeof(prefix), "Log alert(%s):", alrt->name);
+  snprintf(prefix, sizeof(prefix), "log alert(%s):", alrt->name);
 
   char *f_substitued = dollar_subst_alloc(alrt->log_file, exec_alert->subst, exec_alert->subst_len);
 
@@ -3015,6 +3033,7 @@ void checks_display() {
     } else if (chk->method == CM_PROGRAM) {
       d_s("   PROGRAM/command            = ", chk->prg_command_set, chk->prg_command);
     } else if (chk->method == CM_LOOP) {
+      d_s("   LOOP/id                    = ", chk->loop_id_set, chk->loop_id);
       d_i("   LOOP/fail delay            = ", chk->loop_fail_delay_set, chk->loop_fail_delay);
       d_i("   LOOP/fail timeout          = ", chk->loop_fail_timeout_set, chk->loop_fail_timeout);
       d_i("   LOOP/send every            = ", chk->loop_send_every_set, chk->loop_send_every);
