@@ -11,9 +11,10 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/time.h>
-#include <sys/wait.h>
+/*#include <sys/wait.h>*/
 #include <time.h>
 #include <pthread.h>
+#include <ctype.h>
 
 loglevel_t g_current_log_level = LL_NORMAL;
 
@@ -28,6 +29,7 @@ static pthread_mutex_t util_mutex;
 
 #if defined(_WIN32) || defined(_WIN64)
 
+#include <windows.h>
 
   // * ******* *
   // * WINDOWS *
@@ -96,6 +98,8 @@ void os_closesocket(int sock) {
 }
 
 int add_reader_access_right(const char *f) {
+UNUSED(f);
+
   return 0;
 }
 
@@ -456,7 +460,13 @@ void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, 
   *minute = ts.tm_min;
   *second = ts.tm_sec;
   *usec = tv.tv_usec;
+
+#ifdef HAS_TM_GMTOFF
   *gmtoff = ts.tm_gmtoff;
+#else
+  *gmtoff = 0;
+#error "où va-t-on ???!!"
+#endif
 }
 
 //

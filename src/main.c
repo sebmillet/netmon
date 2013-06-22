@@ -11,6 +11,8 @@
 #include <string.h>
 #include <signal.h>
 #include <getopt.h>
+#include <stdint.h>
+#include <ctype.h>
 
 /*#define DEBUG*/
 /*#define DEBUG_LOOP*/
@@ -60,6 +62,8 @@ const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
   // As writtn here:
   //   http://nagiosplug.sourceforge.net/developer-guidelines.html#AEN76
 enum {_NAGIOS_FIRST = 0, NAGIOS_OK = 0, NAGIOS_WARNING = 1, NAGIOS_CRITICAL = 2, NAGIOS_UNKNOWN = 3, _NAGIOS_LAST = 3};
+
+void web_create_img_files();
 
 #if defined(_WIN32) || defined(_WIN64)
 
@@ -760,6 +764,14 @@ int socket_line_sendf(int *s, int trace, const char *fmt, ...) {
 }
 
 //
+// Return true if s begins with prefix, false otherwise
+// String comparison is case insensitive
+//
+int s_begins_with(const char *s, const char *begins_with) {
+  return (strncasecmp(s, begins_with, strlen(begins_with)) == 0);
+}
+
+//
 //
 //
 int socket_round_trip(int sock, const char *expect, const char *fmt, ...) {
@@ -792,14 +804,6 @@ int socket_round_trip(int sock, const char *expect, const char *fmt, ...) {
 
   free(response);
   return SRT_UNEXPECTED_ANSWER;
-}
-
-//
-// Return true if s begins with prefix, false otherwise
-// String comparison is case insensitive
-//
-int s_begins_with(const char *s, const char *begins_with) {
-  return (strncasecmp(s, begins_with, strlen(begins_with)) == 0);
 }
 
 //
@@ -898,6 +902,9 @@ int establish_connection(const char *host_name, int port, const char *expect, in
 //
 //
 int perform_check_tcp(struct check_t *chk, const struct subst_t *subst, int subst_len) {
+UNUSED(subst);
+UNUSED(subst_len);
+
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "TCP check(%s):", chk->display_name);
 
@@ -958,9 +965,234 @@ void build_email_ref(const struct check_t *chk, const time_t time_ref, char *s, 
 }
 
 //
+// Split a hostname between the real hostname and the port, in case
+// the hostname is in the form
+//    hostname:port
+// If no ':' is found, just return the hostname and the default port
+//
+int split_hostname(const char *hostname, const int port, const int port_set, const int default_port, const char *prefix,
+    char *h, const size_t h_len, int *p) {
+  strncpy(h, hostname, h_len);
+  h[h_len - 1] = '\0';
+  char *col = strchr(h, CFGK_PORT_SEPARATOR);
+  if (col != NULL) {
+    *col = '\0';
+    char *strport = col + 1;
+    strport = trim(strport);
+    *p = atoi(strport);
+  } else {
+    *p = port_set ? port : default_port;
+  }
+  if (*p < 1) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s invalid port number (%s:%i)", prefix, h, *p);
+    return -1;
+  }
+  return 0;
+}
+
+//
+// Extract SMTP address from string, example ->
+// smtp_address("abc <x@c> def") will return "x@c"
+// smtp_address("  dd  x@c o@t d,d") will return "x@c o@t"
+// smtp_address("  dd  < a x@c d> zz ") will return "a x@c d"
+//
+char *smtp_address(char *a) {
+  char *p1 = strchr(a, '<');
+  char *p2 = strrchr(a, '>');
+  if (p1 != NULL && p2 != NULL && p2 > p1) {
+    *p2 = '\0';
+    return trim(p1 + 1);
+  }
+  char *p = strchr(a, '@');
+  if (p != NULL) {
+    char *f = strrchr(a, '@');;
+    for (; p > a; --p) {
+      if (isspace(*p)) {
+        ++p;
+        break;
+      }
+    }
+    for (; *f != '\0'; ++f) {
+      if (isspace(*f)) {
+        *f = '\0';
+        break;
+      }
+    }
+    return trim(p);
+  }
+  return trim(a);
+}
+
+//
+// Perform an SMTP transaction up to the DATA command (inclusive)
+// Returns ERR_SMTP_* constants
+//
+int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, int *sock, char *from_buf, size_t from_buf_len) {
+  env->nb_recipients_wanted = -1;
+  env->nb_recipients_ok = -1;
+
+  char h[SMALLSTRSIZE];
+  int p;
+
+  if (split_hostname(env->smarthost, env->port, env->port_set, DEFAULT_SMTP_PORT, prefix, h, sizeof(h), &p))
+    return ERR_SMTP_INVALID_PORT_NUMBER;
+
+  int ec = establish_connection(h, p, "220 ",
+    env->connect_timeout_set ? env->connect_timeout_set : g_connect_timeout, sock, prefix);
+  if (ec != EC_OK)
+    return (ec == EC_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR : ERR_SMTP_NETIO);
+
+  if (socket_line_sendf(sock, g_trace_network_traffic, "EHLO %s",
+      env->self_set ? env->self : DEFAULT_LOOP_SMTP_SELF)) {
+    return ERR_SMTP_NETIO;
+  }
+
+  char *response = NULL;
+  int response_size;
+  do {
+    if (socket_read_line_alloc(*sock, &response, g_trace_network_traffic, &response_size) < 0) {
+      return ERR_SMTP_NETIO;
+    }
+  } while (s_begins_with(response, "250-"));
+  if (!s_begins_with(response, "250 ")) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s unexpected answer from server '%s'", prefix, response);
+    free(response);
+    return ERR_SMTP_BAD_ANSWER_TO_EHLO;
+  }
+  free(response);
+  env->from_orig = env->sender_set ? env->sender : DEFAULT_ALERT_SMTP_SENDER;
+  strncpy(from_buf, env->from_orig, from_buf_len);
+  from_buf[from_buf_len - 1] = '\0';
+  env->from = from_buf;
+  env->from = smtp_address(env->from);
+  if (socket_round_trip(*sock, "250 ", "MAIL FROM: <%s>", env->from) != SRT_SUCCESS) {
+    socket_line_sendf(sock, g_trace_network_traffic, "QUIT");
+    my_logf(LL_ERROR, LP_DATETIME, "%s sender not accepted, closing connection", prefix);
+    return ERR_SMTP_SENDER_REJECTED;
+  }
+
+  env->nb_recipients_wanted = 0;
+  env->nb_recipients_ok = 0;
+  size_t l = strlen(env->recipients) + 1;
+  char *recipients = (char *)malloc(l);
+  strncpy(recipients, env->recipients, l);
+  char *r = recipients;
+  char *next = NULL;
+  while (*r != '\0') {
+    if ((next = strchr(r, CFGK_LIST_SEPARATOR)) != NULL) {
+      *next = '\0';
+      ++next;
+    }
+    r = smtp_address(r);
+    if (strlen(r) >= 1) {
+      env->nb_recipients_wanted++;
+      int res = socket_round_trip(*sock, "250 ", "RCPT TO: <%s>", r);
+      if (res == SRT_SUCCESS)
+        env->nb_recipients_ok++;
+      else if (res != SRT_SUCCESS && res != SRT_UNEXPECTED_ANSWER) {
+        free(recipients);
+        return ERR_SMTP_NETIO;
+      }
+    }
+
+    r = (next == NULL ? &r[strlen(r)] : next);
+  }
+  free(recipients);
+
+  if (env->nb_recipients_ok == 0) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s no recipient accepted, closing connection", prefix);
+    socket_line_sendf(sock, g_trace_network_traffic, "QUIT");
+    return ERR_SMTP_NO_RECIPIENT_ACCEPTED;
+  }
+
+  int res;
+  if ((res = socket_round_trip(*sock, "354 ", "DATA")) != SRT_SUCCESS) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s DATA command not accepted, closing connection", prefix);
+    return (res == SRT_SOCKET_ERROR ? ERR_SMTP_NETIO : ERR_SMTP_DATA_COMMAND_REJECTED);
+  }
+
+  return ERR_SMTP_OK;
+}
+
 //
 //
-int loop_send_email(const struct check_t *chk, const struct subst_t *subst, int subst_len, const char *prefix) {
+//
+int smtp_mail_sending_post(int sock, const char *prefix, char *email_ref, const size_t email_ref_len) {
+  if (socket_line_sendf(&sock, g_trace_network_traffic, "") || socket_line_sendf(&sock, g_trace_network_traffic, ".")) {
+    return ERR_SMTP_NETIO;
+  }
+
+  char *response = NULL;
+  int response_size;
+  if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0) {
+    free(response);
+    os_closesocket(sock);
+    return ERR_SMTP_NETIO;
+  }
+  if (!s_begins_with(response, "250 ")) {
+    free(response);
+    my_logf(LL_ERROR, LP_DATETIME, "%s remote end did not confirm email reception", prefix);
+    return ERR_SMTP_EMAIL_RECEPTION_NOT_CONFIRMED;
+  }
+  char *e;
+
+#define QUEUED_AS " queued as "
+  if ((e = strcasestr(response, QUEUED_AS)) != NULL) {
+    strncpy(email_ref, e + strlen(QUEUED_AS), email_ref_len);
+    email_ref[email_ref_len - 1] = '\0';
+    my_logf(LL_DEBUG, LP_DATETIME, "%s email received by smart host, ref '%s'", prefix, email_ref);
+  }
+  free(response);
+
+  socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
+  os_closesocket(sock);
+
+  my_logf(LL_DEBUG, LP_DATETIME, "Disconnected");
+
+  return ERR_SMTP_OK;
+}
+
+//
+// Fill the string with a standard date
+//
+void get_rfc822_header_format_current_date(char *date, const size_t date_len) {
+  const char *wdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+  const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+  int wday; int year; int month; int day;
+  int hour; int minute; int second; long unsigned int usec;
+  long int gmtoff;
+  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
+  int gmtoff_h = abs(gmtoff) / 3600;
+  int gmtoff_m = abs(gmtoff) % 3600;
+  snprintf(date, date_len, "%s, %d %s %d %02d:%02d:%02d %s%02d%02d", wdays[wday], day, months[month - 1], year,
+    hour, minute, second, gmtoff < 0 ? "-" : "+", gmtoff_h, gmtoff_m);
+}
+
+//
+//
+//
+int smtp_mail_sending_stdheaders(int *sock, const struct rfc821_enveloppe_t *smtp) {
+  if (strlen(smtp->from_orig) >= 1) {
+    socket_line_sendf(sock, g_trace_network_traffic, "return-path: %s", smtp->from);
+    socket_line_sendf(sock, g_trace_network_traffic, "sender: %s", smtp->from);
+    socket_line_sendf(sock, g_trace_network_traffic, "from: %s", smtp->from_orig);
+  }
+  socket_line_sendf(sock, g_trace_network_traffic, "to: %s", smtp->recipients);
+  socket_line_sendf(sock, g_trace_network_traffic, "x-mailer: %s", PACKAGE_STRING);
+  char date[SMALLSTRSIZE];
+  get_rfc822_header_format_current_date(date, sizeof(date));
+  return socket_line_sendf(sock, g_trace_network_traffic, "date: %s", date) ? ERR_SMTP_NETIO : ERR_SMTP_OK;
+}
+
+//
+//
+//
+int loop_send_email(const struct check_t *chk,
+    const struct subst_t *subst, int subst_len, const char *prefix) {
+UNUSED(subst);
+UNUSED(subst_len);
+
   my_logf(LL_VERBOSE, LP_DATETIME, "%s sending probe email", prefix);
 
   int sock;
@@ -1082,7 +1314,11 @@ void loop_manage_retrieved_email(const char *reference, const char *prefix) {
 //
 //
 //
-int loop_receive_emails(const struct check_t *chk, const struct subst_t *subst, int subst_len, const char *prefix) {
+int loop_receive_emails(const struct check_t *chk,
+    const struct subst_t *subst, int subst_len, const char *prefix) {
+UNUSED(subst);
+UNUSED(subst_len);
+
   my_logf(LL_VERBOSE, LP_DATETIME, "%s retrieving probe email(s)", prefix);
 
   char h[SMALLSTRSIZE];
@@ -1408,225 +1644,6 @@ int perform_check(struct check_t *chk) {
 }
 
 //
-// Extract SMTP address from string, example ->
-// smtp_address("abc <x@c> def") will return "x@c"
-// smtp_address("  dd  x@c o@t d,d") will return "x@c o@t"
-// smtp_address("  dd  < a x@c d> zz ") will return "a x@c d"
-//
-char *smtp_address(char *a) {
-  char *p1 = strchr(a, '<');
-  char *p2 = strrchr(a, '>');
-  if (p1 != NULL && p2 != NULL && p2 > p1) {
-    *p2 = '\0';
-    return trim(p1 + 1);
-  }
-  char *p = strchr(a, '@');
-  if (p != NULL) {
-    char *f = strrchr(a, '@');;
-    for (; p > a; --p) {
-      if (isspace(*p)) {
-        ++p;
-        break;
-      }
-    }
-    for (; *f != '\0'; ++f) {
-      if (isspace(*f)) {
-        *f = '\0';
-        break;
-      }
-    }
-    return trim(p);
-  }
-  return trim(a);
-}
-
-//
-// Fill the string with a standard date
-//
-void get_rfc822_header_format_current_date(char *date, size_t date_len) {
-  const char *wdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-  const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-
-  int wday; int year; int month; int day;
-  int hour; int minute; int second; long unsigned int usec;
-  long int gmtoff;
-  get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
-  int gmtoff_h = abs(gmtoff) / 3600;
-  int gmtoff_m = abs(gmtoff) % 3600;
-  snprintf(date, date_len, "%s, %d %s %d %02d:%02d:%02d %s%02d%02d", wdays[wday], day, months[month - 1], year,
-    hour, minute, second, gmtoff < 0 ? "-" : "+", gmtoff_h, gmtoff_m);
-}
-
-//
-// Split a hostname between the real hostname and the port, in case
-// the hostname is in the form
-//    hostname:port
-// If no ':' is found, just return the hostname and the default port
-//
-int split_hostname(const char *hostname, const int port, const int port_set, const int default_port, const char *prefix,
-    char *h, const size_t h_len, int *p) {
-  strncpy(h, hostname, h_len);
-  h[h_len - 1] = '\0';
-  char *col = strchr(h, CFGK_PORT_SEPARATOR);
-  if (col != NULL) {
-    *col = '\0';
-    char *strport = col + 1;
-    strport = trim(strport);
-    *p = atoi(strport);
-  } else {
-    *p = port_set ? port : default_port;
-  }
-  if (*p < 1) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s invalid port number (%s:%i)", prefix, h, *p);
-    return -1;
-  }
-  return 0;
-}
-
-//
-// Perform an SMTP transaction up to the DATA command (inclusive)
-// Returns ERR_SMTP_* constants
-//
-int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, int *sock, char *from_buf, size_t from_buf_len) {
-  env->nb_recipients_wanted = -1;
-  env->nb_recipients_ok = -1;
-
-  char h[SMALLSTRSIZE];
-  int p;
-
-  if (split_hostname(env->smarthost, env->port, env->port_set, DEFAULT_SMTP_PORT, prefix, h, sizeof(h), &p))
-    return ERR_SMTP_INVALID_PORT_NUMBER;
-
-  int ec = establish_connection(h, p, "220 ",
-    env->connect_timeout_set ? env->connect_timeout_set : g_connect_timeout, sock, prefix);
-  if (ec != EC_OK)
-    return (ec == EC_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR : ERR_SMTP_NETIO);
-
-  if (socket_line_sendf(sock, g_trace_network_traffic, "EHLO %s",
-      env->self_set ? env->self : DEFAULT_LOOP_SMTP_SELF)) {
-    return ERR_SMTP_NETIO;
-  }
-
-  char *response = NULL;
-  int response_size;
-  do {
-    if (socket_read_line_alloc(*sock, &response, g_trace_network_traffic, &response_size) < 0) {
-      return ERR_SMTP_NETIO;
-    }
-  } while (s_begins_with(response, "250-"));
-  if (!s_begins_with(response, "250 ")) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s unexpected answer from server '%s'", prefix, response);
-    free(response);
-    return ERR_SMTP_BAD_ANSWER_TO_EHLO;
-  }
-  free(response);
-  env->from_orig = env->sender_set ? env->sender : DEFAULT_ALERT_SMTP_SENDER;
-  strncpy(from_buf, env->from_orig, from_buf_len);
-  from_buf[from_buf_len - 1] = '\0';
-  env->from = from_buf;
-  env->from = smtp_address(env->from);
-  if (socket_round_trip(*sock, "250 ", "MAIL FROM: <%s>", env->from) != SRT_SUCCESS) {
-    socket_line_sendf(sock, g_trace_network_traffic, "QUIT");
-    my_logf(LL_ERROR, LP_DATETIME, "%s sender not accepted, closing connection", prefix);
-    return ERR_SMTP_SENDER_REJECTED;
-  }
-
-  env->nb_recipients_wanted = 0;
-  env->nb_recipients_ok = 0;
-  size_t l = strlen(env->recipients) + 1;
-  char *recipients = (char *)malloc(l);
-  strncpy(recipients, env->recipients, l);
-  char *r = recipients;
-  char *next = NULL;
-  while (*r != '\0') {
-    if ((next = strchr(r, CFGK_LIST_SEPARATOR)) != NULL) {
-      *next = '\0';
-      ++next;
-    }
-    r = smtp_address(r);
-    if (strlen(r) >= 1) {
-      env->nb_recipients_wanted++;
-      int res = socket_round_trip(*sock, "250 ", "RCPT TO: <%s>", r);
-      if (res == SRT_SUCCESS)
-        env->nb_recipients_ok++;
-      else if (res != SRT_SUCCESS && res != SRT_UNEXPECTED_ANSWER) {
-        free(recipients);
-        return ERR_SMTP_NETIO;
-      }
-    }
-
-    r = (next == NULL ? &r[strlen(r)] : next);
-  }
-  free(recipients);
-
-  if (env->nb_recipients_ok == 0) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s no recipient accepted, closing connection", prefix);
-    socket_line_sendf(sock, g_trace_network_traffic, "QUIT");
-    return ERR_SMTP_NO_RECIPIENT_ACCEPTED;
-  }
-
-  int res;
-  if ((res = socket_round_trip(*sock, "354 ", "DATA")) != SRT_SUCCESS) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s DATA command not accepted, closing connection", prefix);
-    return (res == SRT_SOCKET_ERROR ? ERR_SMTP_NETIO : ERR_SMTP_DATA_COMMAND_REJECTED);
-  }
-}
-
-//
-//
-//
-int smtp_mail_sending_post(int sock, const char *prefix, char *email_ref, const size_t email_ref_len) {
-  if (socket_line_sendf(&sock, g_trace_network_traffic, "") || socket_line_sendf(&sock, g_trace_network_traffic, ".")) {
-    return ERR_SMTP_NETIO;
-  }
-
-  char *response = NULL;
-  int response_size;
-  if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0) {
-    free(response);
-    os_closesocket(sock);
-    return ERR_SMTP_NETIO;
-  }
-  if (!s_begins_with(response, "250 ")) {
-    free(response);
-    my_logf(LL_ERROR, LP_DATETIME, "%s remote end did not confirm email reception", prefix);
-    return ERR_SMTP_EMAIL_RECEPTION_NOT_CONFIRMED;
-  }
-  char *e;
-
-#define QUEUED_AS " queued as "
-  if ((e = strcasestr(response, QUEUED_AS)) != NULL) {
-    strncpy(email_ref, e + strlen(QUEUED_AS), email_ref_len);
-    email_ref[email_ref_len - 1] = '\0';
-    my_logf(LL_DEBUG, LP_DATETIME, "%s email received by smart host, ref '%s'", prefix, email_ref);
-  }
-  free(response);
-
-  socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
-  os_closesocket(sock);
-
-  my_logf(LL_DEBUG, LP_DATETIME, "Disconnected");
-
-  return ERR_SMTP_OK;
-}
-
-//
-//
-//
-int smtp_mail_sending_stdheaders(int *sock, const struct rfc821_enveloppe_t *smtp) {
-  if (strlen(smtp->from_orig) >= 1) {
-    socket_line_sendf(sock, g_trace_network_traffic, "return-path: %s", smtp->from);
-    socket_line_sendf(sock, g_trace_network_traffic, "sender: %s", smtp->from);
-    socket_line_sendf(sock, g_trace_network_traffic, "from: %s", smtp->from_orig);
-  }
-  socket_line_sendf(sock, g_trace_network_traffic, "to: %s", smtp->recipients);
-  socket_line_sendf(sock, g_trace_network_traffic, "x-mailer: %s", PACKAGE_STRING);
-  char date[SMALLSTRSIZE];
-  get_rfc822_header_format_current_date(date, sizeof(date));
-  return socket_line_sendf(sock, g_trace_network_traffic, "date: %s", date) ? ERR_SMTP_NETIO : ERR_SMTP_OK;
-}
-
-//
 // Used by execute_alert_smtp
 //
 int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, const char *smart_host, const char *prefix) {
@@ -1711,7 +1728,6 @@ int execute_alert_smtp(const struct exec_alert_t *exec_alert) {
   char *h = smart_hosts;
   char *next = NULL;
 
-  int port;
   int nb_attempts_done = 0;
   int err_smtp = ERR_SMTP_OK + 1;
   int smart_host_number = 0;
@@ -1763,7 +1779,6 @@ int execute_alert_program(const struct exec_alert_t *exec_alert) {
 //
 int execute_alert_log(const struct exec_alert_t *exec_alert) {
   struct alert_t *alrt = exec_alert->alrt;
-  struct tm *now = exec_alert->my_now;
 
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "log alert(%s):", alrt->name);
@@ -2379,7 +2394,6 @@ void parse_options(int argc, char *argv[]) {
 
   int n;
 
-  char x = g_log_file[0];
   strncpy(g_log_file, DEFAULT_LOGFILE, sizeof(g_log_file));
   strncpy(g_cfg_file, DEFAULT_CFGFILE, sizeof(g_cfg_file));
   strncpy(g_test_alert, "", sizeof(g_test_alert));

@@ -28,9 +28,10 @@
       <cxxflags>-Wextra -Wuninitialized</cxxflags>
     </if>
     <app-type>console</app-type>
-    <headers>netmon.h
+    <headers>main.h util.h
     </headers>
-    <sources>netmon.c img\st-fail.c img\st-ok.c img\st-undef.c img\st-unknown.c
+    <sources>main.c util.c webserver.c
+      img\st-fail.c img\st-ok.c img\st-undef.c img\st-unknown.c
     </sources>
     <warnings>max</warnings>
     <debug-info>$(DEBUG_FLAG)</debug-info>

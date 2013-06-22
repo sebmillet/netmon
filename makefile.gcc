@@ -37,7 +37,9 @@ CPPDEPS = -MT$@ -MF$@.d -MD -MP
 NETMON_CFLAGS = -W -Wall $(__DEBUG_FLAG) $(__OPTIMIZE_FLAG_4) $(CPPFLAGS) \
 	$(CFLAGS)
 NETMON_OBJECTS =  \
-	build\netmon_netmon.o \
+	build\netmon_main.o \
+	build\netmon_util.o \
+	build\netmon_webserver.o \
 	build\netmon_st_fail.o \
 	build\netmon_st_ok.o \
 	build\netmon_st_undef.o \
@@ -75,7 +77,13 @@ clean:
 build\netmon.exe: $(NETMON_OBJECTS)
 	$(CC) -o $@ $(NETMON_OBJECTS)   $(__DEBUG_FLAG) $(LDFLAGS)  -lWs2_32 -lAdvapi32 -lShell32 -lpthread
 
-build\netmon_netmon.o: src/netmon.c
+build\netmon_main.o: src/main.c
+	$(CC) -c -o $@ $(NETMON_CFLAGS) $(CPPDEPS) $<
+
+build\netmon_util.o: src/util.c
+	$(CC) -c -o $@ $(NETMON_CFLAGS) $(CPPDEPS) $<
+
+build\netmon_webserver.o: src/webserver.c
 	$(CC) -c -o $@ $(NETMON_CFLAGS) $(CPPDEPS) $<
 
 build\netmon_st_fail.o: src/img/st-fail.c
