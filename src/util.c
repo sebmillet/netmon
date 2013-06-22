@@ -11,7 +11,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/time.h>
-/*#include <sys/wait.h>*/
 #include <time.h>
 #include <pthread.h>
 #include <ctype.h>
@@ -108,10 +107,12 @@ UNUSED(f);
 
 #else
 
-
   // * *********** *
   // * NOT WINDOWS *
   // * *********** *
+
+#include <sys/wait.h>
+#define HAS_TM_GMTOFF
 
 const char FS_SEPARATOR = '/';
 
@@ -465,7 +466,6 @@ void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, 
   *gmtoff = ts.tm_gmtoff;
 #else
   *gmtoff = 0;
-#error "où va-t-on ???!!"
 #endif
 }
 
