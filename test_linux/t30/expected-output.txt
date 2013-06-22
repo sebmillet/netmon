@@ -135,24 +135,24 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 2
 My prog probe -> ** KO **
 program(print) -> display_name = 'My prog probe', host_name = 'none', status = '3'
-Program alert(print): will execute the command:
+program alert(print): will execute the command:
 ./printargs.sh "My prog probe" "none" "Fail"
 $0='./printargs.sh'
 $1='My prog probe'
 $2='none'
 $3='Fail'
-Program alert(print): return code: 0
+program alert(print): return code: 0
 Executed alert, result = 0
 Performing check loop(My loop)
 Loop check(My loop): sending probe email
 Loop check(My loop): retrieving probe email(s)
 My loop -> ** KO **
 program(print) -> display_name = 'My loop', host_name = '', status = '3'
-Program alert(print): will execute the command:
+program alert(print): will execute the command:
 ./printargs.sh "My loop" "" "Fail"
 $0='./printargs.sh'
 $1='My loop'
-Program alert(print): return code: 0
+program alert(print): return code: 0
 Executed alert, result = 0
 Check done in 0.123450s
 Starting check...
@@ -306,13 +306,13 @@ Program check(My prog probe): will execute the command:
 Program check(My prog probe): return code: 0
 My prog probe -> ok
 program(print) -> display_name = 'My prog probe', host_name = 'none', status = '2'
-Program alert(print): will execute the command:
+program alert(print): will execute the command:
 ./printargs.sh "My prog probe" "none" "Ok"
 $0='./printargs.sh'
 $1='My prog probe'
 $2='none'
 $3='Ok'
-Program alert(print): return code: 0
+program alert(print): return code: 0
 Executed alert, result = 0
 Performing check loop(My loop)
 Loop check(My loop): sending probe email
