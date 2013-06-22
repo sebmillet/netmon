@@ -10,6 +10,8 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/time.h>
+#include <wchar.h>
+#include <sys/stat.h>
 
 #if defined(_WIN32) || defined(_WIN64)
 
@@ -227,7 +229,7 @@ char *my_ctime_r(const time_t *timep, char *buf, size_t buflen) {
 //
 // Answers web connections
 //
-int manage_web_transaction(int sock, const struct sockaddr_in *remote_sin) {
+int manage_web_transaction(int sock) {
 
   my_logf(LL_DEBUG, LP_DATETIME, "Entering web transaction...");
 
@@ -387,6 +389,8 @@ int manage_web_transaction(int sock, const struct sockaddr_in *remote_sin) {
 // Manages web server
 //
 void *webserver(void *p) {
+UNUSED(p);
+
   int listen_sock = server_listen(g_webserver_port, WEBSERVER_LOG_PREFIX);
   if (listen_sock == 0) {
     return NULL;
@@ -399,7 +403,7 @@ void *webserver(void *p) {
   while (1) {
     sock = server_accept(listen_sock, &remote_sin, g_webserver_port, WEBSERVER_LOG_PREFIX);
     while (sock != -1) {
-      if (manage_web_transaction(sock, &remote_sin) != 0) {
+      if (manage_web_transaction(sock) != 0) {
         os_closesocket(sock);
         sock = -1;
         my_logf(LL_VERBOSE, LP_DATETIME, WEBSERVER_LOG_PREFIX ": terminated connection with client");

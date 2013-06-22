@@ -2,6 +2,8 @@
 
 // Copyright Sébastien Millet, 2013
 
+//#define DEBUG
+
 #include <sys/types.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -68,6 +70,7 @@ char *errno_error(char *s, size_t s_len);
 void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *format, ...);
 void my_logs(const loglevel_t log_level, const logdisp_t log_disp, const char *s);
 
+int os_wexitstatus(const int r);
 int find_string(const char **table, int n, const char *elem);
 ssize_t my_getline(char **lineptr, size_t *n, FILE *stream);
 void os_sleep(long int seconds);

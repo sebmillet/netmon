@@ -28,13 +28,21 @@ static pthread_mutex_t util_mutex;
 
 #if defined(_WIN32) || defined(_WIN64)
 
-#include <windows.h>
-
   // * ******* *
   // * WINDOWS *
   // * ******* *
 
+#include <windows.h>
+
 const char FS_SEPARATOR = '\\';
+
+// HAS_TM_GMTOFF is NOT defined under Windows
+// and thus the fnuction below is needed.
+long int os_gmtoff() {
+  TIME_ZONE_INFORMATION TimeZoneInfo;
+  GetTimeZoneInformation(&TimeZoneInfo);
+  return -(TimeZoneInfo.Bias + TimeZoneInfo.DaylightBias) * 60;
+}
 
 void os_sleep(long int seconds) {
   unsigned long int msecs = (unsigned long int)seconds * 1000;
@@ -96,6 +104,10 @@ void os_closesocket(int sock) {
   closesocket(sock);
 }
 
+int os_wexitstatus(const int r) {
+  return r;
+}
+
 int add_reader_access_right(const char *f) {
 UNUSED(f);
 
@@ -112,7 +124,10 @@ UNUSED(f);
   // * *********** *
 
 #include <sys/wait.h>
+
 #define HAS_TM_GMTOFF
+// Because HAS_TM_GMTOFF is defined, the fnuction
+// os_gmtoff is not needed.
 
 const char FS_SEPARATOR = '/';
 
@@ -151,6 +166,10 @@ int os_last_network_op_is_in_progress() {
 
 void os_closesocket(int sock) {
   close(sock);
+}
+
+int os_wexitstatus(const int r) {
+  return WEXITSTATUS(r);
 }
 
 int add_reader_access_right(const char *f) {
@@ -465,7 +484,7 @@ void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, 
 #ifdef HAS_TM_GMTOFF
   *gmtoff = ts.tm_gmtoff;
 #else
-  *gmtoff = 0;
+  *gmtoff = os_gmtoff();
 #endif
 }
 

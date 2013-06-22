@@ -9,12 +9,12 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <signal.h>
 #include <getopt.h>
 #include <stdint.h>
 #include <ctype.h>
 
-/*#define DEBUG*/
 /*#define DEBUG_LOOP*/
 
 #define DEFAULT_CHECK_INTERVAL 120
@@ -43,6 +43,11 @@
 #define LOOP_PREFIX     PACKAGE_NAME
 #define LOOP_POSTFIX    PACKAGE_NAME
 #define LOOP_ARRAY_REALLOC_STEP 60
+  // "subject" is the simplest! It could be
+  //    "x-" PACKAGE_NAME
+  // but x- headers are not guaranteed to be kept along the way...
+  // Also message-ID could be used but you then would need to
+  // determine the domain name.
 #define LOOP_HEADER_REF "subject:"
 #define LAST_STATUS_CHANGE_DISPLAY_SECONDS  (60 * 60 * 23)
 
@@ -932,7 +937,7 @@ int perform_check_program(struct check_t *chk, const struct subst_t *subst, int 
   my_logs(LL_VERBOSE, LP_INDENT, s_substitued);
 
   int r1 = system(s_substitued);
-  int r2 = WEXITSTATUS(r1);
+  int r2 = os_wexitstatus(r1);
   my_logf(LL_VERBOSE, LP_DATETIME, "%s return code: %i", prefix, r2);
   free(s_substitued);
   if (r2 < _NAGIOS_FIRST)
@@ -1137,11 +1142,22 @@ int smtp_mail_sending_post(int sock, const char *prefix, char *email_ref, const 
   char *e;
 
 #define QUEUED_AS " queued as "
-  if ((e = strcasestr(response, QUEUED_AS)) != NULL) {
-    strncpy(email_ref, e + strlen(QUEUED_AS), email_ref_len);
+  size_t l = strlen(response + 1);
+  char *tmp = (char *)malloc(l);
+  int ii;
+  for (ii = 0; response[ii] != '\0'; ++ii) {
+    if (isupper(response[ii]))
+      tmp[ii] = toupper(response[ii]);
+    else
+      tmp[ii] = response[ii];
+  }
+  tmp[ii] = '\0';
+  if ((e = strstr(tmp, QUEUED_AS)) != NULL) {
+    strncpy(email_ref, response + (e - tmp) + strlen(QUEUED_AS), email_ref_len);
     email_ref[email_ref_len - 1] = '\0';
     my_logf(LL_DEBUG, LP_DATETIME, "%s email received by smart host, ref '%s'", prefix, email_ref);
   }
+  free(tmp);
   free(response);
 
   socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
@@ -1768,7 +1784,7 @@ int execute_alert_program(const struct exec_alert_t *exec_alert) {
   my_logf(LL_VERBOSE, LP_DATETIME, "%s will execute the command:", prefix);
   my_logs(LL_VERBOSE, LP_INDENT, s_substitued);
   int r1 = system(s_substitued);
-  int r2 = WEXITSTATUS(r1);
+  int r2 = os_wexitstatus(r1);
   my_logf(LL_VERBOSE, LP_DATETIME, "%s return code: %i", prefix, r2);
   free(s_substitued);
   return r2;
@@ -2685,7 +2701,7 @@ void read_configuration_file(const char *cf, int *nb_errors) {
 
             if (sec == CS_CHECK) {
               ++cur_check;
-              if (cur_check >= sizeof(checks) / sizeof(*checks)) {
+              if (cur_check >= (signed)(sizeof(checks) / sizeof(*checks))) {
                 --cur_check;
                 (*nb_errors)++;
                 my_logf(LL_ERROR, LP_DATETIME,
@@ -2697,7 +2713,7 @@ void read_configuration_file(const char *cf, int *nb_errors) {
               }
             } else if (sec == CS_ALERT) {
               ++cur_alert;
-              if (cur_alert >= sizeof(alerts) / sizeof(*alerts)) {
+              if (cur_alert >= (signed)(sizeof(alerts) / sizeof(*alerts))) {
                 --cur_alert;
                 (*nb_errors)++;
                 my_logf(LL_ERROR, LP_DATETIME,

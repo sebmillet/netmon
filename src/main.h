@@ -37,6 +37,8 @@ char *os_last_err_desc(char *s, size_t s_bufsize);
 void os_init_network();
 int os_last_network_op_is_in_progress();
 void os_closesocket(int sock);
+int socket_read_line_alloc(int sock, char **out, int trace, int *size);
+int socket_line_sendf(int *s, int trace, const char *fmt, ...);
 
 enum {ST_UNDEF = 0, ST_UNKNOWN = 1, ST_OK = 2, ST_FAIL = 3, _ST_LAST = 3, _ST_NBELEMS = 4};
 enum {EC_OK, EC_RESOLVE_ERROR, EC_CONNECTION_ERROR, EC_UNEXPECTED_ANSWER};
