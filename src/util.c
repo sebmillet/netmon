@@ -15,6 +15,9 @@
 #include <pthread.h>
 #include <ctype.h>
 
+#include <unistd.h>
+#include <sys/stat.h>
+
 loglevel_t g_current_log_level = LL_NORMAL;
 
 char g_log_file[SMALLSTRSIZE];
