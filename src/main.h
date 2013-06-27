@@ -11,10 +11,6 @@
 #include <sys/types.h>
 #include <time.h>
 
-#if defined(_WIN32) || defined(_WIN64)
-typedef int socklen_t;
-#endif
-
 #define BIND_ERROR -1
 #define LISTEN_ERROR -1
 #define ACCEPT_ERROR -1

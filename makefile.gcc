@@ -34,7 +34,8 @@ DEBUG ?= 0
 ### Variables: ###
 
 CPPDEPS = -MT$@ -MF$@.d -MD -MP
-NETMON_CFLAGS = -W -Wall $(__DEBUG_FLAG) $(__OPTIMIZE_FLAG_4) $(CPPFLAGS) \
+NETMON_CFLAGS = -W -Wall $(__DEBUG_FLAG) $(__OPTIMIZE_FLAG_4) \
+	-I"C:\openssl\include" -I"C:\pthreads" -DPTW32_STATIC_LIB $(CPPFLAGS) \
 	$(CFLAGS)
 NETMON_OBJECTS =  \
 	build\netmon_main.o \
@@ -75,7 +76,7 @@ clean:
 	-if exist build\netmon.exe del build\netmon.exe
 
 build\netmon.exe: $(NETMON_OBJECTS)
-	$(CC) -o $@ $(NETMON_OBJECTS)   $(__DEBUG_FLAG) $(LDFLAGS)  -lWs2_32 -lAdvapi32 -lShell32 -lpthread
+	$(CC) -o $@ $(NETMON_OBJECTS)   $(__DEBUG_FLAG) -L"C:\openssl\lib" -L"C:\pthreads" $(LDFLAGS)  -lssl -lcrypto -lWs2_32 -lAdvapi32 -lShell32 -lpthreadGC2
 
 build\netmon_main.o: src/main.c
 	$(CC) -c -o $@ $(NETMON_CFLAGS) $(CPPDEPS) $<

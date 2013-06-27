@@ -7,8 +7,15 @@
 #include <sys/types.h>
 #include <pthread.h>
 #include <stdio.h>
-#include <netinet/in.h>
 #include <openssl/ssl.h>
+
+#if defined(_WIN32) || defined(_WIN64)
+  // WINDOWS
+#include <winsock2.h>
+#else
+  // NOT WINDOWS
+#include <netinet/in.h>
+#endif
 
 #define FALSE 0
 #define TRUE  1
@@ -17,7 +24,9 @@
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
 #endif
-
+#if defined(_WIN32) || defined(_WIN64)
+typedef int socklen_t;
+#endif
 
 #define MAX_READLINE_SIZE 10000
 

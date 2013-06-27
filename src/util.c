@@ -14,8 +14,6 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 
 #include <openssl/err.h>
 
@@ -131,6 +129,8 @@ UNUSED(f);
   // * *********** *
 
 #include <sys/wait.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 #define HAS_TM_GMTOFF
 // Because HAS_TM_GMTOFF is defined, the fnuction
