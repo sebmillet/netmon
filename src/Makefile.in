@@ -54,8 +54,6 @@ am_netmon_OBJECTS = main.$(OBJEXT) util.$(OBJEXT) webserver.$(OBJEXT) \
 	st-fail.$(OBJEXT)
 netmon_OBJECTS = $(am_netmon_OBJECTS)
 netmon_LDADD = $(LDADD)
-netmon_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(netmon_LDFLAGS) \
-	$(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/admin/depcomp
 am__depfiles_maybe = depfiles
@@ -169,7 +167,6 @@ netmon_SOURCES = main.c main.h util.c util.h webserver.c \
 	img/st-ok.png img/st-ok.c \
 	img/st-fail.png img/st-fail.c
 
-netmon_LDFLAGS = -lpthread
 all: all-am
 
 .SUFFIXES:
@@ -243,7 +240,7 @@ clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
 netmon$(EXEEXT): $(netmon_OBJECTS) $(netmon_DEPENDENCIES) $(EXTRA_netmon_DEPENDENCIES) 
 	@rm -f netmon$(EXEEXT)
-	$(netmon_LINK) $(netmon_OBJECTS) $(netmon_LDADD) $(LIBS)
+	$(LINK) $(netmon_OBJECTS) $(netmon_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -532,6 +529,8 @@ uninstall-am: uninstall-binPROGRAMS
 	mostlyclean-generic pdf pdf-am ps ps-am tags uninstall \
 	uninstall-am uninstall-binPROGRAMS
 
+
+# netmon_LDFLAGS=-lpthread -lssl
 
 img/st-undef.c: img/st-undef.png
 	img/rdtosrc.sh $<

@@ -7,7 +7,7 @@ netmon_SOURCES=main.c main.h util.c util.h webserver.c \
 	img/st-ok.png img/st-ok.c \
 	img/st-fail.png img/st-fail.c
 
-netmon_LDFLAGS=-lpthread
+# netmon_LDFLAGS=-lpthread -lssl
 
 img/st-undef.c: img/st-undef.png
 	img/rdtosrc.sh $<

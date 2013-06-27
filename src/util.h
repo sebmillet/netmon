@@ -7,9 +7,19 @@
 #include <sys/types.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <netinet/in.h>
+#include <openssl/ssl.h>
 
 #define FALSE 0
 #define TRUE  1
+
+#define CONNECT_ERROR -1
+#ifndef SOCKET_ERROR
+#define SOCKET_ERROR -1
+#endif
+
+
+#define MAX_READLINE_SIZE 10000
 
 #define SMALLSTRSIZE  200
 #define BIGSTRSIZE    1000
@@ -49,12 +59,24 @@ void dbg_write(const char *fmt, ...);
 typedef enum {LL_ERROR = -1, LL_WARNING = 0, LL_NORMAL = 1, LL_VERBOSE = 2, LL_DEBUG = 3} loglevel_t;
   // Type of prefix output in the log
 typedef enum {LP_DATETIME, LP_NOTHING, LP_INDENT} logdisp_t;
+  // Return value of socket-based functions
+enum {SRT_SUCCESS, SRT_SOCKET_ERROR, SRT_UNEXPECTED_ANSWER};
 
 struct subst_t {
   const char *find;
   const char *replace;
 };
 char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n);
+
+  // Replaces a simple "int sock" in connection functions, so
+  // as to allow SSL-based operations.
+enum {CONNTYPE_NONE, CONNTYPE_PLAIN, CONNTYPE_SSL};
+struct connection_t {
+    int type;
+    int sock;
+    SSL *ssl_handle;
+    SSL_CTX *ssl_context;
+};
 
 #define STR_LOG_TIMESTAMP 25
 void set_log_timestamp(char *s, size_t s_len,
@@ -90,4 +112,12 @@ void my_pthread_mutex_lock(pthread_mutex_t *m);
 void my_pthread_mutex_unlock(pthread_mutex_t *m);
 void my_pthread_mutex_init(pthread_mutex_t *m);
 void util_my_pthread_init();
+
+int socket_line_sendf(int *s, int trace, const char *fmt, ...);
+int socket_read_line_alloc(int sock, char **out, int trace, int *size);
+int connect_with_timeout(const struct sockaddr_in *server, int *connection_sock, struct timeval *tv, const char *desc);
+int socket_round_trip(int sock, const char *expect, int trace, const char *fmt, ...);
+int s_begins_with(const char *s, const char *begins_with);
+
+char *ssl_get_error(const unsigned long e, char *s, const size_t s_len);
 

@@ -56,9 +56,6 @@ const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
 
 const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
 
-#define PREFIX_RECEIVED "<<< "
-#define PREFIX_SENT ">>> "
-
   // Don't update the one below unless you know what you're doing!
   // Linked to test_linux directory scripts
 #define TEST2_NB_LOOPS  199
@@ -80,16 +77,12 @@ void web_create_img_files();
 
   // NOT WINDOWS
 
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <netdb.h>
 
 #endif
 
 #define DEFAULT_BUFFER_SIZE 10000
   // Maximum size of an input line in the TCP connection
-#define MAX_READLINE_SIZE 10000
 
 
 //
@@ -620,198 +613,6 @@ void get_unique_mime_boundary(char *boundary, size_t boundary_len) {
 }
 
 //
-// Connect to a remote host, with a timeout
-// Return 0 if success, a non-zero value if failure
-//
-int connect_with_timeout(const struct sockaddr_in *server, int *connection_sock, struct timeval *tv, const char *desc) {
-  fd_set fdset;
-  FD_ZERO(&fdset);
-  FD_SET((unsigned int)*connection_sock, &fdset);
-
-  os_set_sock_nonblocking_mode(*connection_sock);
-
-  char s_err[ERR_STR_BUFSIZE];
-
-  int res = 0;
-  if (connect(*connection_sock, (struct sockaddr *)server, sizeof(*server)) == CONNECT_ERROR) {
-    if (os_last_network_op_is_in_progress()) {
-      if (select((*connection_sock) + 1, NULL, &fdset, NULL, tv) <= 0) {
-        my_logf(LL_ERROR, LP_DATETIME, "Timeout connecting to %s, %s", desc, os_last_err_desc(s_err, sizeof(s_err)));
-        res = 1;
-      } else {
-        char so_error;
-        socklen_t len = sizeof(so_error);
-        getsockopt(*connection_sock, SOL_SOCKET, SO_ERROR, &so_error, &len);
-        if (so_error != 0) {
-          my_logf(LL_ERROR, LP_DATETIME, "Socket error connecting to %s, code=%i (%s)", desc, so_error, strerror(so_error));
-        }
-        res = (so_error != 0);
-      }
-    } else {
-      my_logf(LL_ERROR, LP_DATETIME, "Error connecting to %s, %s", desc, os_last_err_desc(s_err, sizeof(s_err)));
-      res = 1;
-    }
-  } else {
-    abort();
-  }
-
-  os_set_sock_blocking_mode(*connection_sock);
-
-  return res;
-}
-
-//
-// Receives a line from a socket (terminated by \015\010)
-// Return -1 if an error occured, 1 if reading is successful,
-// 0 if transmission is closed.
-//
-int socket_read_line_alloc(int sock, char **out, int trace, int *size) {
-  const int INITIAL_READLINE_BUFFER_SIZE = 100;
-
-  int i = 0;
-  int cr = FALSE;
-  char ch;
-  int nb;
-
-  if (*out == NULL) {
-    *size = INITIAL_READLINE_BUFFER_SIZE;
-    *out = (char *)malloc(*size);
-  }
-
-  for (;;) {
-    if ((nb = recv(sock, &ch, 1, 0)) == SOCKET_ERROR) {
-      char s_err[ERR_STR_BUFSIZE];
-      my_logf(LL_ERROR, LP_DATETIME, "Error reading socket, error %s", os_last_err_desc(s_err, sizeof(s_err)));
-      os_closesocket(sock);
-      return -1;
-    }
-
-    if (i >= *size) {
-      if (*size * 2 <= MAX_READLINE_SIZE) {
-        *size *= 2;
-        *out = (char *)realloc(*out, *size);
-      } else {
-        (*out)[*size - 1] = '\0';
-        break;
-      }
-    }
-
-    if (nb == 0) {
-      (*out)[i] = '\0';
-      break;
-    }
-
-    if (ch == '\n') {
-      if (cr && i > 0) {
-        i--;
-      }
-      (*out)[i] = '\0';
-      break;
-    } else {
-      cr = (ch == '\r' ? TRUE : FALSE);
-      (*out)[i] = ch;
-    }
-    i++;
-  }
-
-  if (nb == 0) {
-    return 0;
-  } else {
-    if (trace) {
-      my_logf(LL_VERBOSE, LP_DATETIME, PREFIX_RECEIVED "%s", *out);
-    }
-    return 1;
-  }
-}
-
-//
-// Send a line to a socket
-// Return 0 if OK, -1 if error.
-// Manage logging an error code and closing socket.
-//
-int socket_line_sendf(int *s, int trace, const char *fmt, ...) {
-
-  if (*s == -1) {
-    return -1;
-  }
-
-    // FIXME, used to be malloc'ed but the instruction free(tmp) (later)
-    // crashes the code...
-/*  int l = strlen(fmt) + 100;*/
-/*  char *tmp;*/
-/*  tmp = (char *)malloc(l + 1);*/
-  char tmp[1000];
-
-  va_list args;
-  va_start(args, fmt);
-/*  vsnprintf(tmp, l, fmt, args);*/
-  vsnprintf(tmp, sizeof(tmp), fmt, args);
-  va_end(args);
-
-  if (trace)
-    my_logf(LL_VERBOSE, LP_DATETIME, PREFIX_SENT "%s", tmp);
-
-  strncat(tmp, "\015\012", sizeof(tmp));
-
-  int e = send(*s, tmp, strlen(tmp), 0);
-
-/*  free(tmp);*/
-
-  if (e == SOCKET_ERROR) {
-    char s_err[ERR_STR_BUFSIZE];
-    my_logf(LL_ERROR, LP_DATETIME, "Network I/O error: %s", os_last_err_desc(s_err, sizeof(s_err)));
-    os_closesocket(*s);
-    *s = -1;
-    return -1;
-  }
-
-  return 0;
-}
-
-//
-// Return true if s begins with prefix, false otherwise
-// String comparison is case insensitive
-//
-int s_begins_with(const char *s, const char *begins_with) {
-  return (strncasecmp(s, begins_with, strlen(begins_with)) == 0);
-}
-
-//
-//
-//
-int socket_round_trip(int sock, const char *expect, const char *fmt, ...) {
-
-  int l = strlen(fmt) + 100;
-  char *tmp;
-  tmp = (char *)malloc(l + 1);
-
-  va_list args;
-  va_start(args, fmt);
-  vsnprintf(tmp, l, fmt, args);
-  va_end(args);
-
-  int e = socket_line_sendf(&sock, g_trace_network_traffic, tmp);
-  free(tmp);
-  if (e)
-    return SRT_SOCKET_ERROR;
-
-  char *response = NULL;
-  int response_size;
-  if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0) {
-    free(response);
-    return SRT_SOCKET_ERROR;
-  }
-
-  if (s_begins_with(response, expect)) {
-    free(response);
-    return SRT_SUCCESS;
-  }
-
-  free(response);
-  return SRT_UNEXPECTED_ANSWER;
-}
-
-//
 // Fill a string with current date/time, format is
 //    dd/mm hh:mm:ss
 //
@@ -842,7 +643,10 @@ void get_str_alert_info(char *s, size_t s_len, const struct tm *ts) {
 }
 
 //
-//
+// Establish a connection, including all what it takes ->
+//    Host name resolution
+//    TCP connection open
+//    Check server answer
 //
 int establish_connection(const char *host_name, int port, const char *expect, int timeout, int *sock, const char *prefix) {
   my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, host_name, port);
@@ -1070,7 +874,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, i
   from_buf[from_buf_len - 1] = '\0';
   env->from = from_buf;
   env->from = smtp_address(env->from);
-  if (socket_round_trip(*sock, "250 ", "MAIL FROM: <%s>", env->from) != SRT_SUCCESS) {
+  if (socket_round_trip(*sock, "250 ", g_trace_network_traffic, "MAIL FROM: <%s>", env->from) != SRT_SUCCESS) {
     socket_line_sendf(sock, g_trace_network_traffic, "QUIT");
     my_logf(LL_ERROR, LP_DATETIME, "%s sender not accepted, closing connection", prefix);
     return ERR_SMTP_SENDER_REJECTED;
@@ -1091,7 +895,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, i
     r = smtp_address(r);
     if (strlen(r) >= 1) {
       env->nb_recipients_wanted++;
-      int res = socket_round_trip(*sock, "250 ", "RCPT TO: <%s>", r);
+      int res = socket_round_trip(*sock, "250 ", g_trace_network_traffic, "RCPT TO: <%s>", r);
       if (res == SRT_SUCCESS)
         env->nb_recipients_ok++;
       else if (res != SRT_SUCCESS && res != SRT_UNEXPECTED_ANSWER) {
@@ -1111,7 +915,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, i
   }
 
   int res;
-  if ((res = socket_round_trip(*sock, "354 ", "DATA")) != SRT_SUCCESS) {
+  if ((res = socket_round_trip(*sock, "354 ", g_trace_network_traffic, "DATA")) != SRT_SUCCESS) {
     my_logf(LL_ERROR, LP_DATETIME, "%s DATA command not accepted, closing connection", prefix);
     return (res == SRT_SOCKET_ERROR ? ERR_SMTP_NETIO : ERR_SMTP_DATA_COMMAND_REJECTED);
   }
@@ -1355,7 +1159,7 @@ UNUSED(subst_len);
   if (ec != EC_OK)
     return (ec == EC_RESOLVE_ERROR ? ERR_POP3_RESOLVE_ERROR : ERR_POP3_NETIO);
 
-  if ((r = socket_round_trip(sock, "+OK ", "USER %s", pop3->user)) != SRT_SUCCESS) {
+  if ((r = socket_round_trip(sock, "+OK ", g_trace_network_traffic, "USER %s", pop3->user)) != SRT_SUCCESS) {
     if (r != SRT_SOCKET_ERROR) {
       socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
       my_logf(LL_ERROR, LP_DATETIME, "%s user not accepted, closing connection", prefix);
@@ -1366,7 +1170,7 @@ UNUSED(subst_len);
     }
   }
 
-  if ((r = socket_round_trip(sock, "+OK ", "PASS %s", pop3->password)) != SRT_SUCCESS) {
+  if ((r = socket_round_trip(sock, "+OK ", g_trace_network_traffic, "PASS %s", pop3->password)) != SRT_SUCCESS) {
     if (r != SRT_SOCKET_ERROR) {
       socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
       my_logf(LL_ERROR, LP_DATETIME, "%s user not accepted, closing connection", prefix);
@@ -1423,7 +1227,7 @@ UNUSED(subst_len);
 
 // 1. Retrieve email headers
 
-    if ((r = socket_round_trip(sock, "+OK ", "TOP %d 0", I)) == SRT_SOCKET_ERROR) {
+    if ((r = socket_round_trip(sock, "+OK ", g_trace_network_traffic, "TOP %d 0", I)) == SRT_SOCKET_ERROR) {
       free(response);
       return ERR_POP3_NETIO;
     } else if (r == SRT_UNEXPECTED_ANSWER) {
@@ -1455,7 +1259,7 @@ UNUSED(subst_len);
       my_logf(LL_DEBUG, LP_DATETIME, "%s email %d of reference '%s' is mine", prefix, I, header_value);
       loop_manage_retrieved_email(header_value, prefix);
 
-      if ((r = socket_round_trip(sock, "+OK ", "DELE %d", I)) == SRT_SOCKET_ERROR) {
+      if ((r = socket_round_trip(sock, "+OK ", g_trace_network_traffic, "DELE %d", I)) == SRT_SOCKET_ERROR) {
         free(header_value);
         free(response);
         return ERR_POP3_NETIO;

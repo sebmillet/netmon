@@ -4,7 +4,6 @@
 
 #include "util.h"
 
-#include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,11 +11,16 @@
 #include <fcntl.h>
 #include <sys/time.h>
 #include <time.h>
-#include <pthread.h>
 #include <ctype.h>
-
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+#include <openssl/err.h>
+
+#define PREFIX_RECEIVED "<<< "
+#define PREFIX_SENT ">>> "
 
 loglevel_t g_current_log_level = LL_NORMAL;
 
@@ -593,5 +597,204 @@ void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *f
   size_t dt_len = strlen(dt);
   strncat(dt, str, sizeof(dt));
   my_log_core_output(dt, dt_len);
+}
+
+//
+// Return true if s begins with prefix, false otherwise
+// String comparison is case insensitive
+//
+int s_begins_with(const char *s, const char *begins_with) {
+  return (strncasecmp(s, begins_with, strlen(begins_with)) == 0);
+}
+
+//
+// Connect to a remote host, with a timeout
+// Return 0 if success, a non-zero value if failure
+//
+int connect_with_timeout(const struct sockaddr_in *server, int *connection_sock, struct timeval *tv, const char *desc) {
+  fd_set fdset;
+  FD_ZERO(&fdset);
+  FD_SET((unsigned int)*connection_sock, &fdset);
+
+  os_set_sock_nonblocking_mode(*connection_sock);
+
+  char s_err[ERR_STR_BUFSIZE];
+
+  int res = 0;
+  if (connect(*connection_sock, (struct sockaddr *)server, sizeof(*server)) == CONNECT_ERROR) {
+    if (os_last_network_op_is_in_progress()) {
+      if (select((*connection_sock) + 1, NULL, &fdset, NULL, tv) <= 0) {
+        my_logf(LL_ERROR, LP_DATETIME, "Timeout connecting to %s, %s", desc, os_last_err_desc(s_err, sizeof(s_err)));
+        res = 1;
+      } else {
+        char so_error;
+        socklen_t len = sizeof(so_error);
+        getsockopt(*connection_sock, SOL_SOCKET, SO_ERROR, &so_error, &len);
+        if (so_error != 0) {
+          my_logf(LL_ERROR, LP_DATETIME, "Socket error connecting to %s, code=%i (%s)", desc, so_error, strerror(so_error));
+        }
+        res = (so_error != 0);
+      }
+    } else {
+      my_logf(LL_ERROR, LP_DATETIME, "Error connecting to %s, %s", desc, os_last_err_desc(s_err, sizeof(s_err)));
+      res = 1;
+    }
+  } else {
+    abort();
+  }
+
+  os_set_sock_blocking_mode(*connection_sock);
+
+  return res;
+}
+
+//
+// Receives a line from a socket (terminated by \015\010)
+// Return -1 if an error occured, 1 if reading is successful,
+// 0 if transmission is closed.
+//
+int socket_read_line_alloc(int sock, char **out, int trace, int *size) {
+  const int INITIAL_READLINE_BUFFER_SIZE = 100;
+
+  int i = 0;
+  int cr = FALSE;
+  char ch;
+  int nb;
+
+  if (*out == NULL) {
+    *size = INITIAL_READLINE_BUFFER_SIZE;
+    *out = (char *)malloc(*size);
+  }
+
+  for (;;) {
+    if ((nb = recv(sock, &ch, 1, 0)) == SOCKET_ERROR) {
+      char s_err[ERR_STR_BUFSIZE];
+      my_logf(LL_ERROR, LP_DATETIME, "Error reading socket, error %s", os_last_err_desc(s_err, sizeof(s_err)));
+      os_closesocket(sock);
+      return -1;
+    }
+
+    if (i >= *size) {
+      if (*size * 2 <= MAX_READLINE_SIZE) {
+        *size *= 2;
+        *out = (char *)realloc(*out, *size);
+      } else {
+        (*out)[*size - 1] = '\0';
+        break;
+      }
+    }
+
+    if (nb == 0) {
+      (*out)[i] = '\0';
+      break;
+    }
+
+    if (ch == '\n') {
+      if (cr && i > 0) {
+        i--;
+      }
+      (*out)[i] = '\0';
+      break;
+    } else {
+      cr = (ch == '\r' ? TRUE : FALSE);
+      (*out)[i] = ch;
+    }
+    i++;
+  }
+
+  if (nb == 0) {
+    return 0;
+  } else {
+    if (trace) {
+      my_logf(LL_VERBOSE, LP_DATETIME, PREFIX_RECEIVED "%s", *out);
+    }
+    return 1;
+  }
+}
+
+//
+// Send a line to a socket
+// Return 0 if OK, -1 if error.
+// Manage logging an error code and closing socket.
+//
+int socket_line_sendf(int *s, int trace, const char *fmt, ...) {
+
+  if (*s == -1) {
+    return -1;
+  }
+
+    // FIXME, used to be malloc'ed but the instruction free(tmp) (later)
+    // crashes the code...
+/*  int l = strlen(fmt) + 100;*/
+/*  char *tmp;*/
+/*  tmp = (char *)malloc(l + 1);*/
+  char tmp[1000];
+
+  va_list args;
+  va_start(args, fmt);
+/*  vsnprintf(tmp, l, fmt, args);*/
+  vsnprintf(tmp, sizeof(tmp), fmt, args);
+  va_end(args);
+
+  if (trace)
+    my_logf(LL_VERBOSE, LP_DATETIME, PREFIX_SENT "%s", tmp);
+
+  strncat(tmp, "\015\012", sizeof(tmp));
+
+  int e = send(*s, tmp, strlen(tmp), 0);
+
+/*  free(tmp);*/
+
+  if (e == SOCKET_ERROR) {
+    char s_err[ERR_STR_BUFSIZE];
+    my_logf(LL_ERROR, LP_DATETIME, "Network I/O error: %s", os_last_err_desc(s_err, sizeof(s_err)));
+    os_closesocket(*s);
+    *s = -1;
+    return -1;
+  }
+
+  return 0;
+}
+
+//
+// Send a string to a socket and chck answer (telnet-style communication)
+//
+int socket_round_trip(int sock, const char *expect, int trace, const char *fmt, ...) {
+  int l = strlen(fmt) + 100;
+  char *tmp;
+  tmp = (char *)malloc(l + 1);
+
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(tmp, l, fmt, args);
+  va_end(args);
+
+  int e = socket_line_sendf(&sock, trace, tmp);
+  free(tmp);
+  if (e)
+    return SRT_SOCKET_ERROR;
+
+  char *response = NULL;
+  int response_size;
+  if (socket_read_line_alloc(sock, &response, trace, &response_size) < 0) {
+    free(response);
+    return SRT_SOCKET_ERROR;
+  }
+
+  if (s_begins_with(response, expect)) {
+    free(response);
+    return SRT_SUCCESS;
+  }
+
+  free(response);
+  return SRT_UNEXPECTED_ANSWER;
+}
+
+//
+// Sets the string passed as argument to the last SSL error
+//
+char *ssl_get_error(const unsigned long e, char *s, const size_t s_len) {
+  ERR_error_string_n(e, s, s_len);
+  return s;
 }
 

@@ -11,10 +11,6 @@
 #include <sys/types.h>
 #include <time.h>
 
-#ifndef SOCKET_ERROR
-#define SOCKET_ERROR -1
-#endif
-
 #if defined(_WIN32) || defined(_WIN64)
 typedef int socklen_t;
 #endif
@@ -22,7 +18,6 @@ typedef int socklen_t;
 #define BIND_ERROR -1
 #define LISTEN_ERROR -1
 #define ACCEPT_ERROR -1
-#define CONNECT_ERROR -1
 #define SELECT_ERROR -1
 #define RECV_ERROR -1
 #define SEND_ERROR -1
@@ -42,7 +37,6 @@ int socket_line_sendf(int *s, int trace, const char *fmt, ...);
 
 enum {ST_UNDEF = 0, ST_UNKNOWN = 1, ST_OK = 2, ST_FAIL = 3, _ST_LAST = 3, _ST_NBELEMS = 4};
 enum {EC_OK, EC_RESOLVE_ERROR, EC_CONNECTION_ERROR, EC_UNEXPECTED_ANSWER};
-enum {SRT_SUCCESS, SRT_SOCKET_ERROR, SRT_UNEXPECTED_ANSWER};
 enum {ERR_SMTP_OK = 0, ERR_SMTP_RESOLVE_ERROR, ERR_SMTP_NETIO, ERR_SMTP_BAD_ANSWER_TO_EHLO, ERR_SMTP_SENDER_REJECTED,
   ERR_SMTP_NO_RECIPIENT_ACCEPTED, ERR_SMTP_DATA_COMMAND_REJECTED, ERR_SMTP_EMAIL_RECEPTION_NOT_CONFIRMED,
   ERR_SMTP_INVALID_PORT_NUMBER};
