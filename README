@@ -2,7 +2,7 @@
    netmon, a portable TCP probing program
    ======================================
 
-$Date: 2013-04-30 21:52:00 +0200 (mar. 30 avril 2013) $
+$Date: 2013-06-29 18:09:00 +0200 (sam. 29 juin 2013) $
 
 Contents:
 
@@ -15,15 +15,20 @@ Contents:
 
 I.    WHAT IS NETMON?
 
-It is meant to probe hosts for availability on TCP ports.
+It is meant to do TCP connection tests at regular intervals, and publish the
+status on a web server included in netmon.
+The check can also be an external program as per NAGIOS standard.
+It can raise an alert when a check fails.
+Compatible with SSL/TLS.
 
 
 
 II.   WHY NETMON?
 
 I wanted a minimalistic program compatible with Windows and Linux out of the
-box - Shinken is perfect but Windows compatibility is done to the expense of
-massive compatibility layers. Also I wanted something small and easy to
+box.
+Shinken is perfect but Windows compatibility is done to the expense of massive
+compatibility layers. Also I wanted something small and very simple to
 configure.
 
 
@@ -48,10 +53,23 @@ This INSTALL file is the one provided by default by autotools.
 
 - Windows
 
-You have to install Mingw and run
+1) You have to install Mingw and run
     mingw32-make.exe -f makefile.gcc
-Mingw is licensed under GPL mostly (as of beginning of 2012), its homepage is
+  Mingw is licensed under GPL mostly (as of beginning of 2012), its homepage is
     http://www.mingw.org
+
+2) openssl must be available for static linking in c:\openssl, see below for
+  instructions as to how to build it. To be more precise:
+  Libs in c:\openssl\lib
+  Includes in c:\openssl\include
+
+3) pthreads must be available for static linking in c:\pthreads, see below for
+  instructions as to how to build it. To be more precise:
+  Libs in c:\pthreads
+  Includes in c:\pthreads
+
+If openssl or pthreads is not available in the directories mentionned above,
+see below the paragraph "Mingw makefile generation" to rebuild makefile.
 
 Borland was not tested, neither Visual C++. If ever used, one showstopper to
 fix will be the getopt library, used to parse long options.
@@ -64,4 +82,40 @@ Mingw makefile generation
     Bakefile is a system allowing multi-platforms control of compilation, you
     can find it here:
         http://www.bakefile.org
+
+To build a static version of openssl with mingw, see the following URLs:
+    http://stackoverflow.com/questions/9379363/how-to-build-openssl-with-mingw-in-windows
+    http://www.wagner.pp.ru/~vitus/articles/openssl-mingw.html
+    http://lists.pjsip.org/pipermail/pjsip_lists.pjsip.org/2008-February/001644.html
+
+  Instructions:
+
+  1. Download the source from there and extract it:
+    http://www.openssl.org/source/openssl-1.0.1e.tar.gz
+  2. Open a MSYS window (from MinGW\msys\1.0\msys.bat)
+  3. Run the command (32 bits)
+    perl Configure mingw no-shared no-asm --prefix=/c/openssl
+  Or (64 bits)
+    perl Configure mingw64 no-shared no-asm --prefix=/c/openssl-x64
+  4. Run
+    make
+    make install
+  5. Under the directory you built openssl in, you will find the libraries, example:
+    C:\openssl\lib\libcrypto.a
+    C:\openssl\lib\libssl.a
+
+To build a static version of pthreads with mingw, see the following URL:
+    http://www.sourceware.org/pthreads-win32/
+
+  Instructions:
+
+  1. Download the source from here and extract it:
+    ftp://sourceware.org/pub/pthreads-win32/pthreads-w32-2-9-1-release.tar.gz
+  2. Open a MSYS window (from MinGW\msys\1.0\msys.bat)
+  3. Run the command
+    make GC-static
+  The compiled code linked against static libpthreads MUST be compiled with the defined macro
+  -DPTW32_STATIC_LIB
+
+You're done!
 
