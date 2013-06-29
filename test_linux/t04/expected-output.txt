@@ -252,7 +252,7 @@ Performing check tcp(My POP3)
 TCP check(My POP3): connecting to localhost:13529...
 Running gethosbyname() on localhost
 Will connect to localhost:13529, timeout = 5
-Socket error connecting to localhost:13529, code=111 (Connection refused)
+TCP check(My POP3): network error connecting to localhost:13529, code=111 (Connection refused)
 TCP check(My POP3): disconnected from localhost:13529
 My POP3 -> ** KO **
 Performing check tcp(Test avec nom inconnu)

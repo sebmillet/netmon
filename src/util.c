@@ -17,9 +17,6 @@
 
 #include <openssl/err.h>
 
-#define PREFIX_RECEIVED "<<< "
-#define PREFIX_SENT ">>> "
-
 loglevel_t g_current_log_level = LL_NORMAL;
 
 char g_log_file[SMALLSTRSIZE];
@@ -30,6 +27,11 @@ long int g_log_usec = DEFAULT_LOG_USEC;
 FILE *log_fd;
 
 static pthread_mutex_t util_mutex;
+
+const struct connection_table_t connection_table[] = {
+  {conn_plain_read, "<<< ", conn_plain_write, ">>> "},  // CONNTYPE_PLAIN
+  {conn_ssl_read,   "S<< ", conn_ssl_write,   "S>> "}   // CONNTYPE_SSL
+};
 
 #if defined(_WIN32) || defined(_WIN64)
 
@@ -54,14 +56,14 @@ void os_sleep(long int seconds) {
   Sleep(msecs);
 }
 
-void os_set_sock_nonblocking_mode(int sock) {
+static void os_set_sock_nonblocking_mode(int sock) {
   u_long iMode = 1;
   int iResult = ioctlsocket(sock, FIONBIO, &iMode);
   if (iResult != NO_ERROR)
     fatal_error("ioctlsocket failed with error: %ld", iResult);
 }
 
-void os_set_sock_blocking_mode(int sock) {
+static void os_set_sock_blocking_mode(int sock) {
   u_long iMode = 0;
   int iResult = ioctlsocket(sock, FIONBIO, &iMode);
   if (iResult != NO_ERROR)
@@ -105,7 +107,7 @@ int os_last_network_op_is_in_progress() {
   return (WSAGetLastError() == WSAEINPROGRESS || WSAGetLastError() == WSAEWOULDBLOCK);
 }
 
-void os_closesocket(int sock) {
+static void os_closesocket(int sock) {
   closesocket(sock);
 }
 
@@ -131,6 +133,7 @@ UNUSED(f);
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netdb.h>
 
 #define HAS_TM_GMTOFF
 // Because HAS_TM_GMTOFF is defined, the fnuction
@@ -171,7 +174,7 @@ int os_last_network_op_is_in_progress() {
   return (errno == EINPROGRESS);
 }
 
-void os_closesocket(int sock) {
+static void os_closesocket(int sock) {
   close(sock);
 }
 
@@ -609,43 +612,156 @@ int s_begins_with(const char *s, const char *begins_with) {
 
 //
 // Connect to a remote host, with a timeout
-// Return 0 if success, a non-zero value if failure
+// Return EC_* code.
 //
-int connect_with_timeout(const struct sockaddr_in *server, int *connection_sock, struct timeval *tv, const char *desc) {
+int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct timeval *tv, const char *desc, const char *prefix) {
   fd_set fdset;
   FD_ZERO(&fdset);
-  FD_SET((unsigned int)*connection_sock, &fdset);
+  FD_SET((unsigned int)(conn->sock), &fdset);
 
-  os_set_sock_nonblocking_mode(*connection_sock);
+  os_set_sock_nonblocking_mode(conn->sock);
 
   char s_err[ERR_STR_BUFSIZE];
 
-  int res = 0;
-  if (connect(*connection_sock, (struct sockaddr *)server, sizeof(*server)) == CONNECT_ERROR) {
+  int cr = CONNRES_OK;
+  if (connect(conn->sock, (struct sockaddr *)server, sizeof(*server)) == CONNECT_ERROR) {
     if (os_last_network_op_is_in_progress()) {
-      if (select((*connection_sock) + 1, NULL, &fdset, NULL, tv) <= 0) {
-        my_logf(LL_ERROR, LP_DATETIME, "Timeout connecting to %s, %s", desc, os_last_err_desc(s_err, sizeof(s_err)));
-        res = 1;
+      if (select((conn->sock) + 1, NULL, &fdset, NULL, tv) <= 0) {
+        my_logf(LL_ERROR, LP_DATETIME, "%s timeout connecting to %s, %s", prefix, desc, os_last_err_desc(s_err, sizeof(s_err)));
+        cr = CONNRES_CONNECTION_TIMEOUT;
       } else {
         char so_error;
         socklen_t len = sizeof(so_error);
-        getsockopt(*connection_sock, SOL_SOCKET, SO_ERROR, &so_error, &len);
+        getsockopt(conn->sock, SOL_SOCKET, SO_ERROR, &so_error, &len);
         if (so_error != 0) {
-          my_logf(LL_ERROR, LP_DATETIME, "Socket error connecting to %s, code=%i (%s)", desc, so_error, strerror(so_error));
+          my_logf(LL_ERROR, LP_DATETIME, "%s network error connecting to %s, code=%i (%s)", prefix, desc, so_error, strerror(so_error));
         }
-        res = (so_error != 0);
+        cr = so_error != 0 ? CONNRES_NETIO : CONNRES_OK;
       }
     } else {
-      my_logf(LL_ERROR, LP_DATETIME, "Error connecting to %s, %s", desc, os_last_err_desc(s_err, sizeof(s_err)));
-      res = 1;
+      my_logf(LL_ERROR, LP_DATETIME, "%s error connecting to %s, %s", prefix, desc, os_last_err_desc(s_err, sizeof(s_err)));
+      cr = CONNRES_CONNECTION_ERROR;
     }
   } else {
-    abort();
+    my_logf(LL_ERROR, LP_DATETIME, "%s unknown error connecting to %s", prefix, desc);
+    cr = CONNRES_CONNECTION_ERROR;
   }
 
-  os_set_sock_blocking_mode(*connection_sock);
+  if (cr != CONNRES_OK) {
+    conn->sock = -1;
+    return cr;
+  }
 
-  return res;
+  if (conn->type == CONNTYPE_PLAIN) {
+    os_set_sock_blocking_mode(conn->sock);
+    return CONNRES_OK;
+  }
+
+  int r;
+
+    // Assume we are a v2 or v3 client
+  if ((conn->ssl_context = SSL_CTX_new(SSLv23_client_method())) == NULL) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)", prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
+    cr = CONNRES_SSL_CONNECTION_ERROR;
+  } else if ((conn->ssl_handle = SSL_new(conn->ssl_context)) == NULL) /* Create SSL connection */ {
+    my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)", prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
+    cr =  CONNRES_SSL_CONNECTION_ERROR;
+  } else if (!SSL_set_fd(conn->ssl_handle, conn->sock)) /* Connect the SSL struct to our connection */ {
+    my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)", prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
+    cr = CONNRES_SSL_CONNECTION_ERROR;
+  }
+  
+  if (cr == CONNRES_OK) {
+    r = SSL_connect(conn->ssl_handle);  /* Initiate SSL handshake */
+    dbg_write("r = %d, want_write = %d, want_read = %d, lasterr = %d\n", r, SSL_ERROR_WANT_WRITE, SSL_ERROR_WANT_READ, ERR_get_error());
+    if (select((conn->sock) + 1, NULL, &fdset, NULL, tv) <= 0) {
+      my_logf(LL_ERROR, LP_DATETIME, "%s timeout handshaking to %s, %s", prefix, desc, os_last_err_desc(s_err, sizeof(s_err)));
+      cr = CONNRES_CONNECTION_TIMEOUT;
+    } else {
+      char so_error;
+      socklen_t len = sizeof(so_error);
+      getsockopt(conn->sock, SOL_SOCKET, SO_ERROR, &so_error, &len);
+      if (so_error != 0) {
+        my_logf(LL_ERROR, LP_DATETIME, "%s network error connecting to %s, code=%i (%s)", prefix, desc, so_error, strerror(so_error));
+      }
+      cr = so_error != 0 ? CONNRES_NETIO : CONNRES_OK;
+    }
+  }
+  
+  if (cr == CONNRES_OK) {
+    my_logf(LL_DEBUG, LP_DATETIME, "%s SSL: handshake [%s] successful", prefix, desc);
+    os_set_sock_blocking_mode(conn->sock);
+  } else {
+    conn_close(conn);
+  }
+
+  return cr;
+}
+
+//
+// Establish a connection, including all what it takes ->
+//    Host name resolution
+//    TCP connection open
+//    Check server answer
+//
+int conn_establish_connection(const char *host_name, int port, const char *expect, int timeout,
+    connection_t *conn, const char *prefix, int trace) {
+  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, host_name, port);
+
+  char server_desc[SMALLSTRSIZE];
+  char s_err[ERR_STR_BUFSIZE];
+
+  snprintf(server_desc, sizeof(server_desc), "%s:%i", host_name, port);
+
+    // Resolving server name
+  struct sockaddr_in server;
+  struct hostent *hostinfo = NULL;
+  my_logf(LL_DEBUG, LP_DATETIME, "Running gethosbyname() on %s", host_name);
+  hostinfo = gethostbyname(host_name);
+  if (hostinfo == NULL) {
+    my_logf(LL_ERROR, LP_DATETIME, "Unknown host %s, %s", host_name, os_last_err_desc(s_err, sizeof(s_err)));
+    return CONNRES_RESOLVE_ERROR;
+  }
+
+  int ret = CONNRES_CONNECTION_ERROR;
+
+  if ((conn->sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == SOCKET_ERROR) {
+    fatal_error("socket() error to create connection socket, %s", os_last_err_desc(s_err, sizeof(s_err)));
+  }
+  server.sin_family = AF_INET;
+  server.sin_port = htons((uint16_t)port);
+  server.sin_addr = *(struct in_addr *)hostinfo->h_addr;
+    // tv value is undefined after call to connect() as per documentation, so
+    // it is to be re-set every time.
+  struct timeval tv;
+  tv.tv_sec = timeout;
+  tv.tv_usec = 0;
+
+  my_logf(LL_DEBUG, LP_DATETIME, "Will connect to %s:%i, timeout = %i", host_name, port, timeout);
+
+  if ((ret = conn_connect(&server, conn, &tv, server_desc, prefix)) == CONNRES_OK) {
+    my_logf(LL_DEBUG, LP_DATETIME, "Connected to %s", server_desc);
+
+    if (expect != NULL && strlen(expect) >= 1) {
+      char *response = NULL;
+      int response_size;
+      if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0) {
+        ;
+      } else if (s_begins_with(response, expect)) {
+        my_logf(LL_DEBUG, LP_DATETIME, "Received the expected answer: '%s' (expected '%s')", response, expect);
+        ret = CONNRES_OK;
+      } else {
+        my_logf(LL_VERBOSE, LP_DATETIME, "Received an unexpected answer: '%s' (expected '%s')", response, expect);
+        ret = CONNRES_UNEXPECTED_ANSWER;
+      }
+      free(response);
+    } else {
+      ret = CONNRES_OK;
+    }
+
+  }
+
+  return ret;
 }
 
 //
@@ -653,7 +769,7 @@ int connect_with_timeout(const struct sockaddr_in *server, int *connection_sock,
 // Return -1 if an error occured, 1 if reading is successful,
 // 0 if transmission is closed.
 //
-int socket_read_line_alloc(int sock, char **out, int trace, int *size) {
+int conn_read_line_alloc(connection_t *conn, char **out, int trace, int *size) {
   const int INITIAL_READLINE_BUFFER_SIZE = 100;
 
   int i = 0;
@@ -667,10 +783,10 @@ int socket_read_line_alloc(int sock, char **out, int trace, int *size) {
   }
 
   for (;;) {
-    if ((nb = recv(sock, &ch, 1, 0)) == SOCKET_ERROR) {
+    if ((nb = conn->sock_read(conn, &ch, 1)) == SOCKET_ERROR) {
       char s_err[ERR_STR_BUFSIZE];
       my_logf(LL_ERROR, LP_DATETIME, "Error reading socket, error %s", os_last_err_desc(s_err, sizeof(s_err)));
-      os_closesocket(sock);
+      conn_close(conn);
       return -1;
     }
 
@@ -706,7 +822,7 @@ int socket_read_line_alloc(int sock, char **out, int trace, int *size) {
     return 0;
   } else {
     if (trace) {
-      my_logf(LL_VERBOSE, LP_DATETIME, PREFIX_RECEIVED "%s", *out);
+      my_logf(LL_DEBUGTRACE, LP_DATETIME, "%s%s", conn->log_prefix_received, *out);
     }
     return 1;
   }
@@ -717,9 +833,9 @@ int socket_read_line_alloc(int sock, char **out, int trace, int *size) {
 // Return 0 if OK, -1 if error.
 // Manage logging an error code and closing socket.
 //
-int socket_line_sendf(int *s, int trace, const char *fmt, ...) {
+int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
 
-  if (*s == -1) {
+  if (conn->sock == -1) {
     return -1;
   }
 
@@ -737,19 +853,18 @@ int socket_line_sendf(int *s, int trace, const char *fmt, ...) {
   va_end(args);
 
   if (trace)
-    my_logf(LL_VERBOSE, LP_DATETIME, PREFIX_SENT "%s", tmp);
+    my_logf(LL_DEBUGTRACE, LP_DATETIME, "%s%s", conn->log_prefix_sent, tmp);
 
   strncat(tmp, "\015\012", sizeof(tmp));
 
-  int e = send(*s, tmp, strlen(tmp), 0);
+  int e = conn->sock_write(conn, tmp, strlen(tmp));
 
 /*  free(tmp);*/
 
   if (e == SOCKET_ERROR) {
     char s_err[ERR_STR_BUFSIZE];
     my_logf(LL_ERROR, LP_DATETIME, "Network I/O error: %s", os_last_err_desc(s_err, sizeof(s_err)));
-    os_closesocket(*s);
-    *s = -1;
+    conn_close(conn);
     return -1;
   }
 
@@ -759,7 +874,7 @@ int socket_line_sendf(int *s, int trace, const char *fmt, ...) {
 //
 // Send a string to a socket and chck answer (telnet-style communication)
 //
-int socket_round_trip(int sock, const char *expect, int trace, const char *fmt, ...) {
+int conn_round_trip(connection_t *conn, const char *expect, int trace, const char *fmt, ...) {
   int l = strlen(fmt) + 100;
   char *tmp;
   tmp = (char *)malloc(l + 1);
@@ -769,25 +884,25 @@ int socket_round_trip(int sock, const char *expect, int trace, const char *fmt, 
   vsnprintf(tmp, l, fmt, args);
   va_end(args);
 
-  int e = socket_line_sendf(&sock, trace, tmp);
+  int e = conn_line_sendf(conn, trace, tmp);
   free(tmp);
   if (e)
-    return SRT_SOCKET_ERROR;
+    return CONNRES_NETIO;
 
   char *response = NULL;
   int response_size;
-  if (socket_read_line_alloc(sock, &response, trace, &response_size) < 0) {
+  if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0) {
     free(response);
-    return SRT_SOCKET_ERROR;
+    return CONNRES_NETIO;
   }
 
   if (s_begins_with(response, expect)) {
     free(response);
-    return SRT_SUCCESS;
+    return CONNRES_OK;
   }
 
   free(response);
-  return SRT_UNEXPECTED_ANSWER;
+  return CONNRES_UNEXPECTED_ANSWER;
 }
 
 //
@@ -796,5 +911,65 @@ int socket_round_trip(int sock, const char *expect, int trace, const char *fmt, 
 char *ssl_get_error(const unsigned long e, char *s, const size_t s_len) {
   ERR_error_string_n(e, s, s_len);
   return s;
+}
+
+//
+// Initializes the connection_t object
+//
+void conn_init(connection_t *conn, int type) {
+  conn->type = type;
+  conn->sock = -1;
+  conn->ssl_handle = NULL;
+  conn->ssl_context = NULL;
+
+  conn->sock_read = connection_table[conn->type].sock_read;
+  conn->log_prefix_received = connection_table[conn->type].log_prefix_received;
+  conn->sock_write = connection_table[conn->type].sock_write;
+  conn->log_prefix_sent = connection_table[conn->type].log_prefix_sent;
+}
+
+//
+// Closes the connection
+//
+void conn_close(connection_t *conn) {
+  os_closesocket(conn->sock);
+  if (conn->ssl_handle != NULL) {
+    SSL_shutdown(conn->ssl_handle);
+    SSL_free(conn->ssl_handle);
+    conn->ssl_handle = NULL;
+  }
+  if (conn->ssl_context != NULL) {
+    SSL_CTX_free(conn->ssl_context);
+    conn->ssl_context = NULL;
+  }
+  conn->sock = -1;
+}
+
+//
+// CONNTYPE_PLAIN -> read sock
+//
+ssize_t conn_plain_read(connection_t *conn, void *buf, const size_t buf_len) {
+  return recv(conn->sock, buf, buf_len, 0);
+}
+
+//
+// CONNTYPE_PLAIN -> write sock
+//
+ssize_t conn_plain_write(connection_t *conn, void *buf, const size_t buf_len) {
+  return send(conn->sock, buf, buf_len, 0);
+}
+
+//
+// CONNTYPE_SSL -> read sock
+//
+ssize_t conn_ssl_read(connection_t *conn, void *buf, const size_t buf_len) {
+  return SSL_read(conn->ssl_handle, buf, buf_len);
+}
+
+//
+// CONNTYPE_SSL -> write sock
+//
+ssize_t conn_ssl_write(connection_t *conn, void *buf, const size_t buf_len) {
+  return SSL_write(conn->ssl_handle, buf, buf_len);
 }
 

@@ -135,23 +135,24 @@ void web_create_img_files() {
 
 //
 // Start server listening
+// Return 1 if OK, 0 if error
 //
-int server_listen(int listen_port, const char *prefix) {
+int server_listen(int listen_port, const char *prefix, connection_t *conn) {
   struct sockaddr_in listen_sa;
 
   char s_err[ERR_STR_BUFSIZE];
 
-  int sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (sock == -1) {
+  conn->sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (conn->sock == -1) {
     my_logf(LL_ERROR, LP_DATETIME, "%s: error creating socket, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
     return 0;
   }
 
   int bOptVal = TRUE;
   socklen_t bOptLen = sizeof(int);
-  if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&bOptVal, bOptLen) == SOCKET_ERROR) {
+  if (setsockopt(conn->sock, SOL_SOCKET, SO_REUSEADDR, (char *)&bOptVal, bOptLen) == SOCKET_ERROR) {
     my_logf(LL_ERROR, LP_DATETIME, "%s: cannot set socket option, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
-    os_closesocket(sock);
+    conn_close(conn);
     return 0;
   }
 
@@ -159,51 +160,53 @@ int server_listen(int listen_port, const char *prefix) {
   listen_sa.sin_port = htons((u_short)listen_port);
   listen_sa.sin_family = AF_INET;
 
-  if (bind(sock, (struct sockaddr*)&listen_sa, sizeof(listen_sa)) == SOCKET_ERROR) {
+  if (bind(conn->sock, (struct sockaddr*)&listen_sa, sizeof(listen_sa)) == SOCKET_ERROR) {
     my_logf(LL_ERROR, LP_DATETIME, "%s: cannot bind, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
-    os_closesocket(sock);
+    conn_close(conn);
     return 0;
   }
-  if (listen(sock, SOMAXCONN) == SOCKET_ERROR) {
+  if (listen(conn->sock, SOMAXCONN) == SOCKET_ERROR) {
     my_logf(LL_ERROR, LP_DATETIME, "%s: cannot listen, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
-    os_closesocket(sock);
+    conn_close(conn);
     return 0;
   }
-  return sock;
+  return 1;
 }
 
 //
 // Have server accept incoming connections
+// Returns 0 if failure, 1 if OK
 //
-int server_accept(int listen_sock, struct sockaddr_in* remote_sin, int listen_port, const char* prefix) {
+int server_accept(connection_t *listen_conn, struct sockaddr_in* remote_sin, int listen_port, const char* prefix,
+    connection_t *connect_conn) {
   socklen_t remote_sin_len;
 
   char s_err[SMALLSTRSIZE];
 
   my_logf(LL_VERBOSE, LP_DATETIME, "%s: listening on port %u...", prefix, listen_port);
   remote_sin_len = sizeof(*remote_sin);
-  int sock = accept(listen_sock, (struct sockaddr *)remote_sin, &remote_sin_len);
-  if (sock == -1) {
+  connect_conn->sock = accept(listen_conn->sock, (struct sockaddr *)remote_sin, &remote_sin_len);
+  if (connect_conn->sock == -1) {
     my_logf(LL_ERROR, LP_DATETIME, "%s: cannot accept, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
-    os_closesocket(listen_sock);
+    conn_close(connect_conn);
     return 0;
   }
   my_logf(LL_VERBOSE, LP_DATETIME, "%s: connection accepted from %s", prefix, inet_ntoa(remote_sin->sin_addr));
-  return sock;
+  return 1;
 }
 
 //
 // Send error page over HTTP connection
 //
-void http_send_error_page(int sock, const char *e, const char *t) {
+void http_send_error_page(connection_t *conn, const char *e, const char *t) {
   my_logf(LL_DEBUG, LP_DATETIME, "Sending HTTP error %s / %s", e, t);
 
-  socket_line_sendf(&sock, g_trace_network_traffic, "HTTP/1.1 %s", e);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Connection: close");
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-type: text/html");
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
-  socket_line_sendf(&sock, g_trace_network_traffic, "<html><head><title>Not Found</title></head>");
-  socket_line_sendf(&sock, g_trace_network_traffic, "<body><p><b>%s</b></p></body></html>", t);
+  conn_line_sendf(conn, g_trace_network_traffic, "HTTP/1.1 %s", e);
+  conn_line_sendf(conn, g_trace_network_traffic, "Connection: close");
+  conn_line_sendf(conn, g_trace_network_traffic, "Content-type: text/html");
+  conn_line_sendf(conn, g_trace_network_traffic, "");
+  conn_line_sendf(conn, g_trace_network_traffic, "<html><head><title>Not Found</title></head>");
+  conn_line_sendf(conn, g_trace_network_traffic, "<body><p><b>%s</b></p></body></html>", t);
 
   my_logf(LL_DEBUG, LP_DATETIME, "Finished sending HTTP error %s / %s", e, t);
 }
@@ -229,14 +232,14 @@ char *my_ctime_r(const time_t *timep, char *buf, size_t buflen) {
 //
 // Answers web connections
 //
-int manage_web_transaction(int sock) {
+int manage_web_transaction(connection_t *conn) {
 
   my_logf(LL_DEBUG, LP_DATETIME, "Entering web transaction...");
 
   char *received = NULL;
   int size;
   int read_res = 0;
-  if ((read_res = socket_read_line_alloc(sock, &received, g_trace_network_traffic, &size)) < 0) {
+  if ((read_res = conn_read_line_alloc(conn, &received, g_trace_network_traffic, &size)) < 0) {
     free(received);
     return -1;
   }
@@ -246,7 +249,7 @@ int manage_web_transaction(int sock) {
   char *p = received;
   if (strncmp(p, "GET", 3)) {
     free(received);
-    http_send_error_page(sock, "400 Bad Request", "Could not understand request");
+    http_send_error_page(conn, "400 Bad Request", "Could not understand request");
     return -1;
   }
   p += 3;
@@ -270,7 +273,7 @@ int manage_web_transaction(int sock) {
     ++p;
   if (strncmp(p, "HTTP/1.1", 8)) {
     free(received);
-    http_send_error_page(sock, "400 Bad Request", "Could not understand request");
+    http_send_error_page(conn, "400 Bad Request", "Could not understand request");
     return -1;
   }
 
@@ -279,7 +282,7 @@ int manage_web_transaction(int sock) {
     tmpurl = t + 1;
   if (strstr(received, "..") != 0) {
     free(received);
-    http_send_error_page(sock, "401 Unauthorized", "Not allowed to go up in directory tree");
+    http_send_error_page(conn, "401 Unauthorized", "Not allowed to go up in directory tree");
     return -1;
   }
 
@@ -288,7 +291,7 @@ int manage_web_transaction(int sock) {
 
   int keep_alive = TRUE;
   while (strlen(received) != 0) {
-    if ((read_res = socket_read_line_alloc(sock, &received, g_trace_network_traffic, &size)) < 0) {
+    if ((read_res = conn_read_line_alloc(conn, &received, g_trace_network_traffic, &size)) < 0) {
       free(received);
       return -1;
     }
@@ -314,7 +317,7 @@ int manage_web_transaction(int sock) {
     char s_err[SMALLSTRSIZE];
     errno_error(s_err, sizeof(s_err));
     my_logf(LL_ERROR, LP_DATETIME, "%s", s_err);
-    http_send_error_page(sock, "404 Not found", s_err);
+    http_send_error_page(conn, "404 Not found", s_err);
     return -1;
   }
 
@@ -324,13 +327,13 @@ int manage_web_transaction(int sock) {
   if (my_ctime_r(&s.st_mtime, dt_fileupdate, sizeof(dt_fileupdate)) == 0 ||
       gettimeofday(&tv, NULL) != 0 ||
       my_ctime_r(&tv.tv_sec, dt_now, sizeof(dt_now)) == 0) {
-    http_send_error_page(sock, "500 Server error", "Internal server error");
+    http_send_error_page(conn, "500 Server error", "Internal server error");
     return -1;
   }
 
   FILE *F = fopen(path, "rb");
   if (F == NULL) {
-    http_send_error_page(sock, "404 Not found", "File not found");
+    http_send_error_page(conn, "404 Not found", "File not found");
     return -1;
   }
   char *pos;
@@ -348,13 +351,13 @@ int manage_web_transaction(int sock) {
     // No way to work with binary files and kep-alive? I don't find...
   keep_alive = FALSE;
 
-  socket_line_sendf(&sock, g_trace_network_traffic, "HTTP/1.1 200 OK");
-  socket_line_sendf(&sock, g_trace_network_traffic, "Connection: %s", keep_alive ? "keep-alive" : "close");
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-length: %li", (long int)s.st_size);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-type: %s", content_type);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Date: %s", dt_now);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Last-modified: %s", dt_fileupdate);
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
+  conn_line_sendf(conn, g_trace_network_traffic, "HTTP/1.1 200 OK");
+  conn_line_sendf(conn, g_trace_network_traffic, "Connection: %s", keep_alive ? "keep-alive" : "close");
+  conn_line_sendf(conn, g_trace_network_traffic, "Content-length: %li", (long int)s.st_size);
+  conn_line_sendf(conn, g_trace_network_traffic, "Content-type: %s", content_type);
+  conn_line_sendf(conn, g_trace_network_traffic, "Date: %s", dt_now);
+  conn_line_sendf(conn, g_trace_network_traffic, "Last-modified: %s", dt_fileupdate);
+  conn_line_sendf(conn, g_trace_network_traffic, "");
 
   char *buffer = (char *)malloc(g_buffer_size);
   size_t n;
@@ -369,7 +372,7 @@ int manage_web_transaction(int sock) {
       }
     }
 
-    e = send(sock, buffer, n, 0);
+    e = conn->sock_write(conn, buffer, n);
     if (e == SOCKET_ERROR) {
       my_logf(LL_ERROR, LP_DATETIME, "Socket error");
         keep_alive = FALSE;
@@ -377,7 +380,7 @@ int manage_web_transaction(int sock) {
     }
   }
 
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
+  conn_line_sendf(conn, g_trace_network_traffic, "");
 
   free(buffer);
   fclose(F);
@@ -391,21 +394,24 @@ int manage_web_transaction(int sock) {
 void *webserver(void *p) {
 UNUSED(p);
 
-  int listen_sock = server_listen(g_webserver_port, WEBSERVER_LOG_PREFIX);
-  if (listen_sock == 0) {
+  connection_t listen_conn;
+  conn_init(&listen_conn, CONNTYPE_PLAIN);
+
+  if (server_listen(g_webserver_port, WEBSERVER_LOG_PREFIX, &listen_conn) == 0) {
+    my_logf(LL_NORMAL, LP_DATETIME, "%s: stop", WEBSERVER_LOG_PREFIX);
     return NULL;
   }
-
-  my_logf(LL_NORMAL, LP_DATETIME, WEBSERVER_LOG_PREFIX ": start");
+  my_logf(LL_NORMAL, LP_DATETIME, "%s: start", WEBSERVER_LOG_PREFIX);
 
   struct sockaddr_in remote_sin;
-  int sock;
+
+  connection_t connect_conn;
+  conn_init(&connect_conn, CONNTYPE_PLAIN);
+
   while (1) {
-    sock = server_accept(listen_sock, &remote_sin, g_webserver_port, WEBSERVER_LOG_PREFIX);
-    while (sock != -1) {
-      if (manage_web_transaction(sock) != 0) {
-        os_closesocket(sock);
-        sock = -1;
+    while (server_accept(&listen_conn, &remote_sin, g_webserver_port, WEBSERVER_LOG_PREFIX, &connect_conn) != -1) {
+      if (manage_web_transaction(&connect_conn) != 0) {
+        conn_close(&connect_conn);
         my_logf(LL_VERBOSE, LP_DATETIME, WEBSERVER_LOG_PREFIX ": terminated connection with client");
       } else {
         my_logf(LL_VERBOSE, LP_DATETIME, WEBSERVER_LOG_PREFIX ": continuing connection with client");

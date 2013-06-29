@@ -65,11 +65,12 @@ void dbg_write(const char *fmt, ...);
 #define UNUSED(x) (void)(x)
 
   // Level of log
-typedef enum {LL_ERROR = -1, LL_WARNING = 0, LL_NORMAL = 1, LL_VERBOSE = 2, LL_DEBUG = 3} loglevel_t;
+typedef enum {LL_ERROR = -1, LL_WARNING = 0, LL_NORMAL = 1, LL_VERBOSE = 2, LL_DEBUG = 3, LL_DEBUGTRACE = 4} loglevel_t;
   // Type of prefix output in the log
 typedef enum {LP_DATETIME, LP_NOTHING, LP_INDENT} logdisp_t;
   // Return value of socket-based functions
-enum {SRT_SUCCESS, SRT_SOCKET_ERROR, SRT_UNEXPECTED_ANSWER};
+enum {CONNRES_OK, CONNRES_NETIO, CONNRES_UNEXPECTED_ANSWER,
+  CONNRES_RESOLVE_ERROR, CONNRES_CONNECTION_ERROR, CONNRES_SSL_CONNECTION_ERROR, CONNRES_CONNECTION_TIMEOUT};
 
 struct subst_t {
   const char *find;
@@ -79,12 +80,25 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n);
 
   // Replaces a simple "int sock" in connection functions, so
   // as to allow SSL-based operations.
-enum {CONNTYPE_NONE, CONNTYPE_PLAIN, CONNTYPE_SSL};
-struct connection_t {
+enum {CONNTYPE_PLAIN = 0, CONNTYPE_SSL = 1};
+
+typedef struct connection connection_t;
+typedef struct connection {
     int type;
     int sock;
     SSL *ssl_handle;
     SSL_CTX *ssl_context;
+    ssize_t (*sock_read) (connection_t *, void *, const size_t);
+    const char *log_prefix_received;
+    ssize_t (*sock_write) (connection_t *, void *, const size_t);
+    const char *log_prefix_sent;
+} connection_t;
+
+struct connection_table_t {
+  ssize_t (*sock_read)(connection_t *, void *, const size_t);
+  const char *log_prefix_received;
+  ssize_t (*sock_write)(connection_t *, void *, const size_t);
+  const char *log_prefix_sent;
 };
 
 #define STR_LOG_TIMESTAMP 25
@@ -112,7 +126,6 @@ void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, 
        long unsigned int *usec, long int *gmtoff);
 
 char *os_last_err_desc(char *s, size_t s_bufsize);
-void os_closesocket(int sock);
 void os_set_sock_nonblocking_mode(int sock);
 int os_last_network_op_is_in_progress();
 void os_set_sock_blocking_mode(int sock);
@@ -122,11 +135,22 @@ void my_pthread_mutex_unlock(pthread_mutex_t *m);
 void my_pthread_mutex_init(pthread_mutex_t *m);
 void util_my_pthread_init();
 
-int socket_line_sendf(int *s, int trace, const char *fmt, ...);
-int socket_read_line_alloc(int sock, char **out, int trace, int *size);
-int connect_with_timeout(const struct sockaddr_in *server, int *connection_sock, struct timeval *tv, const char *desc);
-int socket_round_trip(int sock, const char *expect, int trace, const char *fmt, ...);
+void os_init_network();
+int os_last_err();
 int s_begins_with(const char *s, const char *begins_with);
+
+void conn_init(connection_t *conn, int type);
+void conn_close(connection_t *conn);
+int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...);
+int conn_read_line_alloc(connection_t *conn, char **out, int trace, int *size);
+int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct timeval *tv, const char *desc, const char *prefix);
+int conn_round_trip(connection_t *conn, const char *expect, int trace, const char *fmt, ...);
+int conn_establish_connection(const char *host_name, int port, const char *expect, int timeout,
+      connection_t *conn, const char *prefix, int trace);
+ssize_t conn_plain_read(connection_t *conn, void *buf, const size_t buf_len);
+ssize_t conn_plain_write(connection_t *conn, void *buf, const size_t buf_len);
+ssize_t conn_ssl_read(connection_t *conn, void *buf, const size_t buf_len);
+ssize_t conn_ssl_write(connection_t *conn, void *buf, const size_t buf_len);
 
 char *ssl_get_error(const unsigned long e, char *s, const size_t s_len);
 

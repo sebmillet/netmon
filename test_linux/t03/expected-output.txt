@@ -258,7 +258,7 @@ Running gethosbyname() on Localhost
 Will connect to Localhost:21, timeout = 5
 Connected to Localhost:21
 <<< 220 (vsFTPd 2.3.5)
-Unexpected answer: '220 (vsFTPd 2.3.5)' (expected '221 ')
+Received an unexpected answer: '220 (vsFTPd 2.3.5)' (expected '221 ')
 TCP check(Local FTP): disconnected from Localhost:21
 Local FTP -> ** KO **
 Performing check tcp(Local HTTP)
@@ -278,7 +278,7 @@ Performing check tcp(My POP3)
 TCP check(My POP3): connecting to localhost:13529...
 Running gethosbyname() on localhost
 Will connect to localhost:13529, timeout = 5
-Socket error connecting to localhost:13529, code=111 (Connection refused)
+TCP check(My POP3): network error connecting to localhost:13529, code=111 (Connection refused)
 TCP check(My POP3): disconnected from localhost:13529
 My POP3 -> ** KO **
 Performing check tcp(Test avec nom inconnu)

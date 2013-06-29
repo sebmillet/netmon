@@ -22,17 +22,16 @@
 #define LOOP_REF_SIZE 70
 
 void os_set_sock_nonblocking_mode(int sock);
-void os_set_sock_blocking_mode(int sock);
-int os_last_err();
-char *os_last_err_desc(char *s, size_t s_bufsize);
-void os_init_network();
-int os_last_network_op_is_in_progress();
-void os_closesocket(int sock);
-int socket_read_line_alloc(int sock, char **out, int trace, int *size);
-int socket_line_sendf(int *s, int trace, const char *fmt, ...);
+//void os_set_sock_blocking_mode(int sock);
+//int os_last_err();
+//char *os_last_err_desc(char *s, size_t s_bufsize);
+//void os_init_network();
+//int os_last_network_op_is_in_progress();
+//void os_closesocket(int sock);
+//int socket_read_line_alloc(int sock, char **out, int trace, int *size);
+//int socket_line_sendf(int *s, int trace, const char *fmt, ...);
 
 enum {ST_UNDEF = 0, ST_UNKNOWN = 1, ST_OK = 2, ST_FAIL = 3, _ST_LAST = 3, _ST_NBELEMS = 4};
-enum {EC_OK, EC_RESOLVE_ERROR, EC_CONNECTION_ERROR, EC_UNEXPECTED_ANSWER};
 enum {ERR_SMTP_OK = 0, ERR_SMTP_RESOLVE_ERROR, ERR_SMTP_NETIO, ERR_SMTP_BAD_ANSWER_TO_EHLO, ERR_SMTP_SENDER_REJECTED,
   ERR_SMTP_NO_RECIPIENT_ACCEPTED, ERR_SMTP_DATA_COMMAND_REJECTED, ERR_SMTP_EMAIL_RECEPTION_NOT_CONFIRMED,
   ERR_SMTP_INVALID_PORT_NUMBER};
@@ -57,12 +56,14 @@ struct alert_ctrl_t {
 struct rfc821_enveloppe_t {
   char *smarthost;
   long int port;
+  long int crypt;
   char *self;
   char *sender;
   char *recipients;
   long int connect_timeout;
   int smarthost_set;
   int port_set;
+  int crypt_set;
   int self_set;
   int sender_set;
   int recipients_set;
@@ -77,11 +78,13 @@ struct rfc821_enveloppe_t {
 struct pop3_account_t {
   char *server;
   long int port;
+  long int crypt;
   char *user;
   char *password;
   long int connect_timeout;
   int server_set;
   int port_set;
+  int crypt_set;
   int user_set;
   int password_set;
   int connect_timeout_set;
@@ -112,9 +115,11 @@ struct check_t {
     // CM_TCP method
   char *tcp_expect;
   long int tcp_port;
+  long int tcp_crypt;
   long int tcp_connect_timeout;
   int tcp_expect_set;
   int tcp_port_set;
+  int tcp_crypt_set;
   int tcp_connect_timeout_set;
 
     // CM_PROGRAM method

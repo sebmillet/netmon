@@ -54,6 +54,8 @@
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
 const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
 
+const int crypt_ports[] = {443, 465, 585, 993, 995};
+
 const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
 
   // Don't update the one below unless you know what you're doing!
@@ -77,7 +79,7 @@ void web_create_img_files();
 
   // NOT WINDOWS
 
-#include <netdb.h>
+/*#include <netdb.h>*/
 
 #endif
 
@@ -226,6 +228,11 @@ const char *l_yesno[] = {
   "no"    // ID_NO
 };
 
+const char *l_crypts[] = {
+  "plain",  // CONNTYPE_PLAIN
+  "ssl"     // CONNTYPE_SSL
+};
+
 extern long int g_log_usec;
 int g_log_usec_set = FALSE;
 long int g_date_format;
@@ -268,6 +275,8 @@ const struct readcfg_var_t readcfg_vars[] = {
 // CHCKS -> TCP method
 
   {"tcp_port", V_INT, CS_CHECK, &(chk00.tcp_port), NULL, NULL, 0, &(chk00.tcp_port_set), FALSE, NULL, 0, CM_TCP},
+  {"tcp_crypt", V_STRKEY, CS_CHECK, &chk00.tcp_crypt, NULL, NULL, 0, &chk00.tcp_crypt_set, FALSE, l_crypts,
+    sizeof(l_crypts) / sizeof(*l_crypts), -1},
   {"tcp_connect_timeout", V_INT, CS_CHECK, &(chk00.tcp_connect_timeout), NULL, NULL, 0,
     &(chk00.tcp_connect_timeout_set), FALSE, NULL, 0, CM_TCP},
   {"tcp_expect", V_STR, CS_CHECK, NULL, &(chk00.tcp_expect), NULL, 0, &(chk00.tcp_expect_set), FALSE, NULL, 0, CM_TCP},
@@ -286,6 +295,8 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"loop_smtp_smart_host", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.smarthost, NULL, 0,
     &chk00.loop_smtp.smarthost_set, FALSE, NULL, 0, CM_LOOP},
   {"loop_smtp_port", V_INT, CS_CHECK, &chk00.loop_smtp.port, NULL, NULL, 0, &chk00.loop_smtp.port_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_smtp_crypt", V_STRKEY, CS_CHECK, &chk00.loop_smtp.crypt, NULL, NULL, 0, &chk00.loop_smtp.crypt_set, FALSE, l_crypts,
+    sizeof(l_crypts) / sizeof(*l_crypts), -1},
   {"loop_smtp_self", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.self, NULL, 0, &chk00.loop_smtp.self_set, FALSE, NULL, 0, CM_LOOP},
   {"loop_smtp_sender", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.sender, NULL, 0, &chk00.loop_smtp.sender_set, TRUE, NULL, 0, CM_LOOP},
   {"loop_smtp_recipients", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.recipients, NULL, 0,
@@ -294,6 +305,8 @@ const struct readcfg_var_t readcfg_vars[] = {
     &chk00.loop_smtp.connect_timeout_set, FALSE, NULL, 0, CM_LOOP},
   {"loop_pop3_server", V_STR, CS_CHECK, NULL, &chk00.loop_pop3.server, NULL, 0, &chk00.loop_pop3.server_set, FALSE, NULL, 0, CM_LOOP},
   {"loop_pop3_port", V_INT, CS_CHECK, &chk00.loop_pop3.port, NULL, NULL, 0, &chk00.loop_pop3.port_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_pop3_crypt", V_STRKEY, CS_CHECK, &chk00.loop_pop3.crypt, NULL, NULL, 0, &chk00.loop_pop3.crypt_set, FALSE, l_crypts,
+    sizeof(l_crypts) / sizeof(*l_crypts), -1},
   {"loop_pop3_user", V_STR, CS_CHECK, NULL, &chk00.loop_pop3.user, NULL, 0, &chk00.loop_pop3.user_set, FALSE, NULL, 0, CM_LOOP},
   {"loop_pop3_password", V_STR, CS_CHECK, NULL, &chk00.loop_pop3.password, NULL, 0,
     &chk00.loop_pop3.password_set, FALSE, NULL, 0, CM_LOOP},
@@ -346,6 +359,8 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"smtp_smart_host", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.smarthost, NULL, 0,
     &alrt00.smtp_env.smarthost_set, FALSE, NULL, 0, AM_SMTP},
   {"smtp_port", V_INT, CS_ALERT, &alrt00.smtp_env.port, NULL, NULL, 0, &alrt00.smtp_env.port_set, FALSE, NULL, 0, AM_SMTP},
+  {"smtp_crypt", V_STRKEY, CS_ALERT, &alrt00.smtp_env.crypt, NULL, NULL, 0, &alrt00.smtp_env.crypt_set, FALSE, l_crypts,
+    sizeof(l_crypts) / sizeof(*l_crypts), -1},
   {"smtp_self", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.self, NULL, 0, &alrt00.smtp_env.self_set, FALSE, NULL, 0, AM_SMTP},
   {"smtp_sender", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.sender, NULL, 0, &alrt00.smtp_env.sender_set, TRUE, NULL, 0, AM_SMTP},
   {"smtp_recipients", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.recipients, NULL, 0,
@@ -444,6 +459,7 @@ void rfc821_enveloppe_t_create(struct rfc821_enveloppe_t *smtp_env) {
   smtp_env->smarthost = NULL;
 
   smtp_env->port_set = FALSE;
+  smtp_env->crypt_set = FALSE;
 
   smtp_env->self_set = FALSE;
   smtp_env->self = NULL;
@@ -462,6 +478,7 @@ void pop3_account_t_create(struct pop3_account_t *p) {
   p->server = NULL;
 
   p->port_set = FALSE;
+  p->crypt_set = FALSE;
 
   p->user_set = FALSE;
   p->user = NULL;
@@ -494,6 +511,7 @@ void check_t_create(struct check_t *chk) {
   chk->tcp_expect = NULL;
 
   chk->tcp_port_set = FALSE;
+  chk->tcp_crypt_set = FALSE;
   chk->tcp_connect_timeout_set = FALSE;
 
   chk->prg_command = NULL;
@@ -600,6 +618,19 @@ void alert_t_create(struct alert_t *alrt) {
   alrt->log_string_set = FALSE;
 }
 
+int get_conntype(const long int p, const int crypt_set, const int crypt) {
+  if (!crypt_set || crypt == FIND_STRING_NOT_FOUND) {
+    int i;
+    for (i = 0; i < sizeof(crypt_ports) / sizeof(*crypt_ports); ++i) {
+      if (p == crypt_ports[i])
+        return CONNTYPE_SSL;
+    }
+    return CONNTYPE_PLAIN;
+  } else {
+    return crypt;
+  }
+}
+
 //
 // Fill the string with a boundary string, garanteed unique
 //
@@ -643,71 +674,6 @@ void get_str_alert_info(char *s, size_t s_len, const struct tm *ts) {
 }
 
 //
-// Establish a connection, including all what it takes ->
-//    Host name resolution
-//    TCP connection open
-//    Check server answer
-//
-int establish_connection(const char *host_name, int port, const char *expect, int timeout, int *sock, const char *prefix) {
-  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, host_name, port);
-
-  char server_desc[SMALLSTRSIZE];
-  char s_err[ERR_STR_BUFSIZE];
-
-  snprintf(server_desc, sizeof(server_desc), "%s:%i", host_name, port);
-
-    // Resolving server name
-  struct sockaddr_in server;
-  struct hostent *hostinfo = NULL;
-  my_logf(LL_DEBUG, LP_DATETIME, "Running gethosbyname() on %s", host_name);
-  hostinfo = gethostbyname(host_name);
-  if (hostinfo == NULL) {
-    my_logf(LL_ERROR, LP_DATETIME, "Unknown host %s, %s", host_name, os_last_err_desc(s_err, sizeof(s_err)));
-    return EC_RESOLVE_ERROR;
-  }
-
-  int ret = EC_CONNECTION_ERROR;
-
-  if ((*sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == SOCKET_ERROR) {
-    fatal_error("socket() error to create connection socket, %s", os_last_err_desc(s_err, sizeof(s_err)));
-  }
-  server.sin_family = AF_INET;
-  server.sin_port = htons((uint16_t)port);
-  server.sin_addr = *(struct in_addr *)hostinfo->h_addr;
-    // tv value is undefined after call to connect() as per documentation, so
-    // it is to be re-set every time.
-  struct timeval tv;
-  tv.tv_sec = timeout;
-  tv.tv_usec = 0;
-
-  my_logf(LL_DEBUG, LP_DATETIME, "Will connect to %s:%i, timeout = %i", host_name, port, timeout);
-
-  if (connect_with_timeout(&server, sock, &tv, server_desc) == 0) {
-    my_logf(LL_DEBUG, LP_DATETIME, "Connected to %s", server_desc);
-
-    if (expect != NULL && strlen(expect) >= 1) {
-      char *response = NULL;
-      int response_size;
-      if (socket_read_line_alloc(*sock, &response, g_trace_network_traffic, &response_size) < 0) {
-        ;
-      } else if (s_begins_with(response, expect)) {
-        my_logf(LL_DEBUG, LP_DATETIME, "Expected answer: '%s'", response);
-        ret = EC_OK;
-      } else {
-        my_logf(LL_DEBUG, LP_DATETIME, "Unexpected answer: '%s' (expected '%s')", response, expect);
-        ret = EC_UNEXPECTED_ANSWER;
-      }
-      free(response);
-    } else {
-      ret = EC_OK;
-    }
-
-  }
-
-  return ret;
-}
-
-//
 //
 //
 int perform_check_tcp(struct check_t *chk, const struct subst_t *subst, int subst_len) {
@@ -717,14 +683,16 @@ UNUSED(subst_len);
   char prefix[SMALLSTRSIZE];
   snprintf(prefix, sizeof(prefix), "TCP check(%s):", chk->display_name);
 
-  int sock;
-  int ec = establish_connection(chk->host_name, chk->tcp_port, chk->tcp_expect_set ? chk->tcp_expect : NULL,
-    chk->tcp_connect_timeout_set ? chk->tcp_connect_timeout : g_connect_timeout, &sock, prefix);
-  os_closesocket(sock);
+  connection_t conn;
+  conn_init(&conn, get_conntype(chk->tcp_port, chk->tcp_crypt_set, chk->tcp_crypt));
+
+  int cr = conn_establish_connection(chk->host_name, chk->tcp_port, chk->tcp_expect_set ? chk->tcp_expect : NULL,
+    chk->tcp_connect_timeout_set ? chk->tcp_connect_timeout : g_connect_timeout, &conn, prefix, g_trace_network_traffic);
+  conn_close(&conn);
   my_logf(LL_VERBOSE, LP_DATETIME, "%s disconnected from %s:%i", prefix, chk->host_name, chk->tcp_port);
-  if (ec == EC_OK)
+  if (cr == CONNRES_OK)
     return ST_OK;
-  if (ec == EC_RESOLVE_ERROR)
+  if (cr == CONNRES_RESOLVE_ERROR)
     return ST_UNKNOWN;
   return ST_FAIL;
 }
@@ -836,7 +804,8 @@ char *smtp_address(char *a) {
 // Perform an SMTP transaction up to the DATA command (inclusive)
 // Returns ERR_SMTP_* constants
 //
-int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, int *sock, char *from_buf, size_t from_buf_len) {
+int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix,
+    connection_t *conn, char *from_buf, size_t from_buf_len) {
   env->nb_recipients_wanted = -1;
   env->nb_recipients_ok = -1;
 
@@ -846,12 +815,12 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, i
   if (split_hostname(env->smarthost, env->port, env->port_set, DEFAULT_SMTP_PORT, prefix, h, sizeof(h), &p))
     return ERR_SMTP_INVALID_PORT_NUMBER;
 
-  int ec = establish_connection(h, p, "220 ",
-    env->connect_timeout_set ? env->connect_timeout_set : g_connect_timeout, sock, prefix);
-  if (ec != EC_OK)
-    return (ec == EC_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR : ERR_SMTP_NETIO);
+  int cr = conn_establish_connection(h, p, "220 ",
+    env->connect_timeout_set ? env->connect_timeout_set : g_connect_timeout, conn, prefix, g_trace_network_traffic);
+  if (cr != CONNRES_OK)
+    return (cr == CONNRES_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR : ERR_SMTP_NETIO);
 
-  if (socket_line_sendf(sock, g_trace_network_traffic, "EHLO %s",
+  if (conn_line_sendf(conn, g_trace_network_traffic, "EHLO %s",
       env->self_set ? env->self : DEFAULT_LOOP_SMTP_SELF)) {
     return ERR_SMTP_NETIO;
   }
@@ -859,7 +828,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, i
   char *response = NULL;
   int response_size;
   do {
-    if (socket_read_line_alloc(*sock, &response, g_trace_network_traffic, &response_size) < 0) {
+    if (conn_read_line_alloc(conn, &response, g_trace_network_traffic, &response_size) < 0) {
       return ERR_SMTP_NETIO;
     }
   } while (s_begins_with(response, "250-"));
@@ -874,8 +843,8 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, i
   from_buf[from_buf_len - 1] = '\0';
   env->from = from_buf;
   env->from = smtp_address(env->from);
-  if (socket_round_trip(*sock, "250 ", g_trace_network_traffic, "MAIL FROM: <%s>", env->from) != SRT_SUCCESS) {
-    socket_line_sendf(sock, g_trace_network_traffic, "QUIT");
+  if (conn_round_trip(conn, "250 ", g_trace_network_traffic, "MAIL FROM: <%s>", env->from) != CONNRES_OK) {
+    conn_line_sendf(conn, g_trace_network_traffic, "QUIT");
     my_logf(LL_ERROR, LP_DATETIME, "%s sender not accepted, closing connection", prefix);
     return ERR_SMTP_SENDER_REJECTED;
   }
@@ -895,10 +864,10 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, i
     r = smtp_address(r);
     if (strlen(r) >= 1) {
       env->nb_recipients_wanted++;
-      int res = socket_round_trip(*sock, "250 ", g_trace_network_traffic, "RCPT TO: <%s>", r);
-      if (res == SRT_SUCCESS)
+      int res = conn_round_trip(conn, "250 ", g_trace_network_traffic, "RCPT TO: <%s>", r);
+      if (res == CONNRES_OK)
         env->nb_recipients_ok++;
-      else if (res != SRT_SUCCESS && res != SRT_UNEXPECTED_ANSWER) {
+      else if (res != CONNRES_OK && res != CONNRES_UNEXPECTED_ANSWER) {
         free(recipients);
         return ERR_SMTP_NETIO;
       }
@@ -910,14 +879,14 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, i
 
   if (env->nb_recipients_ok == 0) {
     my_logf(LL_ERROR, LP_DATETIME, "%s no recipient accepted, closing connection", prefix);
-    socket_line_sendf(sock, g_trace_network_traffic, "QUIT");
+    conn_line_sendf(conn, g_trace_network_traffic, "QUIT");
     return ERR_SMTP_NO_RECIPIENT_ACCEPTED;
   }
 
   int res;
-  if ((res = socket_round_trip(*sock, "354 ", g_trace_network_traffic, "DATA")) != SRT_SUCCESS) {
+  if ((res = conn_round_trip(conn, "354 ", g_trace_network_traffic, "DATA")) != CONNRES_OK) {
     my_logf(LL_ERROR, LP_DATETIME, "%s DATA command not accepted, closing connection", prefix);
-    return (res == SRT_SOCKET_ERROR ? ERR_SMTP_NETIO : ERR_SMTP_DATA_COMMAND_REJECTED);
+    return (res == CONNRES_NETIO ? ERR_SMTP_NETIO : ERR_SMTP_DATA_COMMAND_REJECTED);
   }
 
   return ERR_SMTP_OK;
@@ -926,16 +895,16 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix, i
 //
 //
 //
-int smtp_mail_sending_post(int sock, const char *prefix, char *email_ref, const size_t email_ref_len) {
-  if (socket_line_sendf(&sock, g_trace_network_traffic, "") || socket_line_sendf(&sock, g_trace_network_traffic, ".")) {
+int smtp_mail_sending_post(connection_t *conn, const char *prefix, char *email_ref, const size_t email_ref_len) {
+  if (conn_line_sendf(conn, g_trace_network_traffic, "") || conn_line_sendf(conn, g_trace_network_traffic, ".")) {
     return ERR_SMTP_NETIO;
   }
 
   char *response = NULL;
   int response_size;
-  if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0) {
+  if (conn_read_line_alloc(conn, &response, g_trace_network_traffic, &response_size) < 0) {
     free(response);
-    os_closesocket(sock);
+    conn_close(conn);
     return ERR_SMTP_NETIO;
   }
   if (!s_begins_with(response, "250 ")) {
@@ -964,8 +933,8 @@ int smtp_mail_sending_post(int sock, const char *prefix, char *email_ref, const 
   free(tmp);
   free(response);
 
-  socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
-  os_closesocket(sock);
+  conn_line_sendf(conn, g_trace_network_traffic, "QUIT");
+  conn_close(conn);
 
   my_logf(LL_DEBUG, LP_DATETIME, "Disconnected");
 
@@ -992,17 +961,17 @@ void get_rfc822_header_format_current_date(char *date, const size_t date_len) {
 //
 //
 //
-int smtp_mail_sending_stdheaders(int *sock, const struct rfc821_enveloppe_t *smtp) {
+int smtp_mail_sending_stdheaders(connection_t *conn, const struct rfc821_enveloppe_t *smtp) {
   if (strlen(smtp->from_orig) >= 1) {
-    socket_line_sendf(sock, g_trace_network_traffic, "return-path: %s", smtp->from);
-    socket_line_sendf(sock, g_trace_network_traffic, "sender: %s", smtp->from);
-    socket_line_sendf(sock, g_trace_network_traffic, "from: %s", smtp->from_orig);
+    conn_line_sendf(conn, g_trace_network_traffic, "return-path: %s", smtp->from);
+    conn_line_sendf(conn, g_trace_network_traffic, "sender: %s", smtp->from);
+    conn_line_sendf(conn, g_trace_network_traffic, "from: %s", smtp->from_orig);
   }
-  socket_line_sendf(sock, g_trace_network_traffic, "to: %s", smtp->recipients);
-  socket_line_sendf(sock, g_trace_network_traffic, "x-mailer: %s", PACKAGE_STRING);
+  conn_line_sendf(conn, g_trace_network_traffic, "to: %s", smtp->recipients);
+  conn_line_sendf(conn, g_trace_network_traffic, "x-mailer: %s", PACKAGE_STRING);
   char date[SMALLSTRSIZE];
   get_rfc822_header_format_current_date(date, sizeof(date));
-  return socket_line_sendf(sock, g_trace_network_traffic, "date: %s", date) ? ERR_SMTP_NETIO : ERR_SMTP_OK;
+  return conn_line_sendf(conn, g_trace_network_traffic, "date: %s", date) ? ERR_SMTP_NETIO : ERR_SMTP_OK;
 }
 
 //
@@ -1015,22 +984,23 @@ UNUSED(subst_len);
 
   my_logf(LL_VERBOSE, LP_DATETIME, "%s sending probe email", prefix);
 
-  int sock;
+  connection_t conn;
+  conn_init(&conn, get_conntype(chk->loop_smtp.port, chk->loop_smtp.crypt_set, chk->loop_smtp.crypt));
 
   int r;
 
   if (g_test_mode == 0) {
     struct rfc821_enveloppe_t smtp = chk->loop_smtp;
     char from_buf[SMALLSTRSIZE];
-    if ((r = smtp_email_sending_pre(&smtp, prefix, &sock, from_buf, sizeof(from_buf))) != ERR_SMTP_OK) {
-      os_closesocket(sock);
+    if ((r = smtp_email_sending_pre(&smtp, prefix, &conn, from_buf, sizeof(from_buf))) != ERR_SMTP_OK) {
+      conn_close(&conn);
       return LOOP_STATUS_WHEN_SENDING_FAILS;
     }
 
 // Email headers
 
-    if ((r = smtp_mail_sending_stdheaders(&sock, &smtp)) != ERR_SMTP_OK) {
-      os_closesocket(sock);
+    if ((r = smtp_mail_sending_stdheaders(&conn, &smtp)) != ERR_SMTP_OK) {
+      conn_close(&conn);
       return LOOP_STATUS_WHEN_SENDING_FAILS;
     }
   }
@@ -1052,27 +1022,27 @@ UNUSED(subst_len);
 
   if (g_test_mode == 0) {
       // Corresponds to LOOP_HEADER_REF
-    socket_line_sendf(&sock, g_trace_network_traffic, "subject: %s", loop->loop_ref);
+    conn_line_sendf(&conn, g_trace_network_traffic, "subject: %s", loop->loop_ref);
 
-    socket_line_sendf(&sock, g_trace_network_traffic, "MIME-Version: 1.0");
-    socket_line_sendf(&sock, g_trace_network_traffic, "Content-Type: text/plain");
-    socket_line_sendf(&sock, g_trace_network_traffic, "Content-Transfer-Encoding: 7bit");
+    conn_line_sendf(&conn, g_trace_network_traffic, "MIME-Version: 1.0");
+    conn_line_sendf(&conn, g_trace_network_traffic, "Content-Type: text/plain");
+    conn_line_sendf(&conn, g_trace_network_traffic, "Content-Transfer-Encoding: 7bit");
 
 // Email body
 
-    socket_line_sendf(&sock, g_trace_network_traffic, "");
+    conn_line_sendf(&conn, g_trace_network_traffic, "");
 
-    socket_line_sendf(&sock, g_trace_network_traffic, "This is a loop email sent by " PACKAGE_STRING);
+    conn_line_sendf(&conn, g_trace_network_traffic, "This is a loop email sent by " PACKAGE_STRING);
     char strnow[STR_NOW];
     get_str_now(strnow, sizeof(strnow), &now);
-    socket_line_sendf(&sock, g_trace_network_traffic, "Sent: %s", strnow);
-    socket_line_sendf(&sock, g_trace_network_traffic, "Refrence: '%s'", loop->loop_ref);
-    socket_line_sendf(&sock, g_trace_network_traffic, "");
+    conn_line_sendf(&conn, g_trace_network_traffic, "Sent: %s", strnow);
+    conn_line_sendf(&conn, g_trace_network_traffic, "Refrence: '%s'", loop->loop_ref);
+    conn_line_sendf(&conn, g_trace_network_traffic, "");
 
   // Email end
 
     char email_ref[SMALLSTRSIZE];
-    if ((r = smtp_mail_sending_post(sock, prefix, email_ref, sizeof(email_ref))) == ERR_SMTP_OK) {
+    if ((r = smtp_mail_sending_post(&conn, prefix, email_ref, sizeof(email_ref))) == ERR_SMTP_OK) {
       loop->status = LE_SENT;
       loop->sent_time = ltime;
     }
@@ -1151,42 +1121,44 @@ UNUSED(subst_len);
   if (split_hostname(pop3->server, pop3->port, pop3->port_set, DEFAULT_POP3_PORT, prefix, h, sizeof(h), &p))
     return ERR_POP3_INVALID_PORT_NUMBER;
 
-  int sock;
+  connection_t conn;
+  conn_init(&conn, get_conntype(p, pop3->crypt_set, pop3->crypt));
+
   int r;
 
-  int ec = establish_connection(h, p, "+OK ",
-    pop3->connect_timeout_set ? pop3->connect_timeout_set : g_connect_timeout, &sock, prefix);
-  if (ec != EC_OK)
-    return (ec == EC_RESOLVE_ERROR ? ERR_POP3_RESOLVE_ERROR : ERR_POP3_NETIO);
+  int cr = conn_establish_connection(h, p, "+OK ",
+    pop3->connect_timeout_set ? pop3->connect_timeout_set : g_connect_timeout, &conn, prefix, g_trace_network_traffic);
+  if (cr != CONNRES_OK)
+    return (cr == CONNRES_RESOLVE_ERROR ? ERR_POP3_RESOLVE_ERROR : ERR_POP3_NETIO);
 
-  if ((r = socket_round_trip(sock, "+OK ", g_trace_network_traffic, "USER %s", pop3->user)) != SRT_SUCCESS) {
-    if (r != SRT_SOCKET_ERROR) {
-      socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
+  if ((r = conn_round_trip(&conn, "+OK ", g_trace_network_traffic, "USER %s", pop3->user)) != CONNRES_OK) {
+    if (r != CONNRES_NETIO) {
+      conn_line_sendf(&conn, g_trace_network_traffic, "QUIT");
       my_logf(LL_ERROR, LP_DATETIME, "%s user not accepted, closing connection", prefix);
-      os_closesocket(sock);
+      conn_close(&conn);
       return ERR_POP3_USER_REJECTED;
     } else {
       return ERR_POP3_NETIO;
     }
   }
 
-  if ((r = socket_round_trip(sock, "+OK ", g_trace_network_traffic, "PASS %s", pop3->password)) != SRT_SUCCESS) {
-    if (r != SRT_SOCKET_ERROR) {
-      socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
+  if ((r = conn_round_trip(&conn, "+OK ", g_trace_network_traffic, "PASS %s", pop3->password)) != CONNRES_OK) {
+    if (r != CONNRES_NETIO) {
+      conn_line_sendf(&conn, g_trace_network_traffic, "QUIT");
       my_logf(LL_ERROR, LP_DATETIME, "%s user not accepted, closing connection", prefix);
-      os_closesocket(sock);
+      conn_close(&conn);
       return ERR_POP3_PASSWORD_REJECTED;
     } else {
       return ERR_POP3_NETIO;
     }
   }
 
-  if (socket_line_sendf(&sock, g_trace_network_traffic, "STAT")) {
+  if (conn_line_sendf(&conn, g_trace_network_traffic, "STAT")) {
     return ERR_POP3_NETIO;
   }
   char *response = NULL;
   int response_size;
-  if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0) {
+  if (conn_read_line_alloc(&conn, &response, g_trace_network_traffic, &response_size) < 0) {
     free(response);
     return ERR_POP3_NETIO;
   }
@@ -1197,7 +1169,7 @@ UNUSED(subst_len);
   if (!s_begins_with(response, "+OK ") || space == NULL) {
     my_logf(LL_ERROR, LP_DATETIME, "%s unexpected answer from server '%s'", prefix, response);
     free(response);
-    os_closesocket(sock);
+    conn_close(&conn);
     return ERR_POP3_STAT_ERROR;
   }
   *space = '\0';
@@ -1210,7 +1182,7 @@ UNUSED(subst_len);
     else {
       my_logf(LL_ERROR, LP_DATETIME, "%s unable to analyze answer from server: '%s'", prefix, response);
       free(response);
-      os_closesocket(sock);
+      conn_close(&conn);
       return ERR_POP3_STAT_ERROR;
     }
   }
@@ -1227,17 +1199,17 @@ UNUSED(subst_len);
 
 // 1. Retrieve email headers
 
-    if ((r = socket_round_trip(sock, "+OK ", g_trace_network_traffic, "TOP %d 0", I)) == SRT_SOCKET_ERROR) {
+    if ((r = conn_round_trip(&conn, "+OK ", g_trace_network_traffic, "TOP %d 0", I)) == CONNRES_NETIO) {
       free(response);
       return ERR_POP3_NETIO;
-    } else if (r == SRT_UNEXPECTED_ANSWER) {
+    } else if (r == CONNRES_UNEXPECTED_ANSWER) {
       my_logf(LL_ERROR, LP_DATETIME, "%s unable to analyze email #%d", prefix, I);
       continue;
     }
 
     char *header_value = NULL;
     do {
-      if (socket_read_line_alloc(sock, &response, g_trace_network_traffic, &response_size) < 0) {
+      if (conn_read_line_alloc(&conn, &response, g_trace_network_traffic, &response_size) < 0) {
         free(response);
         return ERR_POP3_NETIO;
       }
@@ -1259,13 +1231,13 @@ UNUSED(subst_len);
       my_logf(LL_DEBUG, LP_DATETIME, "%s email %d of reference '%s' is mine", prefix, I, header_value);
       loop_manage_retrieved_email(header_value, prefix);
 
-      if ((r = socket_round_trip(sock, "+OK ", g_trace_network_traffic, "DELE %d", I)) == SRT_SOCKET_ERROR) {
+      if ((r = conn_round_trip(&conn, "+OK ", g_trace_network_traffic, "DELE %d", I)) == CONNRES_NETIO) {
         free(header_value);
         free(response);
         return ERR_POP3_NETIO;
-      } else if (r == SRT_UNEXPECTED_ANSWER) {
+      } else if (r == CONNRES_UNEXPECTED_ANSWER) {
         my_logf(LL_ERROR, LP_DATETIME, "%s cannot delete email %d of reference '%s'", prefix, I, header_value);
-      } else if (r == SRT_SUCCESS) {
+      } else if (r == CONNRES_OK) {
         my_logf(LL_VERBOSE, LP_DATETIME, "%s deleted email %d of reference '%s'", prefix, I, header_value);
       } else {
         internal_error("loop_receive_emails", __FILE__, __LINE__);
@@ -1279,9 +1251,9 @@ UNUSED(subst_len);
 
   free(response);
 
-  socket_line_sendf(&sock, g_trace_network_traffic, "QUIT");
+  conn_line_sendf(&conn, g_trace_network_traffic, "QUIT");
   my_logf(LL_DEBUG, LP_DATETIME, "%s closing POP3 connection", prefix);
-  os_closesocket(sock);
+  conn_close(&conn);
 
   return ERR_POP3_OK;
 }
@@ -1469,15 +1441,17 @@ int perform_check(struct check_t *chk) {
 int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, const char *smart_host, const char *prefix) {
   struct alert_t *alrt = exec_alert->alrt;
 
+  connection_t conn;
+  conn_init(&conn, get_conntype(alrt->smtp_env.port, alrt->smtp_env.crypt_set, alrt->smtp_env.crypt));
+
   int r;
-  int sock;
 
   struct rfc821_enveloppe_t smtp = alrt->smtp_env;
   smtp.smarthost = (char *)smart_host;
   smtp.smarthost_set = TRUE;
   char from_buf[SMALLSTRSIZE];
-  if ((r = smtp_email_sending_pre(&smtp, prefix, &sock, from_buf, sizeof(from_buf))) != ERR_SMTP_OK) {
-    os_closesocket(sock);
+  if ((r = smtp_email_sending_pre(&smtp, prefix, &conn, from_buf, sizeof(from_buf))) != ERR_SMTP_OK) {
+    conn_close(&conn);
     return r;
   }
 
@@ -1485,53 +1459,53 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
 
 // Email headers
 
-  if ((r = smtp_mail_sending_stdheaders(&sock, &smtp)) != ERR_SMTP_OK) {
-    os_closesocket(sock);
+  if ((r = smtp_mail_sending_stdheaders(&conn, &smtp)) != ERR_SMTP_OK) {
+    conn_close(&conn);
     return r;
   }
-  socket_line_sendf(&sock, g_trace_network_traffic, "subject: %s", exec_alert->desc);
-  socket_line_sendf(&sock, g_trace_network_traffic, "MIME-Version: 1.0");
+  conn_line_sendf(&conn, g_trace_network_traffic, "subject: %s", exec_alert->desc);
+  conn_line_sendf(&conn, g_trace_network_traffic, "MIME-Version: 1.0");
   char boundary[SMALLSTRSIZE];
   get_unique_mime_boundary(boundary, sizeof(boundary));
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-Type: multipart/alternative; boundary=%s", boundary);
+  conn_line_sendf(&conn, g_trace_network_traffic, "Content-Type: multipart/alternative; boundary=%s", boundary);
 
 // Email body
 
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
+  conn_line_sendf(&conn, g_trace_network_traffic, "");
 
     // Alternative 1: plain text
-  socket_line_sendf(&sock, g_trace_network_traffic, "--%s", boundary);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-Type: text/plain; charset=\"us-ascii\"");
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-Transfer-Encoding: 7bit");
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
-  socket_line_sendf(&sock, g_trace_network_traffic, "%s", exec_alert->desc);
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
+  conn_line_sendf(&conn, g_trace_network_traffic, "--%s", boundary);
+  conn_line_sendf(&conn, g_trace_network_traffic, "Content-Type: text/plain; charset=\"us-ascii\"");
+  conn_line_sendf(&conn, g_trace_network_traffic, "Content-Transfer-Encoding: 7bit");
+  conn_line_sendf(&conn, g_trace_network_traffic, "");
+  conn_line_sendf(&conn, g_trace_network_traffic, "%s", exec_alert->desc);
+  conn_line_sendf(&conn, g_trace_network_traffic, "");
 
     // Alternative 2: html
-  socket_line_sendf(&sock, g_trace_network_traffic, "--%s", boundary);
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-Type: text/html; charset=\"UTF-8\"");
-  socket_line_sendf(&sock, g_trace_network_traffic, "Content-Transfer-Encoding: 7bit");
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
-/*  socket_line_sendf(&sock, g_trace_network_traffic, "<!--");*/
-/*  socket_line_sendf(&sock, g_trace_network_traffic, "-->");*/
-  socket_line_sendf(&sock, g_trace_network_traffic, "<html>");
-  socket_line_sendf(&sock, g_trace_network_traffic, "<body>");
-  socket_line_sendf(&sock, g_trace_network_traffic, "<table cellpadding=\"2\" cellspacing=\"1\" border=\"1\">");
+  conn_line_sendf(&conn, g_trace_network_traffic, "--%s", boundary);
+  conn_line_sendf(&conn, g_trace_network_traffic, "Content-Type: text/html; charset=\"UTF-8\"");
+  conn_line_sendf(&conn, g_trace_network_traffic, "Content-Transfer-Encoding: 7bit");
+  conn_line_sendf(&conn, g_trace_network_traffic, "");
+/*  conn_line_sendf(&sock, g_trace_network_traffic, "<!--");*/
+/*  conn_line_sendf(&sock, g_trace_network_traffic, "-->");*/
+  conn_line_sendf(&conn, g_trace_network_traffic, "<html>");
+  conn_line_sendf(&conn, g_trace_network_traffic, "<body>");
+  conn_line_sendf(&conn, g_trace_network_traffic, "<table cellpadding=\"2\" cellspacing=\"1\" border=\"1\">");
  
-  socket_line_sendf(&sock, g_trace_network_traffic, "<tr><td bgcolor=\"%s\">", ST_TO_BGCOLOR_FORHTML[exec_alert->status]);
-  socket_line_sendf(&sock, g_trace_network_traffic, "%s", exec_alert->desc);
-  socket_line_sendf(&sock, g_trace_network_traffic, "</td></tr></table>");
-  socket_line_sendf(&sock, g_trace_network_traffic, "</body>");
-  socket_line_sendf(&sock, g_trace_network_traffic, "</html>");
-  socket_line_sendf(&sock, g_trace_network_traffic, "");
+  conn_line_sendf(&conn, g_trace_network_traffic, "<tr><td bgcolor=\"%s\">", ST_TO_BGCOLOR_FORHTML[exec_alert->status]);
+  conn_line_sendf(&conn, g_trace_network_traffic, "%s", exec_alert->desc);
+  conn_line_sendf(&conn, g_trace_network_traffic, "</td></tr></table>");
+  conn_line_sendf(&conn, g_trace_network_traffic, "</body>");
+  conn_line_sendf(&conn, g_trace_network_traffic, "</html>");
+  conn_line_sendf(&conn, g_trace_network_traffic, "");
 
     // End of alternatives
-  socket_line_sendf(&sock, g_trace_network_traffic, "--%s--", boundary);
+  conn_line_sendf(&conn, g_trace_network_traffic, "--%s--", boundary);
 
 // Email end
 
   char email_ref[SMALLSTRSIZE];
-  r = smtp_mail_sending_post(sock, prefix, email_ref, sizeof(email_ref));
+  r = smtp_mail_sending_post(&conn, prefix, email_ref, sizeof(email_ref));
 
   return r;
 }
@@ -2284,10 +2258,10 @@ void parse_options(int argc, char *argv[]) {
     option_error("Trailing options");
   if (g_current_log_level < LL_ERROR)
     g_current_log_level = LL_ERROR;
-  if (g_current_log_level > LL_DEBUG)
-    g_current_log_level = LL_DEBUG;
+  if (g_current_log_level > LL_DEBUGTRACE)
+    g_current_log_level = LL_DEBUGTRACE;
 
-  g_trace_network_traffic = (g_current_log_level == LL_DEBUG);
+  g_trace_network_traffic = (g_current_log_level == LL_DEBUGTRACE);
 }
 
 //
@@ -2666,8 +2640,6 @@ void read_configuration_file(const char *cf, int *nb_errors) {
 
                 if (cfg->method != -1) {
 
-                  dbg_write("i = %d, cfg->method = %d\n", i, cfg->method);
-
                   struct section_method_mgmt_t *m = &l_sections_methods[readcfg_vars[i].section];
                   if (m == NULL)
                     internal_error("read_configuration_file", __FILE__, __LINE__);
@@ -3013,6 +2985,9 @@ int main(int argc, char *argv[]) {
 
   my_pthread_mutex_init(&mutex);
   util_my_pthread_init();
+
+  SSL_load_error_strings(); /* readable error messages */
+  SSL_library_init();       /* initialize library */
 
   parse_options(argc, argv);
 
