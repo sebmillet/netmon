@@ -126,9 +126,7 @@ void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, 
        long unsigned int *usec, long int *gmtoff);
 
 char *os_last_err_desc(char *s, size_t s_bufsize);
-void os_set_sock_nonblocking_mode(int sock);
 int os_last_network_op_is_in_progress();
-void os_set_sock_blocking_mode(int sock);
 
 void my_pthread_mutex_lock(pthread_mutex_t *m);
 void my_pthread_mutex_unlock(pthread_mutex_t *m);

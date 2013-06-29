@@ -145,13 +145,13 @@ void os_sleep(long int seconds) {
   sleep(seconds);
 }
 
-void os_set_sock_nonblocking_mode(int sock) {
+static void os_set_sock_nonblocking_mode(int sock) {
   long arg = fcntl(sock, F_GETFL, NULL);
   arg |= O_NONBLOCK;
   fcntl(sock, F_SETFL, arg);
 }
 
-void os_set_sock_blocking_mode(int sock) {
+static void os_set_sock_blocking_mode(int sock) {
   long arg = fcntl(sock, F_GETFL, NULL);
   arg &= ~O_NONBLOCK;
   fcntl(sock, F_SETFL, arg);
@@ -657,8 +657,6 @@ int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct ti
     return CONNRES_OK;
   }
 
-  int r;
-
     // Assume we are a v2 or v3 client
   if ((conn->ssl_context = SSL_CTX_new(SSLv23_client_method())) == NULL) {
     my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)", prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
@@ -672,8 +670,7 @@ int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct ti
   }
   
   if (cr == CONNRES_OK) {
-    r = SSL_connect(conn->ssl_handle);  /* Initiate SSL handshake */
-    dbg_write("r = %d, want_write = %d, want_read = %d, lasterr = %d\n", r, SSL_ERROR_WANT_WRITE, SSL_ERROR_WANT_READ, ERR_get_error());
+    SSL_connect(conn->ssl_handle);  /* Initiate SSL handshake */
     if (select((conn->sock) + 1, NULL, &fdset, NULL, tv) <= 0) {
       my_logf(LL_ERROR, LP_DATETIME, "%s timeout handshaking to %s, %s", prefix, desc, os_last_err_desc(s_err, sizeof(s_err)));
       cr = CONNRES_CONNECTION_TIMEOUT;

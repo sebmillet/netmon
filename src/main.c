@@ -621,7 +621,7 @@ void alert_t_create(struct alert_t *alrt) {
 int get_conntype(const long int p, const int crypt_set, const int crypt) {
   if (!crypt_set || crypt == FIND_STRING_NOT_FOUND) {
     int i;
-    for (i = 0; i < sizeof(crypt_ports) / sizeof(*crypt_ports); ++i) {
+    for (i = 0; i < (signed int)(sizeof(crypt_ports) / sizeof(*crypt_ports)); ++i) {
       if (p == crypt_ports[i])
         return CONNTYPE_SSL;
     }

@@ -76,7 +76,7 @@ clean:
 	-if exist build\netmon.exe del build\netmon.exe
 
 build\netmon.exe: $(NETMON_OBJECTS)
-	$(CC) -o $@ $(NETMON_OBJECTS)   $(__DEBUG_FLAG) -L"C:\openssl\lib" -L"C:\pthreads" $(LDFLAGS)  -lssl -lcrypto -lWs2_32 -lAdvapi32 -lShell32 -lpthreadGC2
+	$(CC) -o $@ $(NETMON_OBJECTS)   $(__DEBUG_FLAG) -L"C:\openssl\lib" -L"C:\pthreads" $(LDFLAGS)  -lssl -lcrypto -lWs2_32 -lGdi32 -lAdvapi32 -lShell32 -lpthreadGC2
 
 build\netmon_main.o: src/main.c
 	$(CC) -c -o $@ $(NETMON_CFLAGS) $(CPPDEPS) $<
