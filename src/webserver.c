@@ -237,7 +237,7 @@ int manage_web_transaction(connection_t *conn) {
   my_logf(LL_DEBUG, LP_DATETIME, "Entering web transaction...");
 
   char *received = NULL;
-  int size;
+  size_t size;
   int read_res = 0;
   if ((read_res = conn_read_line_alloc(conn, &received, g_trace_network_traffic, &size)) < 0) {
     free(received);
@@ -359,7 +359,7 @@ int manage_web_transaction(connection_t *conn) {
   conn_line_sendf(conn, g_trace_network_traffic, "Last-modified: %s", dt_fileupdate);
   conn_line_sendf(conn, g_trace_network_traffic, "");
 
-  char *buffer = (char *)malloc(g_buffer_size);
+  char *buffer = (char *)malloc((size_t)g_buffer_size);
   size_t n;
   ssize_t e;
   while (feof(F) == 0) {
@@ -397,7 +397,7 @@ UNUSED(p);
   connection_t listen_conn;
   conn_init(&listen_conn, CONNTYPE_PLAIN);
 
-  if (server_listen(g_webserver_port, WEBSERVER_LOG_PREFIX, &listen_conn) == 0) {
+  if (server_listen((int)g_webserver_port, WEBSERVER_LOG_PREFIX, &listen_conn) == 0) {
     my_logf(LL_NORMAL, LP_DATETIME, "%s: stop", WEBSERVER_LOG_PREFIX);
     return NULL;
   }
@@ -409,7 +409,7 @@ UNUSED(p);
   conn_init(&connect_conn, CONNTYPE_PLAIN);
 
   while (1) {
-    while (server_accept(&listen_conn, &remote_sin, g_webserver_port, WEBSERVER_LOG_PREFIX, &connect_conn) != -1) {
+    while (server_accept(&listen_conn, &remote_sin, (int)g_webserver_port, WEBSERVER_LOG_PREFIX, &connect_conn) != -1) {
       if (manage_web_transaction(&connect_conn) != 0) {
         conn_close(&connect_conn);
         my_logf(LL_VERBOSE, LP_DATETIME, WEBSERVER_LOG_PREFIX ": terminated connection with client");

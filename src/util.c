@@ -17,6 +17,8 @@
 
 #include <openssl/err.h>
 
+const int crypt_ports[] = {443, 465, 585, 993, 995};
+
 loglevel_t g_current_log_level = LL_NORMAL;
 
 char g_log_file[SMALLSTRSIZE];
@@ -30,7 +32,7 @@ static pthread_mutex_t util_mutex;
 
 const struct connection_table_t connection_table[] = {
   {conn_plain_read, "<<< ", conn_plain_write, ">>> "},  // CONNTYPE_PLAIN
-  {conn_ssl_read,   "S<< ", conn_ssl_write,   "S>> "}   // CONNTYPE_SSL
+  {conn_ssl_read,   "SSL<<< ", conn_ssl_write,   "SSL>>> "}   // CONNTYPE_SSL
 };
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -51,7 +53,7 @@ long int os_gmtoff() {
   return -(TimeZoneInfo.Bias + TimeZoneInfo.DaylightBias) * 60;
 }
 
-void os_sleep(long int seconds) {
+void os_sleep(unsigned int seconds) {
   unsigned long int msecs = (unsigned long int)seconds * 1000;
   Sleep(msecs);
 }
@@ -141,7 +143,7 @@ UNUSED(f);
 
 const char FS_SEPARATOR = '/';
 
-void os_sleep(long int seconds) {
+void os_sleep(unsigned int seconds) {
   sleep(seconds);
 }
 
@@ -257,12 +259,12 @@ ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
     }
   }
   char *write_head = *lineptr;
-  size_t char_read = 0;
+  ssize_t char_read = 0;
   int c;
   while (1) {
 
       // Check there's enough memory to store read characters
-    if (*n - char_read <= 2) {
+    if ((ssize_t)*n - char_read <= 2) {
       size_t increase = *n * MY_GETLINE_COEF_INCREASE;
       if (increase < MY_GETLINE_MIN_INCREASE)
         increase = MY_GETLINE_MIN_INCREASE;
@@ -295,7 +297,7 @@ ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
         break;
     }
 
-    *write_head++ = c;
+    *write_head++ = (char)c;
     ++char_read;
 
       // Deal with newline character
@@ -371,13 +373,6 @@ void fatal_error(const char *format, ...) {
 }
 
 //
-// Stops after an internal error
-//
-void internal_error(const char *desc, const char *source_file, const unsigned long int line) {
-  fatal_error("Internal error %s, file %s, line %lu", desc, source_file, line);
-}
-
-//
 // Initializes the program log
 //
 void my_log_open() {
@@ -413,7 +408,7 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
       char *c = p + 2;
       for (; *c != '}' && *c != '\0'; ++c)
         ;
-      int l = c - p - 2;
+      int l = (int)(c - p - 2);
       if (*c == '}' && l >= 1) {
         *c = '\0';
         strncpy(var, p + 2, sizeof(var));
@@ -470,7 +465,7 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
 // Get date/time of day
 //
 void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, int *minute, int *second,
-       long unsigned int *usec, long int *gmtoff) {
+       long int *usec, long int *gmtoff) {
   time_t ltime = time(NULL);
   struct tm ts;
   ts = *localtime(&ltime);
@@ -525,7 +520,7 @@ void set_log_timestamp(char *s, size_t s_len,
 //
 void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt, size_t dt_len) {
   int wday; int year; int month; int day;
-  int hour; int minute; int second; long unsigned int usec;
+  int hour; int minute; int second; long int usec;
   long int gmtoff;
   get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
 
@@ -611,6 +606,55 @@ int s_begins_with(const char *s, const char *begins_with) {
 }
 
 //
+// Sets the string passed as argument to the last SSL error
+//
+char *ssl_get_error(const unsigned long e, char *s, const size_t s_len) {
+  ERR_error_string_n(e, s, s_len);
+  return s;
+}
+
+//
+// Initializes the connection_t object
+//
+void conn_init(connection_t *conn, int type) {
+  conn->type = type;
+  conn->sock = -1;
+  conn->ssl_handle = NULL;
+  conn->ssl_context = NULL;
+
+  conn->sock_read = connection_table[conn->type].sock_read;
+  conn->log_prefix_received = connection_table[conn->type].log_prefix_received;
+  conn->sock_write = connection_table[conn->type].sock_write;
+  conn->log_prefix_sent = connection_table[conn->type].log_prefix_sent;
+}
+
+//
+// Closes the connection
+//
+void conn_close(connection_t *conn) {
+  os_closesocket(conn->sock);
+  if (conn->ssl_handle != NULL) {
+    SSL_shutdown(conn->ssl_handle);
+    SSL_free(conn->ssl_handle);
+    conn->ssl_handle = NULL;
+  }
+  if (conn->ssl_context != NULL) {
+    SSL_CTX_free(conn->ssl_context);
+    conn->ssl_context = NULL;
+  }
+  conn->sock = -1;
+}
+
+//
+// Check whether a given connection_t object is closed
+//
+int conn_is_closed(connection_t *conn) {
+  if (conn->sock != -1 || conn->ssl_context != NULL || conn->ssl_handle != NULL)
+    return FALSE;
+  return TRUE;
+}
+
+//
 // Connect to a remote host, with a timeout
 // Return EC_* code.
 //
@@ -648,43 +692,47 @@ int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct ti
   }
 
   if (cr != CONNRES_OK) {
-    conn->sock = -1;
+    conn_close(conn);
     return cr;
   }
 
-  if (conn->type == CONNTYPE_PLAIN) {
-    os_set_sock_blocking_mode(conn->sock);
-    return CONNRES_OK;
+  os_set_sock_blocking_mode(conn->sock);
+
+  if (setsockopt(conn->sock, SOL_SOCKET, SO_RCVTIMEO, (char *)tv, sizeof(*tv))) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s unable to set timeout to network I/O", prefix);
   }
+
+  if (conn->type == CONNTYPE_PLAIN)
+    return CONNRES_OK;
 
     // Assume we are a v2 or v3 client
   if ((conn->ssl_context = SSL_CTX_new(SSLv23_client_method())) == NULL) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)", prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
+    my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
+      prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
     cr = CONNRES_SSL_CONNECTION_ERROR;
-  } else if ((conn->ssl_handle = SSL_new(conn->ssl_context)) == NULL) /* Create SSL connection */ {
-    my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)", prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
+  }
+
+    /* Create SSL connection */
+  else if ((conn->ssl_handle = SSL_new(conn->ssl_context)) == NULL)  {
+    my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
+      prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
     cr =  CONNRES_SSL_CONNECTION_ERROR;
-  } else if (!SSL_set_fd(conn->ssl_handle, conn->sock)) /* Connect the SSL struct to our connection */ {
-    my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)", prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
+  }
+
+    /* Connect the SSL struct to our connection */
+  else if (!SSL_set_fd(conn->ssl_handle, conn->sock))  {
+    my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
+      prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
     cr = CONNRES_SSL_CONNECTION_ERROR;
   }
-  
-  if (cr == CONNRES_OK) {
-    SSL_connect(conn->ssl_handle);  /* Initiate SSL handshake */
-    if (select((conn->sock) + 1, NULL, &fdset, NULL, tv) <= 0) {
-      my_logf(LL_ERROR, LP_DATETIME, "%s timeout handshaking to %s, %s", prefix, desc, os_last_err_desc(s_err, sizeof(s_err)));
-      cr = CONNRES_CONNECTION_TIMEOUT;
-    } else {
-      char so_error;
-      socklen_t len = sizeof(so_error);
-      getsockopt(conn->sock, SOL_SOCKET, SO_ERROR, &so_error, &len);
-      if (so_error != 0) {
-        my_logf(LL_ERROR, LP_DATETIME, "%s network error connecting to %s, code=%i (%s)", prefix, desc, so_error, strerror(so_error));
-      }
-      cr = so_error != 0 ? CONNRES_NETIO : CONNRES_OK;
-    }
+
+    /* Initiate SSL handshake */
+  else if (SSL_connect(conn->ssl_handle) != 1) {  
+    my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
+      prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
+    cr = CONNRES_SSL_CONNECTION_ERROR;
   }
-  
+
   if (cr == CONNRES_OK) {
     my_logf(LL_DEBUG, LP_DATETIME, "%s SSL: handshake [%s] successful", prefix, desc);
     os_set_sock_blocking_mode(conn->sock);
@@ -696,37 +744,89 @@ int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct ti
 }
 
 //
+// Split a hostname between the real hostname and the port, in case
+// the hostname is in the form
+//    hostname:port
+// If no ':' is found, just return the hostname and the default port
+//
+static int split_hostname(const char *hostname, const int port_set, const int port, const int default_port, const char *prefix,
+    char *h, const size_t h_len, int *p) {
+  strncpy(h, hostname, h_len);
+  h[h_len - 1] = '\0';
+  char *col = strchr(h, PORT_SEPARATOR);
+  if (col != NULL) {
+    *col = '\0';
+    char *strport = col + 1;
+    strport = trim(strport);
+    *p = atoi(strport);
+  } else {
+    *p = port_set ? port : default_port;
+  }
+  if (*p < 1) {
+    my_logf(LL_ERROR, LP_DATETIME, "%s invalid port number (%s:%i)", prefix, h, *p);
+    return -1;
+  }
+  return 0;
+}
+
+//
+// Guess if SSL is to be used given the port number
+//
+int guess_conntype(const long int p, const int crypt_set, const int crypt) {
+  if (!crypt_set || crypt == FIND_STRING_NOT_FOUND) {
+    int i;
+    for (i = 0; i < (signed int)(sizeof(crypt_ports) / sizeof(*crypt_ports)); ++i) {
+      if (p == crypt_ports[i])
+        return CONNTYPE_SSL;
+    }
+    return CONNTYPE_PLAIN;
+  } else {
+    return crypt;
+  }
+}
+
+//
 // Establish a connection, including all what it takes ->
 //    Host name resolution
 //    TCP connection open
 //    Check server answer
 //
-int conn_establish_connection(const char *host_name, int port, const char *expect, int timeout,
-    connection_t *conn, const char *prefix, int trace) {
-  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, host_name, port);
+int conn_establish_connection(const char *server_name, const int port_set, const int port, const int default_port,
+  const int crypt_set, const int crypt, const char *expect, int timeout, connection_t *conn, const char *prefix, int trace) {
+
+  char h[SMALLSTRSIZE];
+  int p;
+
+  if (split_hostname(server_name, port_set, port, default_port, prefix, h, sizeof(h), &p)) {
+    return CONNRES_INVALID_PORT_NUMBER;
+  }
+
+  conn_init(conn, guess_conntype(p, crypt_set, crypt));
+
+  my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, h, p);
 
   char server_desc[SMALLSTRSIZE];
   char s_err[ERR_STR_BUFSIZE];
 
-  snprintf(server_desc, sizeof(server_desc), "%s:%i", host_name, port);
+  snprintf(server_desc, sizeof(server_desc), "%s:%i", h, p);
 
     // Resolving server name
   struct sockaddr_in server;
   struct hostent *hostinfo = NULL;
-  my_logf(LL_DEBUG, LP_DATETIME, "Running gethosbyname() on %s", host_name);
-  hostinfo = gethostbyname(host_name);
+  my_logf(LL_DEBUG, LP_DATETIME, "Running gethosbyname() on %s", h);
+  hostinfo = gethostbyname(h);
   if (hostinfo == NULL) {
-    my_logf(LL_ERROR, LP_DATETIME, "Unknown host %s, %s", host_name, os_last_err_desc(s_err, sizeof(s_err)));
+    my_logf(LL_ERROR, LP_DATETIME, "Unknown host %s, %s", h, os_last_err_desc(s_err, sizeof(s_err)));
     return CONNRES_RESOLVE_ERROR;
   }
 
   int ret = CONNRES_CONNECTION_ERROR;
 
   if ((conn->sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == SOCKET_ERROR) {
-    fatal_error("socket() error to create connection socket, %s", os_last_err_desc(s_err, sizeof(s_err)));
+    fatal_error("%s socket() error to create connection socket, %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
   }
   server.sin_family = AF_INET;
-  server.sin_port = htons((uint16_t)port);
+  server.sin_port = htons((uint16_t)p);
   server.sin_addr = *(struct in_addr *)hostinfo->h_addr;
     // tv value is undefined after call to connect() as per documentation, so
     // it is to be re-set every time.
@@ -734,21 +834,21 @@ int conn_establish_connection(const char *host_name, int port, const char *expec
   tv.tv_sec = timeout;
   tv.tv_usec = 0;
 
-  my_logf(LL_DEBUG, LP_DATETIME, "Will connect to %s:%i, timeout = %i", host_name, port, timeout);
+  my_logf(LL_DEBUG, LP_DATETIME, "%s will connect to %s:%i, timeout = %i", prefix, h, p, timeout);
 
   if ((ret = conn_connect(&server, conn, &tv, server_desc, prefix)) == CONNRES_OK) {
-    my_logf(LL_DEBUG, LP_DATETIME, "Connected to %s", server_desc);
+    my_logf(LL_DEBUG, LP_DATETIME, "%s connected to %s", prefix, server_desc);
 
     if (expect != NULL && strlen(expect) >= 1) {
       char *response = NULL;
-      int response_size;
+      size_t response_size;
       if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0) {
         ;
       } else if (s_begins_with(response, expect)) {
-        my_logf(LL_DEBUG, LP_DATETIME, "Received the expected answer: '%s' (expected '%s')", response, expect);
+        my_logf(LL_DEBUG, LP_DATETIME, "%s received the expected answer: '%s' (expected '%s')", prefix, response, expect);
         ret = CONNRES_OK;
       } else {
-        my_logf(LL_VERBOSE, LP_DATETIME, "Received an unexpected answer: '%s' (expected '%s')", response, expect);
+        my_logf(LL_VERBOSE, LP_DATETIME, "%s received an unexpected answer: '%s' (expected '%s')", prefix, response, expect);
         ret = CONNRES_UNEXPECTED_ANSWER;
       }
       free(response);
@@ -766,16 +866,16 @@ int conn_establish_connection(const char *host_name, int port, const char *expec
 // Return -1 if an error occured, 1 if reading is successful,
 // 0 if transmission is closed.
 //
-int conn_read_line_alloc(connection_t *conn, char **out, int trace, int *size) {
+int conn_read_line_alloc(connection_t *conn, char **out, int trace, size_t *size) {
   const int INITIAL_READLINE_BUFFER_SIZE = 100;
 
   int i = 0;
   int cr = FALSE;
   char ch;
-  int nb;
+  ssize_t nb;
 
   if (*out == NULL) {
-    *size = INITIAL_READLINE_BUFFER_SIZE;
+    *size = (size_t)INITIAL_READLINE_BUFFER_SIZE;
     *out = (char *)malloc(*size);
   }
 
@@ -854,7 +954,7 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
 
   strncat(tmp, "\015\012", sizeof(tmp));
 
-  int e = conn->sock_write(conn, tmp, strlen(tmp));
+  ssize_t e = conn->sock_write(conn, tmp, strlen(tmp));
 
 /*  free(tmp);*/
 
@@ -872,7 +972,7 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
 // Send a string to a socket and chck answer (telnet-style communication)
 //
 int conn_round_trip(connection_t *conn, const char *expect, int trace, const char *fmt, ...) {
-  int l = strlen(fmt) + 100;
+  size_t l = strlen(fmt) + 100;
   char *tmp;
   tmp = (char *)malloc(l + 1);
 
@@ -887,7 +987,7 @@ int conn_round_trip(connection_t *conn, const char *expect, int trace, const cha
     return CONNRES_NETIO;
 
   char *response = NULL;
-  int response_size;
+  size_t response_size;
   if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0) {
     free(response);
     return CONNRES_NETIO;
@@ -900,46 +1000,6 @@ int conn_round_trip(connection_t *conn, const char *expect, int trace, const cha
 
   free(response);
   return CONNRES_UNEXPECTED_ANSWER;
-}
-
-//
-// Sets the string passed as argument to the last SSL error
-//
-char *ssl_get_error(const unsigned long e, char *s, const size_t s_len) {
-  ERR_error_string_n(e, s, s_len);
-  return s;
-}
-
-//
-// Initializes the connection_t object
-//
-void conn_init(connection_t *conn, int type) {
-  conn->type = type;
-  conn->sock = -1;
-  conn->ssl_handle = NULL;
-  conn->ssl_context = NULL;
-
-  conn->sock_read = connection_table[conn->type].sock_read;
-  conn->log_prefix_received = connection_table[conn->type].log_prefix_received;
-  conn->sock_write = connection_table[conn->type].sock_write;
-  conn->log_prefix_sent = connection_table[conn->type].log_prefix_sent;
-}
-
-//
-// Closes the connection
-//
-void conn_close(connection_t *conn) {
-  os_closesocket(conn->sock);
-  if (conn->ssl_handle != NULL) {
-    SSL_shutdown(conn->ssl_handle);
-    SSL_free(conn->ssl_handle);
-    conn->ssl_handle = NULL;
-  }
-  if (conn->ssl_context != NULL) {
-    SSL_CTX_free(conn->ssl_context);
-    conn->ssl_context = NULL;
-  }
-  conn->sock = -1;
 }
 
 //
@@ -960,13 +1020,13 @@ ssize_t conn_plain_write(connection_t *conn, void *buf, const size_t buf_len) {
 // CONNTYPE_SSL -> read sock
 //
 ssize_t conn_ssl_read(connection_t *conn, void *buf, const size_t buf_len) {
-  return SSL_read(conn->ssl_handle, buf, buf_len);
+  return SSL_read(conn->ssl_handle, buf, (int)buf_len);
 }
 
 //
 // CONNTYPE_SSL -> write sock
 //
 ssize_t conn_ssl_write(connection_t *conn, void *buf, const size_t buf_len) {
-  return SSL_write(conn->ssl_handle, buf, buf_len);
+  return SSL_write(conn->ssl_handle, buf, (int)buf_len);
 }
 

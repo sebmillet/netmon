@@ -54,8 +54,6 @@
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
 const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
 
-const int crypt_ports[] = {443, 465, 585, 993, 995};
-
 const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
 
   // Don't update the one below unless you know what you're doing!
@@ -195,7 +193,6 @@ int g_html_file_set = FALSE;
 char g_html_complete_file_name[BIGSTRSIZE];
 
 #define CFGK_LIST_SEPARATOR ','
-#define CFGK_PORT_SEPARATOR ':'
 #define CFGK_COMMENT_CHAR ';'
 
 enum {AM_UNDEF = FIND_STRING_NOT_FOUND, AM_SMTP = 0, AM_PROGRAM = 1, AM_LOG = 2};
@@ -366,7 +363,7 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"smtp_recipients", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.recipients, NULL, 0,
     &alrt00.smtp_env.recipients_set, FALSE, NULL, 0, AM_SMTP},
   {"smtp_connect_timeout", V_INT, CS_ALERT, &alrt00.smtp_env.connect_timeout, NULL, NULL, 0,
-    &alrt00.smtp_env.connect_timeout_set, FALSE, NULL, 0, AM_SMTP},
+    &alrt00.smtp_env.connect_timeout_set, TRUE, NULL, 0, AM_SMTP},
 
 // ALERTS -> PROGRAM method
 
@@ -553,8 +550,8 @@ void check_t_getready(struct check_t *chk) {
   if (chk->str_prev_status != NULL)
     return;
   if (g_nb_keep_last_status >= 1) {
-    chk->str_prev_status = (char *)malloc(g_nb_keep_last_status + 1);
-    memset(chk->str_prev_status, ST_TO_CHAR[ST_UNDEF], g_nb_keep_last_status);
+    chk->str_prev_status = (char *)malloc((unsigned long)g_nb_keep_last_status + 1);
+    memset(chk->str_prev_status, ST_TO_CHAR[ST_UNDEF], (unsigned long int)g_nb_keep_last_status);
     chk->str_prev_status[g_nb_keep_last_status] = '\0';
   }
   chk->last_status_change_flag = FALSE;
@@ -618,25 +615,12 @@ void alert_t_create(struct alert_t *alrt) {
   alrt->log_string_set = FALSE;
 }
 
-int get_conntype(const long int p, const int crypt_set, const int crypt) {
-  if (!crypt_set || crypt == FIND_STRING_NOT_FOUND) {
-    int i;
-    for (i = 0; i < (signed int)(sizeof(crypt_ports) / sizeof(*crypt_ports)); ++i) {
-      if (p == crypt_ports[i])
-        return CONNTYPE_SSL;
-    }
-    return CONNTYPE_PLAIN;
-  } else {
-    return crypt;
-  }
-}
-
 //
 // Fill the string with a boundary string, garanteed unique
 //
 void get_unique_mime_boundary(char *boundary, size_t boundary_len) {
   int wday; int year; int month; int day;
-  int hour; int minute; int second; long unsigned int usec;
+  int hour; int minute; int second; long int usec;
   long int gmtoff;
   get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
   snprintf(boundary, boundary_len, "nm1_%04d%02d%02d%02d%02d%02d%06lu_%d_%d",
@@ -684,11 +668,15 @@ UNUSED(subst_len);
   snprintf(prefix, sizeof(prefix), "TCP check(%s):", chk->display_name);
 
   connection_t conn;
-  conn_init(&conn, get_conntype(chk->tcp_port, chk->tcp_crypt_set, chk->tcp_crypt));
 
-  int cr = conn_establish_connection(chk->host_name, chk->tcp_port, chk->tcp_expect_set ? chk->tcp_expect : NULL,
-    chk->tcp_connect_timeout_set ? chk->tcp_connect_timeout : g_connect_timeout, &conn, prefix, g_trace_network_traffic);
+  int cr = conn_establish_connection(chk->host_name, chk->tcp_port_set, (int)chk->tcp_port, 0, chk->tcp_crypt_set, (int)chk->tcp_crypt,
+    chk->tcp_expect_set ? chk->tcp_expect : NULL,
+    (int)(chk->tcp_connect_timeout_set ? chk->tcp_connect_timeout : g_connect_timeout),
+    &conn, prefix, g_trace_network_traffic);
+
   conn_close(&conn);
+  assert(conn_is_closed(&conn));
+
   my_logf(LL_VERBOSE, LP_DATETIME, "%s disconnected from %s:%i", prefix, chk->host_name, chk->tcp_port);
   if (cr == CONNRES_OK)
     return ST_OK;
@@ -742,32 +730,6 @@ void build_email_ref(const struct check_t *chk, const time_t time_ref, char *s, 
 }
 
 //
-// Split a hostname between the real hostname and the port, in case
-// the hostname is in the form
-//    hostname:port
-// If no ':' is found, just return the hostname and the default port
-//
-int split_hostname(const char *hostname, const int port, const int port_set, const int default_port, const char *prefix,
-    char *h, const size_t h_len, int *p) {
-  strncpy(h, hostname, h_len);
-  h[h_len - 1] = '\0';
-  char *col = strchr(h, CFGK_PORT_SEPARATOR);
-  if (col != NULL) {
-    *col = '\0';
-    char *strport = col + 1;
-    strport = trim(strport);
-    *p = atoi(strport);
-  } else {
-    *p = port_set ? port : default_port;
-  }
-  if (*p < 1) {
-    my_logf(LL_ERROR, LP_DATETIME, "%s invalid port number (%s:%i)", prefix, h, *p);
-    return -1;
-  }
-  return 0;
-}
-
-//
 // Extract SMTP address from string, example ->
 // smtp_address("abc <x@c> def") will return "x@c"
 // smtp_address("  dd  x@c o@t d,d") will return "x@c o@t"
@@ -809,14 +771,8 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix,
   env->nb_recipients_wanted = -1;
   env->nb_recipients_ok = -1;
 
-  char h[SMALLSTRSIZE];
-  int p;
-
-  if (split_hostname(env->smarthost, env->port, env->port_set, DEFAULT_SMTP_PORT, prefix, h, sizeof(h), &p))
-    return ERR_SMTP_INVALID_PORT_NUMBER;
-
-  int cr = conn_establish_connection(h, p, "220 ",
-    env->connect_timeout_set ? env->connect_timeout_set : g_connect_timeout, conn, prefix, g_trace_network_traffic);
+  int cr = conn_establish_connection(env->smarthost, env->port_set, (int)env->port, DEFAULT_SMTP_PORT, env->crypt_set, (int)env->crypt,
+    "220 ", (int)(env->connect_timeout_set ? env->connect_timeout : g_connect_timeout), conn, prefix, g_trace_network_traffic);
   if (cr != CONNRES_OK)
     return (cr == CONNRES_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR : ERR_SMTP_NETIO);
 
@@ -826,7 +782,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix,
   }
 
   char *response = NULL;
-  int response_size;
+  size_t response_size;
   do {
     if (conn_read_line_alloc(conn, &response, g_trace_network_traffic, &response_size) < 0) {
       return ERR_SMTP_NETIO;
@@ -901,7 +857,7 @@ int smtp_mail_sending_post(connection_t *conn, const char *prefix, char *email_r
   }
 
   char *response = NULL;
-  int response_size;
+  size_t response_size;
   if (conn_read_line_alloc(conn, &response, g_trace_network_traffic, &response_size) < 0) {
     free(response);
     conn_close(conn);
@@ -910,6 +866,7 @@ int smtp_mail_sending_post(connection_t *conn, const char *prefix, char *email_r
   if (!s_begins_with(response, "250 ")) {
     free(response);
     my_logf(LL_ERROR, LP_DATETIME, "%s remote end did not confirm email reception", prefix);
+    conn_close(conn);
     return ERR_SMTP_EMAIL_RECEPTION_NOT_CONFIRMED;
   }
   char *e;
@@ -920,7 +877,7 @@ int smtp_mail_sending_post(connection_t *conn, const char *prefix, char *email_r
   int ii;
   for (ii = 0; response[ii] != '\0'; ++ii) {
     if (isupper(response[ii]))
-      tmp[ii] = toupper(response[ii]);
+      tmp[ii] = (char)toupper(response[ii]);
     else
       tmp[ii] = response[ii];
   }
@@ -949,11 +906,11 @@ void get_rfc822_header_format_current_date(char *date, const size_t date_len) {
   const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
   int wday; int year; int month; int day;
-  int hour; int minute; int second; long unsigned int usec;
+  int hour; int minute; int second; long int usec;
   long int gmtoff;
   get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
-  int gmtoff_h = abs(gmtoff) / 3600;
-  int gmtoff_m = abs(gmtoff) % 3600;
+  int gmtoff_h = (int)(labs(gmtoff) / 3600L);
+  int gmtoff_m = (int)(labs(gmtoff) % 3600L);
   snprintf(date, date_len, "%s, %d %s %d %02d:%02d:%02d %s%02d%02d", wdays[wday], day, months[month - 1], year,
     hour, minute, second, gmtoff < 0 ? "-" : "+", gmtoff_h, gmtoff_m);
 }
@@ -985,7 +942,6 @@ UNUSED(subst_len);
   my_logf(LL_VERBOSE, LP_DATETIME, "%s sending probe email", prefix);
 
   connection_t conn;
-  conn_init(&conn, get_conntype(chk->loop_smtp.port, chk->loop_smtp.crypt_set, chk->loop_smtp.crypt));
 
   int r;
 
@@ -994,6 +950,7 @@ UNUSED(subst_len);
     char from_buf[SMALLSTRSIZE];
     if ((r = smtp_email_sending_pre(&smtp, prefix, &conn, from_buf, sizeof(from_buf))) != ERR_SMTP_OK) {
       conn_close(&conn);
+      assert(conn_is_closed(&conn));
       return LOOP_STATUS_WHEN_SENDING_FAILS;
     }
 
@@ -1001,6 +958,7 @@ UNUSED(subst_len);
 
     if ((r = smtp_mail_sending_stdheaders(&conn, &smtp)) != ERR_SMTP_OK) {
       conn_close(&conn);
+      assert(conn_is_closed(&conn));
       return LOOP_STATUS_WHEN_SENDING_FAILS;
     }
   }
@@ -1008,7 +966,7 @@ UNUSED(subst_len);
   ++last_loop;
   if (last_loop >= loops_nb_alloc) {
     loops_nb_alloc += LOOP_ARRAY_REALLOC_STEP;
-    loops = (struct loop_t *)realloc(loops, loops_nb_alloc * sizeof(struct loop_t));
+    loops = (struct loop_t *)realloc(loops, (unsigned long int)loops_nb_alloc * sizeof(struct loop_t));
   }
 
   struct loop_t *loop = &loops[last_loop];
@@ -1051,6 +1009,8 @@ UNUSED(subst_len);
     loop->sent_time = ltime;
     r = ERR_SMTP_OK;
   }
+
+  assert(conn_is_closed(&conn));
 
   return r == ERR_SMTP_OK ? ST_OK : LOOP_STATUS_WHEN_SENDING_FAILS;
 }
@@ -1111,23 +1071,17 @@ UNUSED(subst_len);
 
   my_logf(LL_VERBOSE, LP_DATETIME, "%s retrieving probe email(s)", prefix);
 
-  char h[SMALLSTRSIZE];
-  int p;
   const struct pop3_account_t *pop3 = &chk->loop_pop3;
 
   if (g_test_mode != 0)
     return ERR_POP3_OK;
 
-  if (split_hostname(pop3->server, pop3->port, pop3->port_set, DEFAULT_POP3_PORT, prefix, h, sizeof(h), &p))
-    return ERR_POP3_INVALID_PORT_NUMBER;
-
   connection_t conn;
-  conn_init(&conn, get_conntype(p, pop3->crypt_set, pop3->crypt));
 
   int r;
 
-  int cr = conn_establish_connection(h, p, "+OK ",
-    pop3->connect_timeout_set ? pop3->connect_timeout_set : g_connect_timeout, &conn, prefix, g_trace_network_traffic);
+  int cr = conn_establish_connection(pop3->server, pop3->port_set, (int)pop3->port, DEFAULT_POP3_PORT, pop3->crypt_set, (int)pop3->crypt,
+    "+OK ", (int)(pop3->connect_timeout_set ? pop3->connect_timeout : g_connect_timeout), &conn, prefix, g_trace_network_traffic);
   if (cr != CONNRES_OK)
     return (cr == CONNRES_RESOLVE_ERROR ? ERR_POP3_RESOLVE_ERROR : ERR_POP3_NETIO);
 
@@ -1157,7 +1111,7 @@ UNUSED(subst_len);
     return ERR_POP3_NETIO;
   }
   char *response = NULL;
-  int response_size;
+  size_t response_size;
   if (conn_read_line_alloc(&conn, &response, g_trace_network_traffic, &response_size) < 0) {
     free(response);
     return ERR_POP3_NETIO;
@@ -1240,7 +1194,7 @@ UNUSED(subst_len);
       } else if (r == CONNRES_OK) {
         my_logf(LL_VERBOSE, LP_DATETIME, "%s deleted email %d of reference '%s'", prefix, I, header_value);
       } else {
-        internal_error("loop_receive_emails", __FILE__, __LINE__);
+        assert(FALSE);
       }
     } else {
       my_logf(LL_DEBUG, LP_DATETIME, "%s Email %d of reference '%s' is not mine, ignoring", prefix, I, header_value);
@@ -1279,7 +1233,7 @@ int perform_check_loop(struct check_t *chk, const struct subst_t *subst, int sub
 
     if (--chk->loop_send_countdown <= 0) {
       r = loop_send_email(chk, subst, subst_len, prefix);
-      chk->loop_send_countdown = chk->loop_send_every_set ? chk->loop_send_every : DEFAULT_LOOP_SEND_EVERY;
+      chk->loop_send_countdown = (int)(chk->loop_send_every_set ? chk->loop_send_every : DEFAULT_LOOP_SEND_EVERY);
     } else {
       my_logf(LL_VERBOSE, LP_DATETIME, "%s skipping email sending, countdown = %d", prefix, chk->loop_send_countdown);
     }
@@ -1442,7 +1396,6 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
   struct alert_t *alrt = exec_alert->alrt;
 
   connection_t conn;
-  conn_init(&conn, get_conntype(alrt->smtp_env.port, alrt->smtp_env.crypt_set, alrt->smtp_env.crypt));
 
   int r;
 
@@ -1506,6 +1459,8 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
 
   char email_ref[SMALLSTRSIZE];
   r = smtp_mail_sending_post(&conn, prefix, email_ref, sizeof(email_ref));
+
+  assert(conn_is_closed(&conn));
 
   return r;
 }
@@ -1703,7 +1658,8 @@ void manage_output(const struct tm *now_done, float elapsed) {
     char duration[50];
     snprintf(duration, sizeof(duration), ", done in %6.3fs", elapsed);
     char sf[50];
-    int l = g_nb_keep_last_status - strlen(now) - strlen(LC_PREFIX) - strlen(duration) + g_display_name_width + 5;
+    int l = (int)g_nb_keep_last_status - (int)strlen(now) - (int)strlen(LC_PREFIX) - (int)strlen(duration) +
+      (int)g_display_name_width + 5;
     snprintf(sf, sizeof(sf), "%%s %%s %%s%%%is%%s\n", l < 1 ? 1 : l);
 
     fputs(TERM_CLEAR_SCREEN, stdout);
@@ -1768,7 +1724,7 @@ void manage_output(const struct tm *now_done, float elapsed) {
 
     if (g_print_status) {
       char short_display_name[g_display_name_width + 1];
-      strncpy(short_display_name, chk->display_name, g_display_name_width + 1);
+      strncpy(short_display_name, chk->display_name, (unsigned)g_display_name_width + 1);
       short_display_name[g_display_name_width] = '\0';
 
       char f[50];
@@ -1834,7 +1790,7 @@ void almost_neverending_loop() {
   if (g_test_mode == 3) {
     my_logf(LL_DEBUG, LP_DATETIME, "Test mode 3: waiting to be at the middle of a second elapse to start");
     int wday; int year; int month; int day;
-    int hour; int minute; int second; long unsigned int usec;
+    int hour; int minute; int second; long int usec;
     long int gmtoff;
     while (usec >= 500000)
       get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
@@ -1846,7 +1802,7 @@ void almost_neverending_loop() {
 
     my_pthread_mutex_lock(&mutex);
     ++loop_count;
-    int lc = loop_count;
+    int lc = (int)loop_count;
     my_pthread_mutex_unlock(&mutex);
 
     int II;
@@ -1863,8 +1819,7 @@ void almost_neverending_loop() {
         continue;
 
       int status = perform_check(chk);
-      if (status < 0 || status > _ST_LAST)
-        internal_error("almost_neverending_loop", __FILE__, __LINE__);
+      assert(status >= 0 && status <= _ST_LAST);
 
       struct tm my_now;
       set_current_tm(&my_now);
@@ -1908,12 +1863,12 @@ void almost_neverending_loop() {
 
         // Update status history
       if (g_nb_keep_last_status >= 1) {
-        char *buf = (char *)malloc(g_nb_keep_last_status + 1);
-        strncpy(buf, chk->str_prev_status + 1, g_nb_keep_last_status + 1);
-        strncpy(chk->str_prev_status, buf, g_nb_keep_last_status + 1);
+        char *buf = (char *)malloc((unsigned long int)g_nb_keep_last_status + 1);
+        strncpy(buf, chk->str_prev_status + 1, (unsigned long int)g_nb_keep_last_status + 1);
+        strncpy(chk->str_prev_status, buf, (unsigned long int)g_nb_keep_last_status + 1);
         char t[] = "A";
         t[0] = ST_TO_CHAR[chk->status];
-        strncat(chk->str_prev_status, t, g_nb_keep_last_status + 1);
+        strncat(chk->str_prev_status, t, (unsigned long int)g_nb_keep_last_status + 1);
         free(buf);
       }
 
@@ -1923,8 +1878,8 @@ void almost_neverending_loop() {
       if (as == AS_NOTHING)
         chk->trigger_sequence = 0;
 
-      int threshold = chk->alert_threshold_set ? chk->alert_threshold : DEFAULT_ALERT_THRESHOLD;
-      int repeat_max = chk->alert_repeat_max_set ? chk->alert_repeat_max : DEFAULT_ALERT_REPEAT_MAX;
+      int threshold = (int)(chk->alert_threshold_set ? chk->alert_threshold : DEFAULT_ALERT_THRESHOLD);
+      int repeat_max = (int)(chk->alert_repeat_max_set ? chk->alert_repeat_max : DEFAULT_ALERT_REPEAT_MAX);
       if (chk->alert_threshold_set && chk->alert_threshold == chk->nb_consecutive_notok) {
         trigger_alert = TRUE;
         chk->trigger_sequence++;
@@ -1949,21 +1904,21 @@ void almost_neverending_loop() {
           chk->alert_ctrl[i].nb_failures = 0;
 
         if (!chk->alert_threshold_set) {
-          threshold = alrt->threshold_set ? alrt->threshold : DEFAULT_ALERT_THRESHOLD;
+          threshold = (int)(alrt->threshold_set ? alrt->threshold : DEFAULT_ALERT_THRESHOLD);
           if (threshold == chk->nb_consecutive_notok)
             trigger_alert_by_alert = TRUE;
         }
 
         if (!chk->alert_repeat_every_set) {
-          int resend_every = alrt->repeat_every_set ? alrt->repeat_every : DEFAULT_ALERT_REPEAT_EVERY;
+          int resend_every = (int)(alrt->repeat_every_set ? alrt->repeat_every : DEFAULT_ALERT_REPEAT_EVERY);
           if (chk->nb_consecutive_notok - threshold >= resend_every &&
                 (chk->nb_consecutive_notok - threshold + resend_every) % resend_every == 0) {
-            int repm = alrt->repeat_max_set ? alrt->repeat_max : repeat_max;
+            int repm = (int)(alrt->repeat_max_set ? alrt->repeat_max : repeat_max);
             trigger_alert_by_alert = (repm < 0 ? TRUE : (chk->alert_ctrl[i].trigger_sequence <= repm));
           }
         }
 
-        int retries = (alrt->retries_set ? alrt->retries : DEFAULT_ALERT_RETRIES);
+        int retries = (int)(alrt->retries_set ? alrt->retries : DEFAULT_ALERT_RETRIES);
         if (chk->alert_ctrl[i].alert_status == AS_FAIL && as == AS_RECOVERY) {
           if (chk->alert_recovery_set && chk->alert_recovery) {
             trigger_alert_by_alert = TRUE;
@@ -2037,10 +1992,10 @@ void almost_neverending_loop() {
     if (gettimeofday(&tv1, NULL) == GETTIMEOFDAY_ERROR)
       fatal_error("File %s, line %i, gettimeofday() error", __FILE__, __LINE__);
 
-    float elapsed = (long signed int)tv1.tv_sec - (long signed int)tv0.tv_sec;
+    float elapsed = (float)((long signed int)tv1.tv_sec - (long signed int)tv0.tv_sec);
     elapsed += ((float)tv1.tv_usec - (float)tv0.tv_usec) / 1000000;
     if (g_test_mode >= 1)
-      elapsed = .12345;
+      elapsed = .12345F;
 
 //
 // Display result (terminal and HTML file)
@@ -2055,13 +2010,13 @@ void almost_neverending_loop() {
 //
 
     if (g_check_interval && g_test_mode == 0) {
-      long int delay = g_check_interval - (long int)elapsed;
+      int delay = (int)g_check_interval - (int)elapsed;
       if (delay < 1)
         delay = 1;
       if (delay > g_check_interval)
-        delay = g_check_interval;
+        delay = (int)g_check_interval;
       my_logf(LL_NORMAL, LP_DATETIME, "Now sleeping for %li second(s) (interval = %li)", delay, g_check_interval);
-      os_sleep(delay);
+      os_sleep((unsigned int)delay);
     } else if (g_test_mode >=1) {
       if (g_test_mode == 1)
         break;
@@ -2459,13 +2414,11 @@ void read_configuration_file(const char *cf, int *nb_errors) {
           section_name[slen] = '\0';
 
           if (read_status == CS_CHECK) {
-            if (section_start_line_number < 1 || cur_check < 0)
-              internal_error("read_configuration_file", __FILE__, __LINE__);
+            assert(section_start_line_number >= 1 && cur_check >= 0)
             checks[cur_check] = chk00;
             check_t_check(&checks[cur_check], cf, section_start_line_number, nb_errors);
           } else if (read_status == CS_ALERT) {
-            if (section_start_line_number < 1 || cur_alert < 0)
-              internal_error("read_configuration_file", __FILE__, __LINE__);
+            assert(section_start_line_number >= 1 && cur_alert >= 0)
             alerts[cur_alert] = alrt00;
             alert_t_check(&alerts[cur_alert], cf, section_start_line_number, nb_errors);
           }
@@ -2527,19 +2480,19 @@ void read_configuration_file(const char *cf, int *nb_errors) {
 
           char orig_key[SMALLSTRSIZE];
           char *key = orig_key;
-          size_t n = slen + 1;
-          if (n > sizeof(orig_key))
-            n = sizeof(orig_key);
-          strncpy(key, b, n);
-          key[n - 1] = '\0';
+          size_t N = slen + 1;
+          if (N > sizeof(orig_key))
+            N = sizeof(orig_key);
+          strncpy(key, b, N);
+          key[N - 1] = '\0';
           key = trim(key);
 
-          n = blen - slen + 1;
+          N = blen - slen + 1;
           char orig_value[BIGSTRSIZE];
           char *value = orig_value;
-          if (n > sizeof(orig_value))
-            n = sizeof(orig_value);
-          strncpy(value, e + 1, n);
+          if (N > sizeof(orig_value))
+            N = sizeof(orig_value);
+          strncpy(value, e + 1, N);
           value = trim(value);
           size_t l = strlen(value);
           if (value[0] == '"' && value[l - 1] == '"') {
@@ -2615,14 +2568,13 @@ void read_configuration_file(const char *cf, int *nb_errors) {
                     *cfg->pint_var_set = TRUE;
 
                   } else {
-                    internal_error("read_configuration_file", __FILE__, __LINE__);
+                    assert(FALSE);
                   }
 
                 } else if (cfg->p_pchar_target != NULL) {
 
                     // Variable of type string, need to malloc
-                  if (*cfg->p_pchar_target != NULL)
-                    internal_error("read_configuration_file", __FILE__, __LINE__);
+                  assert(*cfg->p_pchar_target == NULL)
                   size_t nn = strlen(value) + 1;
                   *cfg->p_pchar_target = (char *)malloc(nn);
                   strncpy(*cfg->p_pchar_target, value, nn);
@@ -2635,14 +2587,13 @@ void read_configuration_file(const char *cf, int *nb_errors) {
                   *cfg->pint_var_set = TRUE;
 
                 } else {
-                  internal_error("read_configuration_file", __FILE__, __LINE__);
+                  assert(FALSE);
                 }
 
                 if (cfg->method != -1) {
 
                   struct section_method_mgmt_t *m = &l_sections_methods[readcfg_vars[i].section];
-                  if (m == NULL)
-                    internal_error("read_configuration_file", __FILE__, __LINE__);
+                  assert(m != NULL)
 
                   if (*m->guess_method < 0)
                     *m->guess_method = cfg->method;
@@ -2658,7 +2609,7 @@ void read_configuration_file(const char *cf, int *nb_errors) {
                       cf, line_number, key, m->names[*m->guess_method]);
                   }
                   if (*m->method_set && *m->method >= 0) {
-                    *m->guess_method = *m->method;
+                    *m->guess_method = (int)*m->method;
                   }
                 }
 
@@ -2689,24 +2640,19 @@ void read_configuration_file(const char *cf, int *nb_errors) {
     }
   }
   if (cur_check >= 0 && read_status == CS_CHECK) {
-    if (section_start_line_number < 0)
-      internal_error("read_configuration_file", __FILE__, __LINE__);
+    assert(section_start_line_number >= 0)
     checks[cur_check] = chk00;
     check_t_check(&checks[cur_check], cf, section_start_line_number, nb_errors);
   }
 
   if (cur_alert >= 0 && read_status == CS_ALERT) {
-    if (section_start_line_number < 0)
-      internal_error("read_configuration_file", __FILE__, __LINE__);
+    assert(section_start_line_number >= 0)
     alerts[cur_alert] = alrt00;
     alert_t_check(&alerts[cur_alert], cf, section_start_line_number, nb_errors);
   }
 
-  if (g_nb_checks != cur_check + 1)
-    internal_error("read_configuration_file", __FILE__, __LINE__);
-
-  if (g_nb_alerts != cur_alert + 1)
-    internal_error("read_configuration_file", __FILE__, __LINE__);
+  assert(g_nb_checks == cur_check + 1)
+  assert(g_nb_alerts == cur_alert + 1)
 
   if (line != NULL)
     free(line);
@@ -2758,14 +2704,14 @@ void identify_alerts(int *nb_errors) {
         ++n;
     }
     chk->nb_alerts = n;
-    chk->alert_ctrl = (struct alert_ctrl_t *)malloc(sizeof(struct alert_ctrl_t) * n);
+    chk->alert_ctrl = (struct alert_ctrl_t *)malloc(sizeof(struct alert_ctrl_t) * (long unsigned int)n);
     size_t b = strlen(chk->alerts) + 2;
 
     char *t = (char *)malloc(b);
     strncpy(t, chk->alerts, b);
 
     char *next_curs = t;
-    int index = 0;
+    int idx = 0;
     while (next_curs != NULL) {
       char *curs = next_curs;
       char *fc = curs;
@@ -2782,11 +2728,11 @@ void identify_alerts(int *nb_errors) {
         (*nb_errors)++;
         my_logf(LL_ERROR, LP_DATETIME, "Check '%s': unknown alert '%s'", chk->display_name, curs);
       } else {
-        chk->alert_ctrl[index].idx = k;
-        ++index;
+        chk->alert_ctrl[idx].idx = k;
+        ++idx;
       }
     }
-    chk->nb_alerts = index;
+    chk->nb_alerts = idx;
     free(t);
   }
 
@@ -2867,8 +2813,7 @@ void checks_display() {
     d_i("   alert_repeat_every = ", chk->alert_repeat_every_set, chk->alert_repeat_every);
     d_i("   alert_repeat_max   = ", chk->alert_repeat_max_set, chk->alert_repeat_max);
   }
-  if (c != g_nb_valid_checks)
-    internal_error("main", __FILE__, __LINE__);
+  assert(c == g_nb_valid_checks)
 }
 
 //
@@ -2906,8 +2851,7 @@ void alerts_display() {
       d_s("   log/log_file      = ", alrt->log_file_set, alrt->log_file);
     }
   }
-  if (c != g_nb_valid_alerts)
-    internal_error("main", __FILE__, __LINE__);
+  assert(c == g_nb_valid_alerts)
 }
 
 //
@@ -2958,6 +2902,9 @@ void test_alert() {
     my_log_close();
     exit(EXIT_FAILURE);
   }
+
+  alerts_display();
+
   char desc[SMALLSTRSIZE];
   snprintf(desc, sizeof(desc), "[TEST] alert for alert %s", alerts[a].name);
 
@@ -2981,7 +2928,7 @@ int main(int argc, char *argv[]) {
   dbg_write("** DEBUG ACTIVATED **\n");
 
     // rand() function used by get_unique_mime_boundary()
-  srand(time(NULL));
+  srand((unsigned int)time(NULL));
 
   my_pthread_mutex_init(&mutex);
   util_my_pthread_init();

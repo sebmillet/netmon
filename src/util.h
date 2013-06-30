@@ -17,6 +17,12 @@
 #include <netinet/in.h>
 #endif
 
+#define PORT_SEPARATOR ':'
+
+#define assert(b) \
+  if (!(b)) \
+    fatal_error("assert failed, file %s, line %d", __FILE__, __LINE__);
+
 #define FALSE 0
 #define TRUE  1
 
@@ -24,23 +30,21 @@
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
 #endif
+#define GETTIMEOFDAY_ERROR -1
+
 #if defined(_WIN32) || defined(_WIN64)
 typedef int socklen_t;
 #endif
 
 #define MAX_READLINE_SIZE 10000
-
 #define SMALLSTRSIZE  200
 #define BIGSTRSIZE    1000
-
 #define REGULAR_STR_STRBUFSIZE 2000
 #define ERR_STR_BUFSIZE 200
 
 #define MY_GETLINE_INITIAL_ALLOCATE 100
 #define MY_GETLINE_MIN_INCREASE     100
 #define MY_GETLINE_COEF_INCREASE    2
-
-#define GETTIMEOFDAY_ERROR -1
 
 enum {DF_FRENCH = 0, DF_ENGLISH = 1};
 #define DEFAULT_DATE_FORMAT DF_FRENCH
@@ -69,8 +73,8 @@ typedef enum {LL_ERROR = -1, LL_WARNING = 0, LL_NORMAL = 1, LL_VERBOSE = 2, LL_D
   // Type of prefix output in the log
 typedef enum {LP_DATETIME, LP_NOTHING, LP_INDENT} logdisp_t;
   // Return value of socket-based functions
-enum {CONNRES_OK, CONNRES_NETIO, CONNRES_UNEXPECTED_ANSWER,
-  CONNRES_RESOLVE_ERROR, CONNRES_CONNECTION_ERROR, CONNRES_SSL_CONNECTION_ERROR, CONNRES_CONNECTION_TIMEOUT};
+enum {CONNRES_OK, CONNRES_NETIO, CONNRES_UNEXPECTED_ANSWER, CONNRES_RESOLVE_ERROR, CONNRES_CONNECTION_ERROR,
+      CONNRES_SSL_CONNECTION_ERROR, CONNRES_CONNECTION_TIMEOUT, CONNRES_INVALID_PORT_NUMBER};
 
 struct subst_t {
   const char *find;
@@ -110,7 +114,6 @@ void my_log_close();
 char *trim(char *str);
 
 void fatal_error(const char *format, ...);
-void internal_error(const char *desc, const char *source_file, const unsigned long int line);
 char *errno_error(char *s, size_t s_len);
 void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *format, ...);
 void my_logs(const loglevel_t log_level, const logdisp_t log_disp, const char *s);
@@ -118,12 +121,12 @@ void my_logs(const loglevel_t log_level, const logdisp_t log_disp, const char *s
 int os_wexitstatus(const int r);
 int find_string(const char **table, int n, const char *elem);
 ssize_t my_getline(char **lineptr, size_t *n, FILE *stream);
-void os_sleep(long int seconds);
+void os_sleep(unsigned int seconds);
 void fs_concatene(char *dst, const char *src, size_t dst_len);
 void set_current_tm(struct tm *ts);
 int add_reader_access_right(const char *f);
 void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, int *minute, int *second,
-       long unsigned int *usec, long int *gmtoff);
+       long int *usec, long int *gmtoff);
 
 char *os_last_err_desc(char *s, size_t s_bufsize);
 int os_last_network_op_is_in_progress();
@@ -139,16 +142,15 @@ int s_begins_with(const char *s, const char *begins_with);
 
 void conn_init(connection_t *conn, int type);
 void conn_close(connection_t *conn);
+int conn_is_closed(connection_t *conn);
 int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...);
-int conn_read_line_alloc(connection_t *conn, char **out, int trace, int *size);
+int conn_read_line_alloc(connection_t *conn, char **out, int trace, size_t *size);
 int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct timeval *tv, const char *desc, const char *prefix);
 int conn_round_trip(connection_t *conn, const char *expect, int trace, const char *fmt, ...);
-int conn_establish_connection(const char *host_name, int port, const char *expect, int timeout,
-      connection_t *conn, const char *prefix, int trace);
+int conn_establish_connection(const char *server_name, const int port_set, const int prt, const int default_port,
+  const int crypt_set, const int crypt, const char *expect, int timeout, connection_t *conn, const char *prefix, int trace);
 ssize_t conn_plain_read(connection_t *conn, void *buf, const size_t buf_len);
 ssize_t conn_plain_write(connection_t *conn, void *buf, const size_t buf_len);
 ssize_t conn_ssl_read(connection_t *conn, void *buf, const size_t buf_len);
 ssize_t conn_ssl_write(connection_t *conn, void *buf, const size_t buf_len);
-
-char *ssl_get_error(const unsigned long e, char *s, const size_t s_len);
 
