@@ -108,134 +108,137 @@ keep_last_status not defined, taking default = 15
    alert_repeat_max   = <unset>
 == ALERT #0
    is_valid          = Yes
-   name              = main
-   method            = smtp
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
-   SMTP/smart host = smtp1234.sfr.fr,smtp.sfr.fr
-   SMTP/port       = <unset>
-   SMTP/self       = localhostname
-   SMTP/sender     = root@localhost
-   SMTP/recipients = sebastien.millet1@club-internet.fr,root@localhost
-   SMTP/timeout    = <unset>
+   name                 = main
+   method               = smtp
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
+   SMTP/smart host      = smtp1234.sfr.fr,smtp.sfr.fr
+   SMTP/port            = <unset>
+   SMTP/self            = localhostname
+   SMTP/sender          = root@localhost
+   SMTP/recipients      = sebastien.millet1@club-internet.fr,root@localhost
+   SMTP/connect_timeout = <unset>
+   SMTP/netio_timeout   = <unset>
 == ALERT #1
    is_valid          = Yes
-   name              = critical
-   method            = smtp
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
-   SMTP/smart host = localhost
-   SMTP/port       = <unset>
-   SMTP/self       = <unset>
-   SMTP/sender     = <unset>
-   SMTP/recipients = root
-   SMTP/timeout    = <unset>
+   name                 = critical
+   method               = smtp
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
+   SMTP/smart host      = localhost
+   SMTP/port            = <unset>
+   SMTP/self            = <unset>
+   SMTP/sender          = <unset>
+   SMTP/recipients      = root
+   SMTP/connect_timeout = <unset>
+   SMTP/netio_timeout   = <unset>
 == ALERT #2
    is_valid          = Yes
-   name              = prgtest1
-   method            = program
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
+   name                 = prgtest1
+   method               = program
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
    program/command   = allo
 !! alert #3 (will be ignored)
    is_valid          = No
-   name              = prgtest2
-   method            = program
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
+   name                 = prgtest2
+   method               = program
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
    program/command   = <unset>
 !! alert #4 (will be ignored)
    is_valid          = No
-   name              = prgtest3
-   method            = program
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
+   name                 = prgtest3
+   method               = program
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
    program/command   = <unset>
 !! alert #5 (will be ignored)
    is_valid          = No
-   name              = prgtest4
-   method            = program
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
+   name                 = prgtest4
+   method               = program
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
    program/command   = <unset>
 !! alert #6 (will be ignored)
    is_valid          = No
-   name              = <unset>
-   method            = <unknown>
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
+   name                 = <unset>
+   method               = <unknown>
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
 !! alert #7 (will be ignored)
    is_valid          = No
-   name              = fake
-   method            = <unset>
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
+   name                 = fake
+   method               = <unset>
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
 == ALERT #8
    is_valid          = Yes
-   name              = log1
-   method            = log
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
+   name                 = log1
+   method               = log
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
    log/log_file      = yeslog
 !! alert #9 (will be ignored)
    is_valid          = No
-   name              = log2
-   method            = log
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
+   name                 = log2
+   method               = log
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
    log/log_file      = <unset>
 !! alert #10 (will be ignored)
    is_valid          = No
-   name              = log3
-   method            = log
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
+   name                 = log3
+   method               = log
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
    log/log_file      = <unset>
 == ALERT #11
    is_valid          = Yes
-   name              = log4
-   method            = log
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
+   name                 = log4
+   method               = log
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
    log/log_file      = eslog
 == ALERT #12
    is_valid          = Yes
-   name              = sms
-   method            = smtp
-   threshold         = <unset>
-   repeat_every      = <unset>
-   repeat_max        = <unset>
-   retries           = <unset>
-   SMTP/smart host = localhost
-   SMTP/port       = 25
-   SMTP/self       = <unset>
-   SMTP/sender     = 
-   SMTP/recipients = root@localhost
-   SMTP/timeout    = <unset>
+   name                 = sms
+   method               = smtp
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
+   SMTP/smart host      = localhost
+   SMTP/port            = 25
+   SMTP/self            = <unset>
+   SMTP/sender          = 
+   SMTP/recipients      = root@localhost
+   SMTP/connect_timeout = <unset>
+   SMTP/netio_timeout   = <unset>
 check_interval = 0
 keep_last_status = 15
 display_name_width = 20
@@ -255,7 +258,7 @@ Starting check...
 Performing check tcp(Local FTP)
 TCP check(Local FTP): connecting to Localhost:21...
 Running gethosbyname() on Localhost
-TCP check(Local FTP): will connect to Localhost:21, timeout = 5
+TCP check(Local FTP): will connect to Localhost:21, connect timeout = 5, netio timeout = 10
 TCP check(Local FTP): connected to Localhost:21
 <<< 220 (vsFTPd 2.3.5)
 TCP check(Local FTP): received an unexpected answer: '220 (vsFTPd 2.3.5)' (expected '221 ')
@@ -264,7 +267,7 @@ Local FTP -> ** KO **
 Performing check tcp(Local HTTP)
 TCP check(Local HTTP): connecting to 127.0.0.1:80...
 Running gethosbyname() on 127.0.0.1
-TCP check(Local HTTP): will connect to 127.0.0.1:80, timeout = 5
+TCP check(Local HTTP): will connect to 127.0.0.1:80, connect timeout = 5, netio timeout = 10
 TCP check(Local HTTP): connected to 127.0.0.1:80
 TCP check(Local HTTP): disconnected from 127.0.0.1:80
 Local HTTP -> ok
@@ -277,7 +280,7 @@ Local SMTP -> ** ?? **
 Performing check tcp(My POP3)
 TCP check(My POP3): connecting to localhost:13529...
 Running gethosbyname() on localhost
-TCP check(My POP3): will connect to localhost:13529, timeout = 5
+TCP check(My POP3): will connect to localhost:13529, connect timeout = 5, netio timeout = 10
 TCP check(My POP3): network error connecting to localhost:13529, code=111 (Connection refused)
 TCP check(My POP3): disconnected from localhost:13529
 My POP3 -> ** KO **

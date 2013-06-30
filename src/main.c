@@ -3,7 +3,6 @@
 // Copyright Sébastien Millet, 2013
 
 #include "main.h"
-#include "util.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -30,7 +29,6 @@
 #define DEFAULT_SMTP_PORT 25
 #define DEFAULT_POP3_PORT 110
 #define DEFAULT_ALERT_LOG_STRING "${NOW_TIMESTAMP}  ${DESCRIPTION}"
-#define DEFAULT_CONNECT_TIMEOUT 5
 #define DEFAULT_LOOP_SMTP_SELF  PACKAGE_TARNAME
   // 4 hours during which the status will be "fail" when an email gets lost
 #define DEFAULT_LOOP_FAIL_TIMEOUT (60 * 60 * 4)
@@ -178,8 +176,10 @@ int g_display_name_width_set = FALSE;
 
 long int g_buffer_size = DEFAULT_BUFFER_SIZE;
 int g_buffer_size_set = FALSE;
-long int g_connect_timeout = DEFAULT_CONNECT_TIMEOUT;
+extern long int g_connect_timeout;
 int g_connect_timeout_set = FALSE;
+extern long int g_netio_timeout;
+int g_netio_timeout_set = FALSE;
 int telnet_log = FALSE;
 
 extern int g_print_log;
@@ -267,15 +267,17 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"method", V_STRKEY, CS_CHECK, &chk00.method, NULL, NULL, 0, &chk00.method_set, FALSE, l_check_methods,
     sizeof(l_check_methods) / sizeof(*l_check_methods), -1},
   {"display_name", V_STR, CS_CHECK, NULL, &(chk00.display_name), NULL, 0, &(chk00.display_name_set), FALSE, NULL, 0, -1},
-  {"host_name", V_STR, CS_CHECK, NULL, &(chk00.host_name), NULL, 0, &(chk00.host_name_set), FALSE, NULL, 0, -1},
+  {"host_name", V_STR, CS_CHECK, NULL, &(chk00.srv.server), NULL, 0, &(chk00.srv.server_set), FALSE, NULL, 0, -1},
 
 // CHCKS -> TCP method
 
-  {"tcp_port", V_INT, CS_CHECK, &(chk00.tcp_port), NULL, NULL, 0, &(chk00.tcp_port_set), FALSE, NULL, 0, CM_TCP},
-  {"tcp_crypt", V_STRKEY, CS_CHECK, &chk00.tcp_crypt, NULL, NULL, 0, &chk00.tcp_crypt_set, FALSE, l_crypts,
+  {"tcp_port", V_INT, CS_CHECK, &(chk00.srv.port), NULL, NULL, 0, &(chk00.srv.port_set), FALSE, NULL, 0, CM_TCP},
+  {"tcp_crypt", V_STRKEY, CS_CHECK, &chk00.srv.crypt, NULL, NULL, 0, &chk00.srv.crypt_set, FALSE, l_crypts,
     sizeof(l_crypts) / sizeof(*l_crypts), -1},
-  {"tcp_connect_timeout", V_INT, CS_CHECK, &(chk00.tcp_connect_timeout), NULL, NULL, 0,
-    &(chk00.tcp_connect_timeout_set), FALSE, NULL, 0, CM_TCP},
+  {"tcp_connect_timeout", V_INT, CS_CHECK, &(chk00.srv.connect_timeout), NULL, NULL, 0,
+    &(chk00.srv.connect_timeout_set), FALSE, NULL, 0, CM_TCP},
+  {"tcp_netio_timeout", V_INT, CS_CHECK, &(chk00.srv.netio_timeout), NULL, NULL, 0,
+    &(chk00.srv.netio_timeout_set), FALSE, NULL, 0, CM_TCP},
   {"tcp_expect", V_STR, CS_CHECK, NULL, &(chk00.tcp_expect), NULL, 0, &(chk00.tcp_expect_set), FALSE, NULL, 0, CM_TCP},
 
 // CHECKS -> PROGRAM method
@@ -289,26 +291,33 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"loop_fail_timeout", V_INT, CS_CHECK, &chk00.loop_fail_timeout, NULL, NULL, 0,
     &chk00.loop_fail_timeout_set, FALSE, NULL, 0, CM_LOOP},
   {"loop_send_every", V_INT, CS_CHECK, &chk00.loop_send_every, NULL, NULL, 0, &chk00.loop_send_every_set, FALSE, NULL, 0, CM_LOOP},
-  {"loop_smtp_smart_host", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.smarthost, NULL, 0,
-    &chk00.loop_smtp.smarthost_set, FALSE, NULL, 0, CM_LOOP},
-  {"loop_smtp_port", V_INT, CS_CHECK, &chk00.loop_smtp.port, NULL, NULL, 0, &chk00.loop_smtp.port_set, FALSE, NULL, 0, CM_LOOP},
-  {"loop_smtp_crypt", V_STRKEY, CS_CHECK, &chk00.loop_smtp.crypt, NULL, NULL, 0, &chk00.loop_smtp.crypt_set, FALSE, l_crypts,
-    sizeof(l_crypts) / sizeof(*l_crypts), -1},
+  {"loop_smtp_smart_host", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.srv.server, NULL, 0,
+    &chk00.loop_smtp.srv.server_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_smtp_port", V_INT, CS_CHECK, &chk00.loop_smtp.srv.port, NULL, NULL, 0,
+    &chk00.loop_smtp.srv.port_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_smtp_crypt", V_STRKEY, CS_CHECK, &chk00.loop_smtp.srv.crypt, NULL, NULL, 0,
+    &chk00.loop_smtp.srv.crypt_set, FALSE, l_crypts, sizeof(l_crypts) / sizeof(*l_crypts), -1},
   {"loop_smtp_self", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.self, NULL, 0, &chk00.loop_smtp.self_set, FALSE, NULL, 0, CM_LOOP},
   {"loop_smtp_sender", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.sender, NULL, 0, &chk00.loop_smtp.sender_set, TRUE, NULL, 0, CM_LOOP},
   {"loop_smtp_recipients", V_STR, CS_CHECK, NULL, &chk00.loop_smtp.recipients, NULL, 0,
     &chk00.loop_smtp.recipients_set, FALSE, NULL, 0, CM_LOOP},
-  {"loop_smtp_connect_timeout", V_INT, CS_CHECK, &chk00.loop_smtp.connect_timeout, NULL, NULL, 0,
-    &chk00.loop_smtp.connect_timeout_set, FALSE, NULL, 0, CM_LOOP},
-  {"loop_pop3_server", V_STR, CS_CHECK, NULL, &chk00.loop_pop3.server, NULL, 0, &chk00.loop_pop3.server_set, FALSE, NULL, 0, CM_LOOP},
-  {"loop_pop3_port", V_INT, CS_CHECK, &chk00.loop_pop3.port, NULL, NULL, 0, &chk00.loop_pop3.port_set, FALSE, NULL, 0, CM_LOOP},
-  {"loop_pop3_crypt", V_STRKEY, CS_CHECK, &chk00.loop_pop3.crypt, NULL, NULL, 0, &chk00.loop_pop3.crypt_set, FALSE, l_crypts,
-    sizeof(l_crypts) / sizeof(*l_crypts), -1},
+  {"loop_smtp_connect_timeout", V_INT, CS_CHECK, &chk00.loop_smtp.srv.connect_timeout, NULL, NULL, 0,
+    &chk00.loop_smtp.srv.connect_timeout_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_smtp_netio_timeout", V_INT, CS_CHECK, &chk00.loop_smtp.srv.netio_timeout, NULL, NULL, 0,
+    &chk00.loop_smtp.srv.netio_timeout_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_pop3_server", V_STR, CS_CHECK, NULL, &chk00.loop_pop3.srv.server, NULL, 0,
+    &chk00.loop_pop3.srv.server_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_pop3_port", V_INT, CS_CHECK, &chk00.loop_pop3.srv.port, NULL, NULL, 0,
+    &chk00.loop_pop3.srv.port_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_pop3_crypt", V_STRKEY, CS_CHECK, &chk00.loop_pop3.srv.crypt, NULL, NULL, 0,
+    &chk00.loop_pop3.srv.crypt_set, FALSE, l_crypts, sizeof(l_crypts) / sizeof(*l_crypts), -1},
   {"loop_pop3_user", V_STR, CS_CHECK, NULL, &chk00.loop_pop3.user, NULL, 0, &chk00.loop_pop3.user_set, FALSE, NULL, 0, CM_LOOP},
   {"loop_pop3_password", V_STR, CS_CHECK, NULL, &chk00.loop_pop3.password, NULL, 0,
     &chk00.loop_pop3.password_set, FALSE, NULL, 0, CM_LOOP},
-  {"loop_pop3_connect_timeout", V_INT, CS_CHECK, &chk00.loop_pop3.connect_timeout, NULL, NULL, 0,
-    &chk00.loop_pop3.connect_timeout_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_pop3_connect_timeout", V_INT, CS_CHECK, &chk00.loop_pop3.srv.connect_timeout, NULL, NULL, 0,
+    &chk00.loop_pop3.srv.connect_timeout_set, FALSE, NULL, 0, CM_LOOP},
+  {"loop_pop3_netio_timeout", V_INT, CS_CHECK, &chk00.loop_pop3.srv.netio_timeout, NULL, NULL, 0,
+    &chk00.loop_pop3.srv.netio_timeout_set, FALSE, NULL, 0, CM_LOOP},
 
 // CHECKS -> alerts
 
@@ -328,6 +337,7 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"check_interval", V_INT, CS_GENERAL, &g_check_interval, NULL, NULL, 0, &g_check_interval_set, TRUE, NULL, 0, -1},
   {"buffer_size", V_INT, CS_GENERAL, &g_buffer_size, NULL, NULL, 0, &g_buffer_size_set, FALSE, NULL, 0, -1},
   {"connect_timeout", V_INT, CS_GENERAL, &g_connect_timeout, NULL, NULL, 0, &g_connect_timeout_set, FALSE, NULL, 0, -1},
+  {"netio_timeout", V_INT, CS_GENERAL, &g_netio_timeout, NULL, NULL, 0, &g_netio_timeout_set, FALSE, NULL, 0, -1},
   {"keep_last_status", V_INT, CS_GENERAL, &g_nb_keep_last_status, NULL, NULL, 0, &g_nb_keep_last_status_set, TRUE, NULL, 0, -1},
   {"display_name_width", V_INT, CS_GENERAL, &g_display_name_width, NULL, NULL, 0, &g_display_name_width_set, FALSE, NULL, 0, -1},
   {"html_refresh_interval", V_INT, CS_GENERAL, &g_html_refresh_interval, NULL, NULL, 0,
@@ -353,17 +363,19 @@ const struct readcfg_var_t readcfg_vars[] = {
 
 // ALERTS -> SMTP method
 
-  {"smtp_smart_host", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.smarthost, NULL, 0,
-    &alrt00.smtp_env.smarthost_set, FALSE, NULL, 0, AM_SMTP},
-  {"smtp_port", V_INT, CS_ALERT, &alrt00.smtp_env.port, NULL, NULL, 0, &alrt00.smtp_env.port_set, FALSE, NULL, 0, AM_SMTP},
-  {"smtp_crypt", V_STRKEY, CS_ALERT, &alrt00.smtp_env.crypt, NULL, NULL, 0, &alrt00.smtp_env.crypt_set, FALSE, l_crypts,
-    sizeof(l_crypts) / sizeof(*l_crypts), -1},
+  {"smtp_smart_host", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.srv.server, NULL, 0,
+    &alrt00.smtp_env.srv.server_set, FALSE, NULL, 0, AM_SMTP},
+  {"smtp_port", V_INT, CS_ALERT, &alrt00.smtp_env.srv.port, NULL, NULL, 0, &alrt00.smtp_env.srv.port_set, FALSE, NULL, 0, AM_SMTP},
+  {"smtp_crypt", V_STRKEY, CS_ALERT, &alrt00.smtp_env.srv.crypt, NULL, NULL, 0,
+    &alrt00.smtp_env.srv.crypt_set, FALSE, l_crypts, sizeof(l_crypts) / sizeof(*l_crypts), -1},
   {"smtp_self", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.self, NULL, 0, &alrt00.smtp_env.self_set, FALSE, NULL, 0, AM_SMTP},
   {"smtp_sender", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.sender, NULL, 0, &alrt00.smtp_env.sender_set, TRUE, NULL, 0, AM_SMTP},
   {"smtp_recipients", V_STR, CS_ALERT, NULL, &alrt00.smtp_env.recipients, NULL, 0,
     &alrt00.smtp_env.recipients_set, FALSE, NULL, 0, AM_SMTP},
-  {"smtp_connect_timeout", V_INT, CS_ALERT, &alrt00.smtp_env.connect_timeout, NULL, NULL, 0,
-    &alrt00.smtp_env.connect_timeout_set, TRUE, NULL, 0, AM_SMTP},
+  {"smtp_connect_timeout", V_INT, CS_ALERT, &alrt00.smtp_env.srv.connect_timeout, NULL, NULL, 0,
+    &alrt00.smtp_env.srv.connect_timeout_set, TRUE, NULL, 0, AM_SMTP},
+  {"smtp_netio_timeout", V_INT, CS_ALERT, &alrt00.smtp_env.srv.netio_timeout, NULL, NULL, 0,
+    &alrt00.smtp_env.srv.netio_timeout_set, TRUE, NULL, 0, AM_SMTP},
 
 // ALERTS -> PROGRAM method
 
@@ -406,9 +418,13 @@ int loops_nb_alloc = 0;
 // FUNCTIONS
 //
 
+void conn_def_t_destroy(conn_def_t *srv) {
+  if (srv->server != NULL)
+    free(srv->server);
+}
+
 void rfc821_enveloppe_t_destroy(struct rfc821_enveloppe_t *s) {
-  if (s->smarthost != NULL)
-    free(s->smarthost);
+  conn_def_t_destroy(&s->srv);
   if (s->self != NULL)
     free(s->self);
   if (s->sender != NULL)
@@ -418,8 +434,7 @@ void rfc821_enveloppe_t_destroy(struct rfc821_enveloppe_t *s) {
 }
 
 void pop3_account_t_destroy(struct pop3_account_t *p) {
-  if (p->server != NULL)
-    free(p->server);
+  conn_def_t_destroy(&p->srv);
   if (p->user != NULL)
     free(p->user);
   if (p->password != NULL)
@@ -430,8 +445,8 @@ void check_t_destroy(struct check_t *chk) {
   if (chk->display_name != NULL)
     free(chk->display_name);
 
-  if (chk->host_name != NULL)
-    free(chk->host_name);
+  conn_def_t_destroy(&chk->srv);
+
   if (chk->tcp_expect != NULL)
     free(chk->tcp_expect);
 
@@ -451,12 +466,20 @@ void check_t_destroy(struct check_t *chk) {
     free(chk->alert_ctrl);
 }
 
-void rfc821_enveloppe_t_create(struct rfc821_enveloppe_t *smtp_env) {
-  smtp_env->smarthost_set = FALSE;
-  smtp_env->smarthost = NULL;
+//
+// Create a conn_def_t object
+//
+void conn_def_t_create(conn_def_t *srv) {
+  srv->server = NULL;
+  srv->server_set = FALSE;
+  srv->port_set = FALSE;
+  srv->crypt_set = FALSE;
+  srv->connect_timeout_set = FALSE;
+  srv->netio_timeout_set = FALSE;
+}
 
-  smtp_env->port_set = FALSE;
-  smtp_env->crypt_set = FALSE;
+void rfc821_enveloppe_t_create(struct rfc821_enveloppe_t *smtp_env) {
+  conn_def_t_create(&smtp_env->srv);
 
   smtp_env->self_set = FALSE;
   smtp_env->self = NULL;
@@ -466,24 +489,16 @@ void rfc821_enveloppe_t_create(struct rfc821_enveloppe_t *smtp_env) {
 
   smtp_env->recipients_set = FALSE;
   smtp_env->recipients = NULL;
-
-  smtp_env->connect_timeout_set = FALSE;
 }
 
 void pop3_account_t_create(struct pop3_account_t *p) {
-  p->server_set = FALSE;
-  p->server = NULL;
-
-  p->port_set = FALSE;
-  p->crypt_set = FALSE;
+  conn_def_t_create(&p->srv);
 
   p->user_set = FALSE;
   p->user = NULL;
 
   p->password_set = FALSE;
   p->password = NULL;
-
-  p->connect_timeout_set = FALSE;
 }
 
 //
@@ -501,15 +516,10 @@ void check_t_create(struct check_t *chk) {
   chk->display_name_set = FALSE;
   chk->display_name = NULL;
 
-  chk->host_name_set = FALSE;
-  chk->host_name = NULL;
+  conn_def_t_create(&chk->srv);
 
   chk->tcp_expect_set = FALSE;
   chk->tcp_expect = NULL;
-
-  chk->tcp_port_set = FALSE;
-  chk->tcp_crypt_set = FALSE;
-  chk->tcp_connect_timeout_set = FALSE;
 
   chk->prg_command = NULL;
   chk->prg_command_set = FALSE;
@@ -669,15 +679,13 @@ UNUSED(subst_len);
 
   connection_t conn;
 
-  int cr = conn_establish_connection(chk->host_name, chk->tcp_port_set, (int)chk->tcp_port, 0, chk->tcp_crypt_set, (int)chk->tcp_crypt,
-    chk->tcp_expect_set ? chk->tcp_expect : NULL,
-    (int)(chk->tcp_connect_timeout_set ? chk->tcp_connect_timeout : g_connect_timeout),
-    &conn, prefix, g_trace_network_traffic);
+  int cr = conn_establish_connection(&conn, &chk->srv, 0, chk->tcp_expect_set ? chk->tcp_expect : NULL,
+    prefix, g_trace_network_traffic);
 
   conn_close(&conn);
   assert(conn_is_closed(&conn));
 
-  my_logf(LL_VERBOSE, LP_DATETIME, "%s disconnected from %s:%i", prefix, chk->host_name, chk->tcp_port);
+  my_logf(LL_VERBOSE, LP_DATETIME, "%s disconnected from %s:%i", prefix, chk->srv.server, chk->srv.port);
   if (cr == CONNRES_OK)
     return ST_OK;
   if (cr == CONNRES_RESOLVE_ERROR)
@@ -771,8 +779,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix,
   env->nb_recipients_wanted = -1;
   env->nb_recipients_ok = -1;
 
-  int cr = conn_establish_connection(env->smarthost, env->port_set, (int)env->port, DEFAULT_SMTP_PORT, env->crypt_set, (int)env->crypt,
-    "220 ", (int)(env->connect_timeout_set ? env->connect_timeout : g_connect_timeout), conn, prefix, g_trace_network_traffic);
+  int cr = conn_establish_connection(conn, &env->srv, DEFAULT_SMTP_PORT, "220 ", prefix, g_trace_network_traffic);
   if (cr != CONNRES_OK)
     return (cr == CONNRES_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR : ERR_SMTP_NETIO);
 
@@ -1081,8 +1088,7 @@ UNUSED(subst_len);
 
   int r;
 
-  int cr = conn_establish_connection(pop3->server, pop3->port_set, (int)pop3->port, DEFAULT_POP3_PORT, pop3->crypt_set, (int)pop3->crypt,
-    "+OK ", (int)(pop3->connect_timeout_set ? pop3->connect_timeout : g_connect_timeout), &conn, prefix, g_trace_network_traffic);
+  int cr = conn_establish_connection(&conn, &pop3->srv, DEFAULT_POP3_PORT, "+OK ", prefix, g_trace_network_traffic);
   if (cr != CONNRES_OK)
     return (cr == CONNRES_RESOLVE_ERROR ? ERR_POP3_RESOLVE_ERROR : ERR_POP3_NETIO);
 
@@ -1375,7 +1381,7 @@ int perform_check(struct check_t *chk) {
 
   struct subst_t subst[] = {
     {"DISPLAY_NAME", chk->display_name},
-    {"HOST_NAME", chk->host_name},
+    {"HOST_NAME", chk->srv.server},
     {"NOW_TIMESTAMP", now_ts},
     {"NOW_YMD", now_date},
     {"NOW_YEAR", now_y},
@@ -1401,8 +1407,8 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
   int r;
 
   struct rfc821_enveloppe_t smtp = alrt->smtp_env;
-  smtp.smarthost = (char *)smart_host;
-  smtp.smarthost_set = TRUE;
+  smtp.srv.server = (char *)smart_host;
+  smtp.srv.server_set = TRUE;
   char from_buf[SMALLSTRSIZE];
   if ((r = smtp_email_sending_pre(&smtp, prefix, &conn, from_buf, sizeof(from_buf))) != ERR_SMTP_OK) {
     conn_close(&conn);
@@ -1472,9 +1478,9 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
 int execute_alert_smtp(const struct exec_alert_t *exec_alert) {
   char prefix[SMALLSTRSIZE];
 
-  size_t l = strlen(exec_alert->alrt->smtp_env.smarthost) + 1;
+  size_t l = strlen(exec_alert->alrt->smtp_env.srv.server) + 1;
   char *smart_hosts = (char *)malloc(l);
-  strncpy(smart_hosts, exec_alert->alrt->smtp_env.smarthost, l);
+  strncpy(smart_hosts, exec_alert->alrt->smtp_env.srv.server, l);
   char *h = smart_hosts;
   char *next = NULL;
 
@@ -1953,7 +1959,7 @@ void almost_neverending_loop() {
 
           struct exec_alert_t exec_alert = { chk->status, as, alrt, &chk->alert_ctrl[i], lc,
             &my_now, &chk->alert_info, &chk->last_status_change,
-            chk->nb_consecutive_notok, chk->display_name, chk->host_name,
+            chk->nb_consecutive_notok, chk->display_name, chk->srv.server,
             NULL, 0, NULL
           };
 
@@ -2254,12 +2260,12 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number, int *nb
   }
 
   if (chk->method_set && chk->method == CM_TCP) {
-    if (!chk->host_name_set) {
+    if (!chk->srv.server_set) {
       my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no host name defined, discarding check",
         cf, line_number);
       is_valid = FALSE;
     }
-    if (!chk->tcp_port_set) {
+    if (!chk->srv.port_set) {
       my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no port defined, discarding check",
         cf, line_number);
       is_valid = FALSE;
@@ -2280,10 +2286,10 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number, int *nb
 
   ++g_nb_valid_checks;
 
-  if (!chk->host_name_set) {
-    chk->host_name = (char *)malloc(1);
-    strncpy(chk->host_name, "", 1);
-    chk->host_name_set = TRUE;
+  if (!chk->srv.server_set) {
+    chk->srv.server = (char *)malloc(1);
+    strncpy(chk->srv.server, "", 1);
+    chk->srv.server_set = TRUE;
   }
 }
 
@@ -2321,7 +2327,7 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number, int *n
   }
 
   if (alrt->method == AM_SMTP) {
-    if (!alrt->smtp_env.smarthost_set) {
+    if (!alrt->smtp_env.srv.server_set) {
       my_logf(LL_ERROR, LP_DATETIME, "Configuration file '%s', section of line %i: no smart host defined, discarding alert",
         cf, line_number);
       is_valid = FALSE;
@@ -2777,11 +2783,11 @@ void checks_display() {
     }
     my_logf(LL_DEBUG, LP_INDENT,                  "   is_valid       = %s", chk->is_valid ? "Yes" : "No");
     d_s("   display_name   = ", chk->display_name_set, chk->display_name);
-    d_s("   host_name      = ", chk->host_name_set, chk->host_name);
+    d_s("   host_name      = ", chk->srv.server_set, chk->srv.server);
     d_s("   method         = ", chk->method_set,
       chk->method_set && chk->method != FIND_STRING_NOT_FOUND ? l_check_methods[chk->method] : "<unknown>");
     if (chk->method == CM_TCP) {
-      d_i("   TCP/port                   = ", chk->tcp_port_set, chk->tcp_port);
+      d_i("   TCP/port                   = ", chk->srv.port_set, chk->srv.port);
       d_s("   TCP/expect                 = ", chk->tcp_expect_set, chk->tcp_expect);
     } else if (chk->method == CM_PROGRAM) {
       d_s("   PROGRAM/command            = ", chk->prg_command_set, chk->prg_command);
@@ -2790,17 +2796,19 @@ void checks_display() {
       d_i("   LOOP/fail delay            = ", chk->loop_fail_delay_set, chk->loop_fail_delay);
       d_i("   LOOP/fail timeout          = ", chk->loop_fail_timeout_set, chk->loop_fail_timeout);
       d_i("   LOOP/send every            = ", chk->loop_send_every_set, chk->loop_send_every);
-      d_s("   LOOP/smtp/smarthost        = ", chk->loop_smtp.smarthost_set, chk->loop_smtp.smarthost);
-      d_i("   LOOP/smtp/port             = ", chk->loop_smtp.port_set, chk->loop_smtp.port);
+      d_s("   LOOP/smtp/smarthost        = ", chk->loop_smtp.srv.server_set, chk->loop_smtp.srv.server);
+      d_i("   LOOP/smtp/port             = ", chk->loop_smtp.srv.port_set, chk->loop_smtp.srv.port);
       d_s("   LOOP/smtp/self             = ", chk->loop_smtp.self_set, chk->loop_smtp.self);
       d_s("   LOOP/smtp/sender           = ", chk->loop_smtp.sender_set, chk->loop_smtp.sender);
       d_s("   LOOP/smtp/recipients       = ", chk->loop_smtp.recipients_set, chk->loop_smtp.recipients);
-      d_i("   LOOP/smtp/connect_timeout  = ", chk->loop_smtp.connect_timeout_set, chk->loop_smtp.connect_timeout);
-      d_s("   LOOP/pop3/server           = ", chk->loop_pop3.server_set, chk->loop_pop3.server);
-      d_i("   LOOP/pop3/port             = ", chk->loop_pop3.port_set, chk->loop_pop3.port);
+      d_i("   LOOP/smtp/connect_timeout  = ", chk->loop_smtp.srv.connect_timeout_set, chk->loop_smtp.srv.connect_timeout);
+      d_i("   LOOP/smtp/netio_timeout    = ", chk->loop_smtp.srv.netio_timeout_set, chk->loop_smtp.srv.netio_timeout);
+      d_s("   LOOP/pop3/server           = ", chk->loop_pop3.srv.server_set, chk->loop_pop3.srv.server);
+      d_i("   LOOP/pop3/port             = ", chk->loop_pop3.srv.port_set, chk->loop_pop3.srv.port);
       d_s("   LOOP/pop3/user             = ", chk->loop_pop3.user_set, chk->loop_pop3.user);
       d_s("   LOOP/pop3/password         = ", chk->loop_pop3.password_set, "*****");
-      d_i("   LOOP/pop3/connect_timeout  = ", chk->loop_pop3.connect_timeout_set, chk->loop_pop3.connect_timeout);
+      d_i("   LOOP/pop3/connect_timeout  = ", chk->loop_pop3.srv.connect_timeout_set, chk->loop_pop3.srv.connect_timeout);
+      d_i("   LOOP/pop3/netio_timeout    = ", chk->loop_pop3.srv.netio_timeout_set, chk->loop_pop3.srv.netio_timeout);
     }
 
     d_s("   alerts         = ", chk->alerts_set, chk->alerts);
@@ -2832,20 +2840,21 @@ void alerts_display() {
       my_logf(LL_DEBUG, LP_INDENT, "!! alert #%i (will be ignored)", i);
     }
     my_logf(LL_DEBUG, LP_INDENT, "   is_valid          = %s", alrt->is_valid ? "Yes" : "No");
-    d_s("   name              = ", alrt->name_set, alrt->name);
-    d_s("   method            = ", alrt->method_set,
+    d_s("   name                 = ", alrt->name_set, alrt->name);
+    d_s("   method               = ", alrt->method_set,
       alrt->method_set && alrt->method != FIND_STRING_NOT_FOUND ? l_alert_methods[alrt->method] : "<unknown>");
-    d_i("   threshold         = ", alrt->threshold_set, alrt->threshold);
-    d_i("   repeat_every      = ", alrt->repeat_every_set, alrt->repeat_every);
-    d_i("   repeat_max        = ", alrt->repeat_max_set, alrt->repeat_max);
-    d_i("   retries           = ", alrt->retries_set, alrt->retries);
+    d_i("   threshold            = ", alrt->threshold_set, alrt->threshold);
+    d_i("   repeat_every         = ", alrt->repeat_every_set, alrt->repeat_every);
+    d_i("   repeat_max           = ", alrt->repeat_max_set, alrt->repeat_max);
+    d_i("   retries              = ", alrt->retries_set, alrt->retries);
     if (alrt->method == AM_SMTP) {
-      d_s("   SMTP/smart host = ", alrt->smtp_env.smarthost_set, alrt->smtp_env.smarthost);
-      d_i("   SMTP/port       = ", alrt->smtp_env.port_set, alrt->smtp_env.port);
-      d_s("   SMTP/self       = ", alrt->smtp_env.self_set, alrt->smtp_env.self);
-      d_s("   SMTP/sender     = ", alrt->smtp_env.sender_set, alrt->smtp_env.sender);
-      d_s("   SMTP/recipients = ", alrt->smtp_env.recipients_set, alrt->smtp_env.recipients);
-      d_i("   SMTP/timeout    = ", alrt->smtp_env.connect_timeout_set, alrt->smtp_env.connect_timeout);
+      d_s("   SMTP/smart host      = ", alrt->smtp_env.srv.server_set, alrt->smtp_env.srv.server);
+      d_i("   SMTP/port            = ", alrt->smtp_env.srv.port_set, alrt->smtp_env.srv.port);
+      d_s("   SMTP/self            = ", alrt->smtp_env.self_set, alrt->smtp_env.self);
+      d_s("   SMTP/sender          = ", alrt->smtp_env.sender_set, alrt->smtp_env.sender);
+      d_s("   SMTP/recipients      = ", alrt->smtp_env.recipients_set, alrt->smtp_env.recipients);
+      d_i("   SMTP/connect_timeout = ", alrt->smtp_env.srv.connect_timeout_set, alrt->smtp_env.srv.connect_timeout);
+      d_i("   SMTP/netio_timeout   = ", alrt->smtp_env.srv.netio_timeout_set, alrt->smtp_env.srv.netio_timeout);
     } else if (alrt->method == AM_PROGRAM) {
       d_s("   program/command   = ", alrt->prg_command_set, alrt->prg_command);
     } else if (alrt->method == AM_LOG) {
@@ -2887,7 +2896,7 @@ void config_display() {
     }
     t[sizeof(t) - 1] = '\0';
 
-    my_logf(LL_NORMAL, LP_DATETIME, "To check: '%s' [%s:%i], %s%s%s, %s%s", chk->display_name, chk->host_name, chk->tcp_port,
+    my_logf(LL_NORMAL, LP_DATETIME, "To check: '%s' [%s:%i], %s%s%s, %s%s", chk->display_name, chk->srv.server, chk->srv.port,
       chk->tcp_expect_set ? "expect \"" : "no expect", chk->tcp_expect_set ? chk->tcp_expect : "", chk->tcp_expect_set ? "\"" : "",
       chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? t : "");
   }
@@ -2972,12 +2981,12 @@ int main(int argc, char *argv[]) {
     check_t_getready(chk);
   }
 
-  if (strlen(g_test_alert) >= 1)
-    test_alert();
-
   checks_display();
   alerts_display();
   config_display();
+
+  if (strlen(g_test_alert) >= 1)
+    test_alert();
 
   web_create_img_files();
 

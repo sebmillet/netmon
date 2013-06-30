@@ -2,6 +2,24 @@
 netmon 1.0 start
 Reading configuration from 'netmon.ini'
 keep_last_status not defined, taking default = 15
+== ALERT #0
+   is_valid          = Yes
+   name                 = mylog
+   method               = log
+   threshold            = <unset>
+   repeat_every         = <unset>
+   repeat_max           = <unset>
+   retries              = <unset>
+   log/log_file      = tmp-alertlog-H-${HOST_NAME}-D-${DISPLAY_NAME}-N-${NAME}-M-${METHOD}-${A.log
+check_interval = 0
+keep_last_status = 15
+display_name_width = 20
+html_directory = ../www
+html_file = netmon.html
+html_title = netmon 1.0
+html_refresh_interval = 20
+Valid check(s) defined: 0
+Run web server: no
 log(mylog) -> display_name = 'Test alert display name', host_name = 'Test alert host name', status = '0'
 log alert(mylog): wrote in log 'tmp-alertlog-H-Test alert host name-D-Test alert display name-N--M--${A.log':
 Test alert display name [Test alert host name] in status Undefined since 01/01/13 00:00 -- <Nothing> <>

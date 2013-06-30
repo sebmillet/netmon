@@ -19,6 +19,9 @@
 
 const int crypt_ports[] = {443, 465, 585, 993, 995};
 
+long int g_connect_timeout = DEFAULT_CONNECT_TIMEOUT;
+long int g_netio_timeout = DEFAULT_NETIO_TIMEOUT;
+
 loglevel_t g_current_log_level = LL_NORMAL;
 
 char g_log_file[SMALLSTRSIZE];
@@ -658,7 +661,8 @@ int conn_is_closed(connection_t *conn) {
 // Connect to a remote host, with a timeout
 // Return EC_* code.
 //
-int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct timeval *tv, const char *desc, const char *prefix) {
+int conn_connect(connection_t *conn, const struct sockaddr_in *server,
+    const int conn_to, const int netio_to, const char *desc, const char *prefix) {
   fd_set fdset;
   FD_ZERO(&fdset);
   FD_SET((unsigned int)(conn->sock), &fdset);
@@ -667,10 +671,14 @@ int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct ti
 
   char s_err[ERR_STR_BUFSIZE];
 
+  struct timeval conn_tv;
+  conn_tv.tv_sec = conn_to;
+  conn_tv.tv_usec = 0;
+
   int cr = CONNRES_OK;
   if (connect(conn->sock, (struct sockaddr *)server, sizeof(*server)) == CONNECT_ERROR) {
     if (os_last_network_op_is_in_progress()) {
-      if (select((conn->sock) + 1, NULL, &fdset, NULL, tv) <= 0) {
+      if (select((conn->sock) + 1, NULL, &fdset, NULL, &conn_tv) <= 0) {
         my_logf(LL_ERROR, LP_DATETIME, "%s timeout connecting to %s, %s", prefix, desc, os_last_err_desc(s_err, sizeof(s_err)));
         cr = CONNRES_CONNECTION_TIMEOUT;
       } else {
@@ -698,7 +706,10 @@ int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct ti
 
   os_set_sock_blocking_mode(conn->sock);
 
-  if (setsockopt(conn->sock, SOL_SOCKET, SO_RCVTIMEO, (char *)tv, sizeof(*tv))) {
+  struct timeval netio_tv;
+  netio_tv.tv_sec = netio_to;
+  netio_tv.tv_usec = 0;
+  if (setsockopt(conn->sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&netio_tv, sizeof(netio_tv))) {
     my_logf(LL_ERROR, LP_DATETIME, "%s unable to set timeout to network I/O", prefix);
   }
 
@@ -791,17 +802,17 @@ int guess_conntype(const long int p, const int crypt_set, const int crypt) {
 //    TCP connection open
 //    Check server answer
 //
-int conn_establish_connection(const char *server_name, const int port_set, const int port, const int default_port,
-  const int crypt_set, const int crypt, const char *expect, int timeout, connection_t *conn, const char *prefix, int trace) {
+int conn_establish_connection(connection_t *conn, const conn_def_t *srv, const int default_port,
+    const char *expect, const char *prefix, const int trace) {
 
   char h[SMALLSTRSIZE];
   int p;
 
-  if (split_hostname(server_name, port_set, port, default_port, prefix, h, sizeof(h), &p)) {
+  if (split_hostname(srv->server, srv->port_set, (int)srv->port, default_port, prefix, h, sizeof(h), &p)) {
     return CONNRES_INVALID_PORT_NUMBER;
   }
 
-  conn_init(conn, guess_conntype(p, crypt_set, crypt));
+  conn_init(conn, guess_conntype(p, srv->crypt_set, (int)srv->crypt));
 
   my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, h, p);
 
@@ -830,13 +841,13 @@ int conn_establish_connection(const char *server_name, const int port_set, const
   server.sin_addr = *(struct in_addr *)hostinfo->h_addr;
     // tv value is undefined after call to connect() as per documentation, so
     // it is to be re-set every time.
-  struct timeval tv;
-  tv.tv_sec = timeout;
-  tv.tv_usec = 0;
+  int conn_to = (int)(srv->connect_timeout_set ? srv->connect_timeout : g_connect_timeout);
+  int netio_to = (int)(srv->netio_timeout_set ? srv->netio_timeout : g_netio_timeout);
 
-  my_logf(LL_DEBUG, LP_DATETIME, "%s will connect to %s:%i, timeout = %i", prefix, h, p, timeout);
+  my_logf(LL_DEBUG, LP_DATETIME, "%s will connect to %s:%i, connect timeout = %d, netio timeout = %d",
+    prefix, h, p, conn_to, netio_to);
 
-  if ((ret = conn_connect(&server, conn, &tv, server_desc, prefix)) == CONNRES_OK) {
+  if ((ret = conn_connect(conn, &server, conn_to, netio_to, server_desc, prefix)) == CONNRES_OK) {
     my_logf(LL_DEBUG, LP_DATETIME, "%s connected to %s", prefix, server_desc);
 
     if (expect != NULL && strlen(expect) >= 1) {

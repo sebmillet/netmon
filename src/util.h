@@ -49,6 +49,8 @@ typedef int socklen_t;
 enum {DF_FRENCH = 0, DF_ENGLISH = 1};
 #define DEFAULT_DATE_FORMAT DF_FRENCH
 
+#define DEFAULT_CONNECT_TIMEOUT 5
+#define DEFAULT_NETIO_TIMEOUT   10
 #define DEFAULT_PRINT_LOG FALSE
 #define DEFAULT_LOG_USEC TRUE
 #define DEFAULT_PRINT_SUBST_ERROR FALSE
@@ -86,6 +88,21 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n);
   // as to allow SSL-based operations.
 enum {CONNTYPE_PLAIN = 0, CONNTYPE_SSL = 1};
 
+  // Definition of a connection
+typedef struct {
+  char *server;
+  long int port;
+  long int crypt;
+  long int connect_timeout;
+  long int netio_timeout;
+  int server_set;
+  int port_set;
+  int crypt_set;
+  int connect_timeout_set;
+  int netio_timeout_set;
+} conn_def_t;
+
+  // Live connection
 typedef struct connection connection_t;
 typedef struct connection {
     int type;
@@ -145,10 +162,11 @@ void conn_close(connection_t *conn);
 int conn_is_closed(connection_t *conn);
 int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...);
 int conn_read_line_alloc(connection_t *conn, char **out, int trace, size_t *size);
-int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct timeval *tv, const char *desc, const char *prefix);
+int conn_connect(connection_t *conn, const struct sockaddr_in *server,
+    const int conn_to, const int netio_to, const char *desc, const char *prefix);
 int conn_round_trip(connection_t *conn, const char *expect, int trace, const char *fmt, ...);
-int conn_establish_connection(const char *server_name, const int port_set, const int prt, const int default_port,
-  const int crypt_set, const int crypt, const char *expect, int timeout, connection_t *conn, const char *prefix, int trace);
+int conn_establish_connection(connection_t *conn, const conn_def_t *srv, const int default_port,
+    const char *expect, const char *prefix, const int trace);
 ssize_t conn_plain_read(connection_t *conn, void *buf, const size_t buf_len);
 ssize_t conn_plain_write(connection_t *conn, void *buf, const size_t buf_len);
 ssize_t conn_ssl_read(connection_t *conn, void *buf, const size_t buf_len);

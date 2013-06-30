@@ -3,7 +3,6 @@
 // Copyright Sébastien Millet, 2013
 
 #include "main.h"
-#include "util.h"
 
 #include <stdio.h>
 #include <stdlib.h>

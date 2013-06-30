@@ -8,6 +8,8 @@
 #include "../extracfg.h"
 #endif
 
+#include "util.h"
+
 #include <sys/types.h>
 #include <time.h>
 
@@ -38,20 +40,13 @@ struct alert_ctrl_t {
 };
 
 struct rfc821_enveloppe_t {
-  char *smarthost;
-  long int port;
-  long int crypt;
+  conn_def_t srv;
   char *self;
   char *sender;
   char *recipients;
-  long int connect_timeout;
-  int smarthost_set;
-  int port_set;
-  int crypt_set;
   int self_set;
   int sender_set;
   int recipients_set;
-  int connect_timeout_set;
 
   int nb_recipients_wanted;
   int nb_recipients_ok;
@@ -60,18 +55,11 @@ struct rfc821_enveloppe_t {
 };
 
 struct pop3_account_t {
-  char *server;
-  long int port;
-  long int crypt;
+  conn_def_t srv;
   char *user;
   char *password;
-  long int connect_timeout;
-  int server_set;
-  int port_set;
-  int crypt_set;
   int user_set;
   int password_set;
-  int connect_timeout_set;
 };
 
 enum {LE_NONE = 0, LE_SENT = 1, LE_RECEIVED = 2};
@@ -91,20 +79,13 @@ struct check_t {
   long int method;
   int guess_method;
   char *display_name;
-  char *host_name;
+  conn_def_t srv;
   int method_set;
   int display_name_set;
-  int host_name_set;
 
     // CM_TCP method
   char *tcp_expect;
-  long int tcp_port;
-  long int tcp_crypt;
-  long int tcp_connect_timeout;
   int tcp_expect_set;
-  int tcp_port_set;
-  int tcp_crypt_set;
-  int tcp_connect_timeout_set;
 
     // CM_PROGRAM method
   char *prg_command;

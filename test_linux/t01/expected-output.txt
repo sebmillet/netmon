@@ -144,7 +144,7 @@ Starting check...
 Performing check tcp(my Localhost)
 TCP check(my Localhost): connecting to localhost:21219...
 Running gethosbyname() on localhost
-TCP check(my Localhost): will connect to localhost:21219, timeout = 5
+TCP check(my Localhost): will connect to localhost:21219, connect timeout = 5, netio timeout = 10
 TCP check(my Localhost): network error connecting to localhost:21219, code=111 (Connection refused)
 TCP check(my Localhost): disconnected from localhost:21219
 my Localhost -> ** KO **
