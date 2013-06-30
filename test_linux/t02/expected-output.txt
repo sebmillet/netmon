@@ -169,17 +169,17 @@ Starting check...
 Performing check tcp(Local FTP)
 TCP check(Local FTP): connecting to Localhost:21...
 Running gethosbyname() on Localhost
-Will connect to Localhost:21, timeout = 5
-Connected to Localhost:21
+TCP check(Local FTP): will connect to Localhost:21, timeout = 5
+TCP check(Local FTP): connected to Localhost:21
 <<< 220 (vsFTPd 2.3.5)
-Received an unexpected answer: '220 (vsFTPd 2.3.5)' (expected '221 ')
+TCP check(Local FTP): received an unexpected answer: '220 (vsFTPd 2.3.5)' (expected '221 ')
 TCP check(Local FTP): disconnected from Localhost:21
 Local FTP -> ** KO **
 Performing check tcp(Local HTTP)
 TCP check(Local HTTP): connecting to 127.0.0.1:80...
 Running gethosbyname() on 127.0.0.1
-Will connect to 127.0.0.1:80, timeout = 5
-Connected to 127.0.0.1:80
+TCP check(Local HTTP): will connect to 127.0.0.1:80, timeout = 5
+TCP check(Local HTTP): connected to 127.0.0.1:80
 TCP check(Local HTTP): disconnected from 127.0.0.1:80
 Local HTTP -> ok
 Performing check tcp(Local SMTP)
@@ -191,7 +191,7 @@ Local SMTP -> ** ?? **
 Performing check tcp(My POP3)
 TCP check(My POP3): connecting to localhost:13529...
 Running gethosbyname() on localhost
-Will connect to localhost:13529, timeout = 5
+TCP check(My POP3): will connect to localhost:13529, timeout = 5
 TCP check(My POP3): network error connecting to localhost:13529, code=111 (Connection refused)
 TCP check(My POP3): disconnected from localhost:13529
 My POP3 -> ** KO **

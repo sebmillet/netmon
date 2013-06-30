@@ -437,7 +437,7 @@ void check_t_destroy(struct check_t *chk) {
 
   if (chk->prg_command != NULL)
     free(chk->prg_command);
-  
+
   rfc821_enveloppe_t_destroy(&chk->loop_smtp);
   if (chk->loop_id != NULL)
     free(chk->loop_id);
@@ -1004,13 +1004,14 @@ UNUSED(subst_len);
       loop->status = LE_SENT;
       loop->sent_time = ltime;
     }
+
+    assert(conn_is_closed(&conn));
+
   } else {
     loop->status = LE_SENT;
     loop->sent_time = ltime;
     r = ERR_SMTP_OK;
   }
-
-  assert(conn_is_closed(&conn));
 
   return r == ERR_SMTP_OK ? ST_OK : LOOP_STATUS_WHEN_SENDING_FAILS;
 }
@@ -1444,7 +1445,7 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert, cons
   conn_line_sendf(&conn, g_trace_network_traffic, "<html>");
   conn_line_sendf(&conn, g_trace_network_traffic, "<body>");
   conn_line_sendf(&conn, g_trace_network_traffic, "<table cellpadding=\"2\" cellspacing=\"1\" border=\"1\">");
- 
+
   conn_line_sendf(&conn, g_trace_network_traffic, "<tr><td bgcolor=\"%s\">", ST_TO_BGCOLOR_FORHTML[exec_alert->status]);
   conn_line_sendf(&conn, g_trace_network_traffic, "%s", exec_alert->desc);
   conn_line_sendf(&conn, g_trace_network_traffic, "</td></tr></table>");
@@ -2903,7 +2904,7 @@ void test_alert() {
     exit(EXIT_FAILURE);
   }
 
-  alerts_display();
+/*  alerts_display();*/
 
   char desc[SMALLSTRSIZE];
   snprintf(desc, sizeof(desc), "[TEST] alert for alert %s", alerts[a].name);

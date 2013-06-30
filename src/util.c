@@ -619,7 +619,7 @@ char *ssl_get_error(const unsigned long e, char *s, const size_t s_len) {
 void conn_init(connection_t *conn, int type) {
   conn->type = type;
   conn->sock = -1;
-  conn->ssl_handle = NULL;
+  conn->ssl = NULL;
   conn->ssl_context = NULL;
 
   conn->sock_read = connection_table[conn->type].sock_read;
@@ -633,10 +633,10 @@ void conn_init(connection_t *conn, int type) {
 //
 void conn_close(connection_t *conn) {
   os_closesocket(conn->sock);
-  if (conn->ssl_handle != NULL) {
-    SSL_shutdown(conn->ssl_handle);
-    SSL_free(conn->ssl_handle);
-    conn->ssl_handle = NULL;
+  if (conn->ssl != NULL) {
+    SSL_shutdown(conn->ssl);
+    SSL_free(conn->ssl);
+    conn->ssl = NULL;
   }
   if (conn->ssl_context != NULL) {
     SSL_CTX_free(conn->ssl_context);
@@ -649,7 +649,7 @@ void conn_close(connection_t *conn) {
 // Check whether a given connection_t object is closed
 //
 int conn_is_closed(connection_t *conn) {
-  if (conn->sock != -1 || conn->ssl_context != NULL || conn->ssl_handle != NULL)
+  if (conn->sock != -1 || conn->ssl_context != NULL || conn->ssl != NULL)
     return FALSE;
   return TRUE;
 }
@@ -713,21 +713,21 @@ int conn_connect(const struct sockaddr_in *server, connection_t *conn, struct ti
   }
 
     /* Create SSL connection */
-  else if ((conn->ssl_handle = SSL_new(conn->ssl_context)) == NULL)  {
+  else if ((conn->ssl = SSL_new(conn->ssl_context)) == NULL)  {
     my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
       prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
     cr =  CONNRES_SSL_CONNECTION_ERROR;
   }
 
     /* Connect the SSL struct to our connection */
-  else if (!SSL_set_fd(conn->ssl_handle, conn->sock))  {
+  else if (!SSL_set_fd(conn->ssl, conn->sock))  {
     my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
       prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
     cr = CONNRES_SSL_CONNECTION_ERROR;
   }
 
     /* Initiate SSL handshake */
-  else if (SSL_connect(conn->ssl_handle) != 1) {  
+  else if (SSL_connect(conn->ssl) != 1) {
     my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
       prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err, sizeof(s_err)));
     cr = CONNRES_SSL_CONNECTION_ERROR;
@@ -1020,13 +1020,13 @@ ssize_t conn_plain_write(connection_t *conn, void *buf, const size_t buf_len) {
 // CONNTYPE_SSL -> read sock
 //
 ssize_t conn_ssl_read(connection_t *conn, void *buf, const size_t buf_len) {
-  return SSL_read(conn->ssl_handle, buf, (int)buf_len);
+  return SSL_read(conn->ssl, buf, (int)buf_len);
 }
 
 //
 // CONNTYPE_SSL -> write sock
 //
 ssize_t conn_ssl_write(connection_t *conn, void *buf, const size_t buf_len) {
-  return SSL_write(conn->ssl_handle, buf, (int)buf_len);
+  return SSL_write(conn->ssl, buf, (int)buf_len);
 }
 

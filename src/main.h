@@ -11,14 +11,6 @@
 #include <sys/types.h>
 #include <time.h>
 
-#define BIND_ERROR -1
-#define LISTEN_ERROR -1
-#define ACCEPT_ERROR -1
-#define SELECT_ERROR -1
-#define RECV_ERROR -1
-#define SEND_ERROR -1
-#define SETSOCKOPT_ERROR -1
-
 #define LOOP_REF_SIZE 70
 
 void os_set_sock_nonblocking_mode(int sock);

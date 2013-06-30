@@ -90,7 +90,7 @@ typedef struct connection connection_t;
 typedef struct connection {
     int type;
     int sock;
-    SSL *ssl_handle;
+    SSL *ssl;
     SSL_CTX *ssl_context;
     ssize_t (*sock_read) (connection_t *, void *, const size_t);
     const char *log_prefix_received;
