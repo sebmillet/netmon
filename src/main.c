@@ -71,16 +71,7 @@ void web_create_img_files();
 
 #include <winsock2.h>
 
-#else
-
-  // NOT WINDOWS
-
-/*#include <netdb.h>*/
-
 #endif
-
-#define DEFAULT_BUFFER_SIZE 10000
-  // Maximum size of an input line in the TCP connection
 
 
 //
@@ -123,6 +114,7 @@ const char *ST_TO_LONGSTR_SIMPLE[] = {
 //
 // Web Server
 //
+
 extern long int g_html_refresh_interval;
 int g_html_refresh_interval_set = FALSE;
 
@@ -140,6 +132,7 @@ int g_webserver_port_set = FALSE;
 
 extern const char *ST_TO_BGCOLOR_FORHTML[];
 struct img_file_t img_files[_ST_NBELEMS];
+
 
 //
 // CONFIG
@@ -174,7 +167,6 @@ int g_print_subst_error_set = FALSE;
 long int g_display_name_width = DEFAULT_DISPLAY_NAME_WIDTH;
 int g_display_name_width_set = FALSE;
 
-long int g_buffer_size = DEFAULT_BUFFER_SIZE;
 int g_buffer_size_set = FALSE;
 extern long int g_connect_timeout;
 int g_connect_timeout_set = FALSE;
@@ -244,6 +236,7 @@ const char *l_date_formats[] = {
 //
 // All variables found in the ini file
 //
+
 struct check_t chk00;
 struct alert_t alrt00;
 
@@ -335,7 +328,6 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"print_subst_error", V_YESNO, CS_GENERAL, &g_print_subst_error, NULL, NULL, 0, &g_print_subst_error_set, FALSE, NULL, 0, -1},
   {"log_usec", V_YESNO, CS_GENERAL, &g_log_usec, NULL, NULL, 0, &g_log_usec_set, FALSE, NULL, 0, -1},
   {"check_interval", V_INT, CS_GENERAL, &g_check_interval, NULL, NULL, 0, &g_check_interval_set, TRUE, NULL, 0, -1},
-  {"buffer_size", V_INT, CS_GENERAL, &g_buffer_size, NULL, NULL, 0, &g_buffer_size_set, FALSE, NULL, 0, -1},
   {"connect_timeout", V_INT, CS_GENERAL, &g_connect_timeout, NULL, NULL, 0, &g_connect_timeout_set, FALSE, NULL, 0, -1},
   {"netio_timeout", V_INT, CS_GENERAL, &g_netio_timeout, NULL, NULL, 0, &g_netio_timeout_set, FALSE, NULL, 0, -1},
   {"keep_last_status", V_INT, CS_GENERAL, &g_nb_keep_last_status, NULL, NULL, 0, &g_nb_keep_last_status_set, TRUE, NULL, 0, -1},
@@ -347,7 +339,7 @@ const struct readcfg_var_t readcfg_vars[] = {
     &g_html_directory_set, FALSE, NULL, 0, -1},
   {"html_file", V_STR, CS_GENERAL, NULL, NULL, g_html_file, sizeof(g_html_file), &g_html_file_set, FALSE, NULL, 0, -1},
   {"html_nb_columns", V_INT, CS_GENERAL, &g_html_nb_columns, NULL, NULL, 0, &g_html_nb_columns_set, FALSE, NULL, 0, -1},
-  {"webserver_on", V_YESNO, CS_GENERAL, &g_webserver_on, NULL, NULL, 0, &g_webserver_on_set, FALSE, NULL, 0, -1},
+  {"webserver", V_YESNO, CS_GENERAL, &g_webserver_on, NULL, NULL, 0, &g_webserver_on_set, FALSE, NULL, 0, -1},
   {"webserver_port", V_INT, CS_GENERAL, &g_webserver_port, NULL, NULL, 0, &g_webserver_port_set, FALSE, NULL, 0, -1},
 
 // ALERTS
@@ -392,26 +384,32 @@ const struct readcfg_var_t readcfg_vars[] = {
 // GENERAL
 //
 
-
+  // Loop-Email check status names
 const char *LE_NAMES[] = {
   "None",     // LE_NONE
   "Sent",     // LE_SENT
   "Received"  // LE_RECEIVED
 };
 
-int g_trace_network_traffic;
-
-int flag_interrupted = FALSE;
-int quitting = FALSE;
-
-long int loop_count = 0;
-
-pthread_mutex_t mutex;
-
+  // Used to store the status of Email-Loop emails sent
 struct loop_t *loops = NULL;
 int first_loop = 0;
 int last_loop = -1;
 int loops_nb_alloc = 0;
+
+  // Shall we print network traffic to the log?
+  // For very high level debugging only...
+int g_trace_network_traffic;
+
+  // Used to catch interruption
+int flag_interrupted = FALSE;
+int quitting = FALSE;
+
+  // Incremented at each interval as defined in the ini variable
+  // check_interval.
+long int loop_count = 0;
+
+pthread_mutex_t mutex;
 
 
 //
@@ -2949,7 +2947,6 @@ int main(int argc, char *argv[]) {
   parse_options(argc, argv);
 
   my_log_open();
-  my_logs(LL_NORMAL, LP_NOTHING, "");
   my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_STRING " start");
 
   int nb_errors = 0;

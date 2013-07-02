@@ -83,7 +83,7 @@ extern char const st_fail[];
 extern size_t const st_fail_len;
 
 extern int g_trace_network_traffic;
-extern long int g_buffer_size;
+size_t buffer_size = 10000;
 
 extern pthread_mutex_t mutex;
 
@@ -358,7 +358,7 @@ int manage_web_transaction(connection_t *conn) {
   conn_line_sendf(conn, g_trace_network_traffic, "Last-modified: %s", dt_fileupdate);
   conn_line_sendf(conn, g_trace_network_traffic, "");
 
-  char *buffer = (char *)malloc((size_t)g_buffer_size);
+  char *buffer = (char *)malloc(buffer_size);
   size_t n;
   ssize_t e;
   while (feof(F) == 0) {

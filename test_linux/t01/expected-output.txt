@@ -1,4 +1,3 @@
-
 netmon 1.0 start
 Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 2: variable display_name not allowed in this section

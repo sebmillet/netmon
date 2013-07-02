@@ -1,4 +1,3 @@
-
 netmon 1.0 start
 Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 3: variable name not allowed in this section

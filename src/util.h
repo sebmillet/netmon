@@ -36,6 +36,7 @@
 typedef int socklen_t;
 #endif
 
+  // Maximum size of an input line in the TCP connection
 #define MAX_READLINE_SIZE 10000
 #define SMALLSTRSIZE  200
 #define BIGSTRSIZE    1000
