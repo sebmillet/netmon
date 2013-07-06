@@ -1,0 +1,58 @@
+.\" Written by Sébastien Millet
+.\"
+.TH netmon 1 "version 1.0" "July 2013"
+
+.SH NAME
+.TP
+netmon \- a program to monitor remote TCP ports
+
+.SH SYNOPSIS
+.TP
+\fBnetmon\fP [-c config-file] [-l log-file] [\fIOPTIONS\fP]...
+
+.SH DESCRIPTION
+.TP
+netmon is meant to do TCP connection tests at regular intervals, and publish the status in an HTML page
+
+.SH OPTIONS
+.TP
+.B \-h,\ \-\-help
+Display a quick help screen and exit
+.TP
+.B \-V\ \-\-version
+Display version information and exit
+.TP
+.B \-v,\ \-\-verbose
+Be more talkative, the more -v found, the more talkative
+.TP
+.B \-q,\ \-\-quiet
+Be less talkative, the less -q found, the less talkative
+.TP
+.B \-l,\ \-\-log-file\ \fIlog-file\fP
+Log information into \fIlog-file\fP. By default it is \fInetmon.log\fP
+.TP
+.B \-c,\ \-\-config-file\ \fIconfig-file\fP
+Use \fIconfig-file\fP to read configuration. By default it is \fInetmon.ini\fP
+.TP
+.B \-p,\ \-\-print-log
+Display log on the terminal
+.TP
+.B \-C,\ \-\-stdout
+Display status information on the terminal
+.TP
+.B \-t,\ \-\-test \fIN\fP
+Use test mode number \fIN\fP, for test suite only
+.TP
+.B \-a,\ \-\-alert \fIalert-name\fP
+Test alert \fIalert-name\fP, then quit
+.TP
+.B \-\-laxist
+Continue if errors are found in the config file (default: stop)
+.SH "INITIALIZATION FILES"
+.TP
+None.
+.SH AUTHOR
+.TP
+Written by Sébastien Millet <sebastien.millet1@club-internet.fr>
+.TP
+Permission is granted to copy, distribute and/or modify this document under the terms of the GNU General Public License, Version 3 published by the Free Software Foundation.

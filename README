@@ -15,10 +15,11 @@ Contents:
 
 I.    WHAT IS NETMON?
 
-It is meant to do TCP connection tests at regular intervals, and publish the
-status on a web server included in netmon.
-The check can also be an external program as per NAGIOS standard.
-It can raise an alert when a check fails.
+netmon is meant to do TCP connection tests at regular intervals, and publish
+the status in an HTML page. netmon provides a minimalistic web server to
+render this page in a browser.
+The check can also be an external program, as per NAGIOS standard.
+It can raise alerts when a check fails.
 Compatible with SSL/TLS.
 
 
