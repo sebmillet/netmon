@@ -19,13 +19,13 @@
 #define DEFAULT_CHECK_INTERVAL 120
 #define DEFAULT_NB_KEEP_LAST_STATUS 15
 #define DEFAULT_DISPLAY_NAME_WIDTH 20
+#define DEFAULT_SMTP_SENDER  (PACKAGE_TARNAME "@localhost")
+#define DEFAULT_SMTP_SELF PACKAGE_TARNAME
 #define DEFAULT_ALERT_THRESHOLD 3
-#define DEFAULT_ALERT_SMTP_SENDER  (PACKAGE_TARNAME "@localhost")
 #define DEFAULT_ALERT_REPEAT_EVERY 30
 #define DEFAULT_ALERT_REPEAT_MAX 5
 #define DEFAULT_ALERT_RECOVERY TRUE
 #define DEFAULT_ALERT_RETRIES 2
-#define DEFAULT_ALERT_SMTP_SELF PACKAGE_TARNAME
 #define DEFAULT_SMTP_PORT 25
 #define DEFAULT_POP3_PORT 110
 #define DEFAULT_ALERT_LOG_STRING "${NOW_TIMESTAMP}  ${DESCRIPTION}"
@@ -782,7 +782,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix,
     return (cr == CONNRES_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR : ERR_SMTP_NETIO);
 
   if (conn_line_sendf(conn, g_trace_network_traffic, "EHLO %s",
-      env->self_set ? env->self : DEFAULT_LOOP_SMTP_SELF)) {
+      env->self_set ? env->self : DEFAULT_SMTP_SELF)) {
     return ERR_SMTP_NETIO;
   }
 
@@ -799,7 +799,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix,
     return ERR_SMTP_BAD_ANSWER_TO_EHLO;
   }
   free(response);
-  env->from_orig = env->sender_set ? env->sender : DEFAULT_ALERT_SMTP_SENDER;
+  env->from_orig = env->sender_set ? env->sender : DEFAULT_SMTP_SENDER;
   strncpy(from_buf, env->from_orig, from_buf_len);
   from_buf[from_buf_len - 1] = '\0';
   env->from = from_buf;
@@ -1241,6 +1241,7 @@ int perform_check_loop(struct check_t *chk, const struct subst_t *subst, int sub
       chk->loop_send_countdown = (int)(chk->loop_send_every_set ? chk->loop_send_every : DEFAULT_LOOP_SEND_EVERY);
     } else {
       my_logf(LL_VERBOSE, LP_DATETIME, "%s skipping email sending, countdown = %d", prefix, chk->loop_send_countdown);
+      r = chk->status;
     }
     loop_receive_emails(chk, subst, subst_len, prefix);
 

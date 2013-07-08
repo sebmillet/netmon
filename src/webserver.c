@@ -17,7 +17,7 @@
   // WINDOWS
 
 #define DEFAULT_HTML_DIRECTORY (".")
-#define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
+#define DEFAULT_HTML_FILE "status.html"
 
 #include <winsock2.h>
 
@@ -26,7 +26,7 @@
   // NOT WINDOWS
 
 #define DEFAULT_HTML_DIRECTORY (".")
-#define DEFAULT_HTML_FILE (PACKAGE_NAME ".html")
+#define DEFAULT_HTML_FILE "status.html"
 
 #include <sys/socket.h>
 #include <netinet/in.h>

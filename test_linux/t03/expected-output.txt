@@ -242,7 +242,7 @@ check_interval = 0
 keep_last_status = 15
 display_name_width = 20
 html_directory = ../www
-html_file = netmon.html
+html_file = status.html
 html_title = netmon 1.0
 html_refresh_interval = 20
 Valid check(s) defined: 5

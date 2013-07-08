@@ -15,6 +15,8 @@ AC_CANONICAL_HOST
 
 AM_INIT_AUTOMAKE
 
+AM_MAINTAINER_MODE
+
 AC_CONFIG_HEADERS([config.h])
 
 dnl ==================== Options ====================================
@@ -22,6 +24,14 @@ dnl ==================== Options ====================================
 AC_ARG_ENABLE(debug,
               [  --enable-debug          enable debugging information],
               enable_debug="$enableval", enable_debug="no")
+
+if test "x$USE_MAINTAINER_MODE" = "xyes"; then
+	build_docs=yes
+else
+	build_docs=no
+fi
+
+AM_CONDITIONAL(BUILD_DOCS, test $build_docs = yes)
 
 if test "${enable_debug}" = yes ; then
   CFLAGS="$CFLAGS -DDEBUG -g"
@@ -55,6 +65,5 @@ AC_CHECK_FUNCS([atexit gethostbyname gettimeofday memset select socket strcasecm
 AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(ssl, SSL_library_init)
 
-AC_CONFIG_FILES([Makefile
-                 src/Makefile])
-AC_OUTPUT
+AC_OUTPUT(Makefile src/Makefile doc/Makefile)
+

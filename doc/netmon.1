@@ -52,6 +52,735 @@ Continue if errors are found in the config file (default: stop)
 .TP
 .B netmon.ini
 Windows-like configuration file
+
+.B netmon.ini help
+
+A string value can be written as is, as in
+  host_name=localhost
+or with surrounding double-quotes, as in
+  host_name="localhost"
+The equal sign can be preceeded or followed by spaces, as in
+  host_name = Localhost
+
+When multiple values are possible, they are separated by a ','
+character, as in
+  alerts = mylog, myprg, mysmtp
+
+Sections can appear in any order.
+Inside sections, variables can appear in any order.
+
+For settings referring to a TCP connection, the '..._crypt'
+variable (tcp_crypt, smtp_crypt, etc.) is optional. If no crypt
+specification is set, netmon will guess whether SSL is to be
+used by examining the port. If the port is one of 443, 465,
+585, 993 or 995, netmon will use SSL over the TCP connection,
+otherwise it won't.
+
+.B About host names
+  A host name can be followed by :port_number if appropriate,
+  taking precedence on the corresponding port number variable.
+  Thus for a TCP check definition, the line
+    host_name=smtp.myprovider.com:8080
+  produces the same result as the two lines
+    host_name=smtp.myprovider.com
+    tcp_port=8080
+
+.B About substitutions
+  The following parameters
+    program_command, log_file, log_string
+  are subject to substitutions.
+  Any occurence of ${something} will be replaced by the value
+  of the 'something' variable.
+  For example
+    log_string="${NOW_TIMESTAMP}  ${DESCRIPTION}"
+  will cause printouts in the log like
+    21/01/93 10:22:00  
+  What to do in case the variable does not exist is tuned by
+  the print_subst_error variable.
+
+.B   List of substitutions inside alerts and checks
+    DISPLAY_NAME  Check display_name
+    HOST_NAME     Check host_name
+    NOW_TIMESTAMP dd/mm/yy hh:mm:ss of current date/time
+    NOW_YMD       yyyymmdd of current date (8 digits)
+    NOW_YEAR      Year of current date, 4 digits
+    NOW_MONTH     Month of current date, 2 digits
+    NOW_DAY       Day of current date, 2 digits
+    NOW_HOUR      Hour of current time, 2 digits
+    NOW_MINUTE    Minute of current time, 2 digits
+    NOW_SECOND    Second of current time, 2 digits
+    LOOP_COUNT    Number of ticks since program started
+    TAB           A tab (ascii code 9)
+
+.B   List of substitutions inside alerts only
+    DESCRIPTION       Description of alert, example
+      'My prog probe [none] in status Fail since 21/01 10:22'
+    STATUS            Check status string, can be
+      "Undefined", "Unknown", "Ok", "Fail"
+    STATUS_NUM        Check status code, can be 0 for
+      Undefined, 1 for Unknown, 2 for Ok, 3 for Fail
+    CONSECUTIVE_NOTOK Number of consecutive ticks being not
+      "Ok" for the check
+    ALERT_NAME        Name of alert
+    ALERT_METHOD      Method of alert, can be "smtp",
+      "program", "log"
+    ALERT_STATUS      Alert status string, can be "Nothing",
+      "Fail", "Recovery".
+    ALERT_STATUS_NUM  Alert status code, can be 0 for Nothing,
+      1 for Fail, 2 for Recovery.
+    ALERT_SEQ         Number of times the alert was already
+      triggered (for the same check failure)
+    ALERT_NB_FAILURES Number of failures executing the alert
+      itself
+    ALERT_TIMESTAMP   Timestamp of the date/time at which the
+      check turned to "Fail" or "Unknown"
+    ALERT_YMD         yyyymmdd of alert timestamp (8 digits)
+    ALERT_YEAR        Year of alert timestamp (4 digits)
+    ALERT_MONTH       Month of alert timestamp (2 digits)
+    ALERT_DAY         Day of alert timestamp (2 digits)
+    ALERT_HOUR        Hour of alert timestamp (2 digits)
+    ALERT_MINUTE      Minute of alert timestamp (2 digits)
+    ALERT_SECOND      Second of alert timestamp (2 digits)
+
+.B   [general] section
+
+The [general] section sets global options to netmon, the most
+important one being
+  check_interval
+This option is the number of seconds between checks. It is the
+reference duration for the "tick" of the running program. Many
+other options, like alert_threshold, alert_repeat_every, ...,
+correspond to a number of elapsed ticks.
+
+.B   [check] sections
+
+The [check] section appears once per probe to do. So, you have
+as many [check] sections as you have probes. It is not a very
+ini-proof approach but that is how it is. Probes can be of
+three kinds set by the method variable. It is tcp, program and
+loop.
+  tcp
+    Connect to a given address through TCP. You can specify an
+    expected answer (as per telnet standard), useful to check
+    SMTP or similar (POP3, FTP etc.) protocols availability.
+  program
+    Runs an arbitrary external program, and use its return
+    value for the service status, as per Nagios standard =>
+      0 = Nagios Ok =>        netmon "ok"
+      1 = Nagios Warning =>   netmon "fail"
+      2 = Nagios Critical =>  netmon "fail"
+      3 = Nagios Unknown =>   netmon "unknown"
+    (netmon does not have a warning status)
+  loop
+    Perform an email loop. Sends an email through SMTP and
+    collect received emails on a POP3 mail box to which sent
+    emails are addressed.
+
+.B   [alert] sections
+
+Define alerts, referred to inside checks using the 'alerts'
+variable (matched against the 'name' variable of each alert.)
+Alerts can be of three kinds set by the method variable, smtp,
+program and log.
+  smtp
+    Sends an email via SMTP
+  program
+    Execute an arbitrary external program
+  log
+    Write information into a log file
+.TP
+.B Variables of the [general] section
+.br
+.TP
+\fIcheck_interval\fP
+  Interval at which checks are done, in seconds.
+  If set to zero, one check is done and the program terminates.
+  Optional
+  Defaults to 120 (= two minutes)
+.br
+
+.TP
+\fIkeep_last_status\fP
+  Number of previous status displayed in the HTML status page.
+  The oldest status displayed goes back "check_interval x
+  keep_last_status" seconds.
+  If check_interval is set to 120 and keep_last_status to 15,
+  then the displayed history covers the last thirty minutes.
+  Can be set to zero, in which case no history is displayed.
+  Optional
+  Defaults to 15
+.br
+
+.TP
+\fIhtml_nb_columns\fP
+  Number of columns to display checks status.
+  Optional
+  Defaults to 2
+.br
+
+.TP
+\fIwebserver\fP
+  Tells whether or not to start the minimalistic web server
+  provided by netmon.
+  Optional
+  Defaults to "yes" (Windows) or "no" (Linux)
+  yes => start the web server
+  no => don't start the web server
+  Note
+  Under Linux, you had better use a web server like Apache
+  available out of the box in most Linux distributions. This is
+  why Linux defaults to no.
+.br
+
+.TP
+\fIwebserver_port\fP
+  If the web server is started, tells what port to listen to.
+  Optional
+  Defaults to 80 (Windows) or 8080 (Linux)
+.br
+
+.TP
+\fIhtml_file\fP
+  Name of the HTML file.
+  Optional
+  Defaults to "status.html"
+.br
+
+.TP
+\fIdate_format\fP
+  Specify whether dates should be written dd/mm or mm/dd.
+  Optional
+  Defaults to "french"
+  french => dates are written dd/mm
+  english => dates are written mm/dd
+.br
+
+.TP
+\fIconnect_timeout\fP
+  Timeout to establish a TCP connection, in seconds.
+  Optional
+  Defaults to 5
+.br
+
+.TP
+\fInetio_timeout\fP
+  Timeout in network communications (once TCP connection is
+  established), in seconds.
+  Optional
+  Defaults to 10
+.br
+
+.TP
+\fIdisplay_name_width\fP
+  Used for terminal display (-C option), not much used. Number of
+  characters reserved to display the check's display name.
+  Optional
+  Defaults to 20
+.br
+
+.TP
+\fIhtml_refresh_interval\fP
+  Interval at which the HTML page will get reloaded, in seconds.
+  Optional
+  Defaults to 20
+.br
+
+.TP
+\fIhtml_title\fP
+  Header of the HTML page displaying checks status.
+  Optional
+  Defaults to "netmon 1.0"
+.br
+
+.TP
+\fIhtml_directory\fP
+  Directory to write HTML page into (also image files that go
+  along with HTML page.)
+  Optional
+  Defaults to "."
+.br
+
+.TP
+\fIprint_subst_error\fP
+  When replacing ${VARNAME} with the variable's value, tells
+  whether a non-existent variable should be replaced by "" (empty
+  string) or leave the variable name surrounded by '?' to
+  highlight the substitution was not possible.
+  Optional
+  Defaults to "no"
+  Note
+  Substitutions are done in log file names, program command
+  strings and log output string definitions. See "About
+  substitutions" above for more information.
+  yes => display subst errors
+  no => silently ignore subst errors
+.br
+
+.TP
+\fIlog_usec\fP
+  Tells whether log output timestamp should indicate
+  micro-seconds or not.
+  Optional
+  Defaults to "yes"
+  yes => Time stamps like "21/01/93 21:45:51.897782"
+  no => Time stamps like "16/10/93 21:45:51"
+.br
+
+.TP
+.B Variables of the [check] sections
+.br
+.TP
+\fIdisplay_name\fP
+  Check name.
+  Mandatory
+  No default value
+.br
+
+.TP
+\fImethod\fP
+  Check method.
+  Optional
+  No default value
+  Each method comes with its set of mandatory variables,
+  therefore netmon can (and will) guess the method, so long as
+  variables employed belong to the same method.
+  tcp => perform a TCP connection
+  program => execute an external program
+  loop => perform an email loop combining SMTP and POP3
+  access
+.br
+
+.TP
+\fIhost_name\fP
+  Host name to connect to.
+  Optional with program and loop checks, mandatory with tcp
+  checks
+  No default value
+.br
+
+.TP
+\fIalerts\fP
+  Alerts to raise in case the service is "fail" or "unknown".
+  Optional
+  No default value
+  Multiple values separated by ','
+.br
+
+.TP
+\fIalert_threshold\fP
+  Number of "ticks" (re check_interval) of "fail" or "unknown"
+  status after which to raise the alert(s).
+  Optional
+  Defaults to threshold defined in each alert
+.br
+
+.TP
+\fIalert_repeat_every\fP
+  Number of "ticks" (re check_interval) after which to re-trigger
+  the alert(s), after the first one (as per alert_threshold) has
+  been triggered.
+  Optional
+  Defaults to repeat_every defined in each alert
+.br
+
+.TP
+\fIalert_repeat_max\fP
+  Maximum number of times an alert is *repeated*. As we count the
+  number of *repetitions*, the total number of times alerts are
+  triggered is equal to 'alert_repeat_max + 1'.
+  Optional
+  Defaults to repeat_max defined in each alert
+.br
+
+.TP
+\fIalert_recovery\fP
+  Tells whether or not to trigger an alert when the service is
+  recovered = switch from 'fail' or 'unknown' status to 'ok'.
+  Optional
+  Defaults to recovery defined in each alert
+  yes => trigger alert when check recovers
+  no => don't trigger alert when check recovers
+.br
+
+.TP
+\fItcp_port\fP
+  "tcp" check only -> target TCP port to connect to.
+  Mandatory
+  No default value
+.br
+
+.TP
+\fItcp_crypt\fP
+  "tcp" check only -> use SSL or not.
+  Optional
+  No default value
+  plain => no SSL
+  ssl => use SSL
+.br
+
+.TP
+\fItcp_expect\fP
+  "tcp" check only -> verify the server gives expeced answer.
+  Optional
+  No default value
+  If not set, no reception and no check are done.
+  The server's answer can be longer than the expected string.
+  Remember to surround the value with double-quotes (") if the
+  expected string contains leading or trailing spaces.
+.br
+
+.TP
+\fItcp_connect_timeout\fP
+  "tcp" check only -> timeout in seconds to establish the TCP
+  connection.
+  Optional
+  Defaults to connect_timeout of the [general] section
+.br
+
+.TP
+\fItcp_netio_timeout\fP
+  "tcp" check only -> timeout in seconds to exchange data over
+  the TCP network connection.
+  Optional
+  Defaults to netio_timeout of the [general] section
+.br
+
+.TP
+\fIhost_name\fP
+  With program_command below netmon will guess the method is
+  "program".
+  method=program
+.br
+
+.TP
+\fIprogram_command\fP
+  "program" check only -> command to execute.
+  Mandatory
+  No default value
+  Perform substitutions (see above, "About substitutions")
+.br
+
+.TP
+\fIloop_id\fP
+  "loop" check only -> identifier used in emails to distinguish
+  betwen multiple loop checks done over the same mail box.
+  Optionnal
+  Defaults to "NMNM"
+.br
+
+.TP
+\fIloop_fail_delay\fP
+  "loop" check only -> for a given sent email probe, the check
+  enters "Fail" mode after that many number of seconds.
+  Optional
+  Defaults to 600 (ten minutes)
+.br
+
+.TP
+\fIloop_fail_timeout\fP
+  "loop" check only -> delay beyond which to discard a given
+  probe -> after that many seconds, the check will just forget
+  about the lost email probe, allowing to go back to "Ok" status
+  when there's no more lost email.
+  Optional
+  Defaults to 14400 (four hours)
+.br
+
+.TP
+\fIloop_send_every\fP
+  "loop" check only -> send one probe email every that number of
+  ticks.
+  Optional
+  Defaults to 2
+  For check_interval set to 120 and a value of 2, there'll be one
+  probe email every four minutes.
+.br
+
+.TP
+\fIloop_smtp_smart_host\fP
+  "loop" check only -> host to send the probe email to.
+  Mandatory
+  No default value
+.br
+
+.TP
+\fIloop_smtp_port\fP
+  "loop" check only -> port to use for SMTP sending to
+  loop_smtp_smart_host.
+  Optional
+  Defaults to 25
+.br
+
+.TP
+\fIloop_smtp_crypt\fP
+  "loop" check only -> tells whether or not to use SSL in the
+  SMTP transaction.
+  Optional
+  No default value
+  plain => no SSL
+  ssl => use SSL
+.br
+
+.TP
+\fIloop_smtp_self\fP
+  "loop" check only -> indicate the name to write in the EHLO
+  command.
+  Optional
+  Defaults to netmon
+.br
+
+.TP
+\fIloop_smtp_sender\fP
+  "loop" check only -> probe email sender.
+  Optional
+  Defaults to "netmon@localhost"
+.br
+
+.TP
+\fIloop_smtp_recipients\fP
+  "loop" check only -> probe email recipients.
+  Mandatory
+  No default value
+  The variable authorizes multiple values, however it is
+  advisable to send to one recipient at a time. netmon expects
+  one received email per sent email, not more. If one sent email
+  is received multiple times, it'll result in warnings in the
+  log, but it is not treated as a "fail" status for the test.
+  Multiple values are separated by a ',' character.
+.br
+
+.TP
+\fIloop_smtp_connect_timeout\fP
+  "loop" check only -> TCP connection timeout in seconds.
+  Optional
+  Defaults to connect_timeout of the [general] section
+.br
+
+.TP
+\fIloop_smtp_netio_timeout\fP
+  "loop" check only -> net i/o timeout in seconds.
+  Optional
+  Defaults to netio_timeout of the [general] section
+.br
+
+.TP
+\fIloop_pop3_server\fP
+  "loop" check only -> POP3 server for loop emails reception.
+  Mandatory
+  No default value
+.br
+
+.TP
+\fIloop_pop3_port\fP
+  "loop" check only -> POP3 port to connect to.
+  Optional
+  Defaults to 110
+.br
+
+.TP
+\fIloop_pop3_crypt\fP
+  "loop" check only -> tells whether or not to use SSL in the
+  POP3 transaction.
+  Optional
+  No default value
+  plain => no SSL
+  ssl => use SSL
+.br
+
+.TP
+\fIloop_pop3_user\fP
+  "loop" check only -> POP3 user name (for authentication.)
+  Mandatory
+  No default value
+.br
+
+.TP
+\fIloop_pop3_password\fP
+  "loop" check only -> POP3 password (for authentication.)
+  Mandatory
+  No default value
+.br
+
+.TP
+\fIloop_pop3_connect_timeout\fP
+  "loop" check only -> TCP connection timeout in seconds.
+  Optional
+  Defaults to connect_timeout of the [general] section
+.br
+
+.TP
+\fIloop_pop3_netio_timeout\fP
+  "loop" check only -> net i/o timeout in seconds.
+  Optional
+  Defaults to netio_timeout of the [general] section
+.br
+
+.TP
+.B Variables of the [alert] sections
+.br
+.TP
+\fIname\fP
+  Alert name, as will be referenced in the checks 'alerts'
+  variable.
+  Mandatory
+  No default value
+.br
+
+.TP
+\fImethod\fP
+  Alert method.
+  Optional
+  No default value
+  Each method comes with its set of mandatory variables,
+  therefore netmon can (and will) guess the method, so long as
+  variables employed belong to the same method.
+  smtp => Send an email
+  program => Execute an external program
+  log => Write to a log file
+.br
+
+.TP
+\fIthreshold\fP
+  Number of ticks (re check_interval) being not "Ok" after which
+  the alert is triggered.
+  Optional
+  Defaults to 3
+  Ignored if the check triggering the alert has set
+  alert_threshold.
+.br
+
+.TP
+\fIrepeat_every\fP
+  Number of ticks (re check_interval) after which an already once
+  triggered alert is triggered again.
+  Optional
+  Defaults to 30
+  Ignored if the check triggering the alert has set
+  alert_repeat_every.
+.br
+
+.TP
+\fIrepeat_max\fP
+  Number of "ticks" (re check_interval) after which to re-trigger
+  the alert, after the first one (as per alert_threshold) has
+  been triggered.
+  Optional
+  Defaults to 5
+  Ignored if the check triggering the alert has set
+  alert_repeat_max.
+.br
+
+.TP
+\fIrecovery\fP
+  Tells whether or not to trigger the alert when the service is
+  recovered = switch from 'fail' or 'unknown' status to 'ok'.
+  Optional
+  Defaults to yes
+  Ignored if the check triggering the alert has set
+  alert_recovery.
+  yes => trigger alert when check recovers
+  no => don't trigger alert when check recovers
+.br
+
+.TP
+\fIretries\fP
+  Tells how many times to re-execute an alert when the execution
+  fails. For an 'smtp' alert, failure occurs if the sending is
+  not successful (unable to connect, bad answer from server,
+  etc.) For a 'program' alert, a non-null return code is a
+  failure. For a 'log' alert, failure can occur if writing in the
+  log failed (unable to open the log file.)
+  When an alert execution fails, the retry occurs at next tick.
+  Optional
+  Defaults to 2
+.br
+
+.TP
+\fIsmtp_smart_host\fP
+  "smtp" alert only -> host to send the alert email to.
+  Mandatory
+  No default value
+.br
+
+.TP
+\fIsmtp_port\fP
+  "smtp" alert only -> port to use for SMTP sending to
+  smtp_smart_host.
+  Optional
+  Defaults to 25
+.br
+
+.TP
+\fIsmtp_crypt\fP
+  "smtp" alert only -> tells whether or not to use SSL in the
+  SMTP transaction.
+  Optional
+  No default value
+  plain => no SSL
+  ssl => use SSL
+.br
+
+.TP
+\fIsmtp_self\fP
+  "smtp" alert only -> indicate the name to write in the EHLO
+  command.
+  Optional
+  Defaults to netmon
+.br
+
+.TP
+\fIsmtp_sender\fP
+  "smtp" alert only -> alert email sender
+  Optional
+  Defaults to "netmon@localhost"
+.br
+
+.TP
+\fIsmtp_recipients\fP
+  "smtp" alert only -> alert email recipients.
+  Mandatory
+  No default value
+  The variable authorizes multiple values, separated by a ','
+  character.
+.br
+
+.TP
+\fIsmtp_connect_timeout\fP
+  "smtp" alert only -> TCP connection timeout in seconds.
+  Optional
+  Defaults to connect_timeout of the [general] section
+.br
+
+.TP
+\fIsmtp_netio_timeout\fP
+  "smtp" alert only -> net i/o timeout in seconds.
+  Optional
+  Defaults to netio_timeout of the [general] section
+.br
+
+.TP
+\fIprogram_command\fP
+  "program" alert only -> command to execute.
+  A non-zero value is a failure and could cause the alert to be
+  re-executed at next tick (as per 'retries' variable.)
+  Mandatory
+  No default value
+.br
+
+.TP
+\fIlog_file\fP
+  "log" alert only -> log file to write to.
+  Mandatory
+  No default value
+.br
+
+.TP
+\fIlog_string\fP
+  "log" alert only -> string to write to the log.
+  Optional
+  Defaults to "${NOW_TIMESTAMP} ${DESCRIPTION}"
+.br
+
 .SH AUTHOR
 .TP
 Written by Sébastien Millet <sebastien.millet1@club-internet.fr>
