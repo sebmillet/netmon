@@ -32,6 +32,7 @@
     </headers>
     <sources>main.c util.c webserver.c
       img\st-fail.c img\st-ok.c img\st-undef.c img\st-unknown.c
+      netmon.html.c
     </sources>
     <warnings>max</warnings>
     <debug-info>$(DEBUG_FLAG)</debug-info>

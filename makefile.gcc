@@ -44,7 +44,8 @@ NETMON_OBJECTS =  \
 	build\netmon_st_fail.o \
 	build\netmon_st_ok.o \
 	build\netmon_st_undef.o \
-	build\netmon_st_unknown.o
+	build\netmon_st_unknown.o \
+	build\netmon_netmon_html.o
 
 ### Conditionally set variables: ###
 
@@ -97,6 +98,9 @@ build\netmon_st_undef.o: src/img/st-undef.c
 	$(CC) -c -o $@ $(NETMON_CFLAGS) $(CPPDEPS) $<
 
 build\netmon_st_unknown.o: src/img/st-unknown.c
+	$(CC) -c -o $@ $(NETMON_CFLAGS) $(CPPDEPS) $<
+
+build\netmon_netmon_html.o: src/netmon.html.c
 	$(CC) -c -o $@ $(NETMON_CFLAGS) $(CPPDEPS) $<
 
 .PHONY: all clean
