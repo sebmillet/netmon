@@ -82,6 +82,9 @@ extern size_t const st_ok_len;
 extern char const st_fail[];
 extern size_t const st_fail_len;
 
+extern const char *netmon[];
+extern size_t const netmon_len;
+
 extern int g_trace_network_traffic;
 size_t buffer_size = 10000;
 
@@ -90,7 +93,7 @@ extern pthread_mutex_t mutex;
 //
 // Create files used for HTML display
 //
-void web_create_img_files() {
+void web_create_files_for_web() {
   char buf[BIGSTRSIZE];
 
   img_files[ST_UNDEF].var = st_undef;
@@ -130,6 +133,21 @@ void web_create_img_files() {
     add_reader_access_right(buf);
   }
 
+  strncpy(buf, g_html_directory, sizeof(buf));
+  fs_concatene(buf, FILE_MAN_EN, sizeof(buf));
+  FILE *IMG = fopen(buf, "w+");
+
+  if (IMG == NULL) {
+    my_logf(LL_ERROR, LP_DATETIME, "Unable to create %s", buf);
+  } else {
+    int j;
+    for (j = 0; j < netmon_len; ++j) {
+      fputs(netmon[j], IMG);
+    }
+    fclose(IMG);
+
+    add_reader_access_right(buf);
+  }
 }
 
 //
@@ -307,7 +325,10 @@ int manage_web_transaction(connection_t *conn) {
 
   char path[BIGSTRSIZE];
   strncpy(path, g_html_directory, sizeof(path));
-  fs_concatene(path, strlen(url) == 0 ? g_html_file : url, sizeof(path));
+  if (strcasecmp(url, MAN_EN) == 0)
+    fs_concatene(path, FILE_MAN_EN, sizeof(path));
+  else
+    fs_concatene(path, strlen(url) == 0 ? g_html_file : url, sizeof(path));
 
   my_logf(LL_DEBUG, LP_DATETIME, "Will stat file '%s'", path);
 

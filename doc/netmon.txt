@@ -12,7 +12,11 @@ SYNOPSIS
 
 DESCRIPTION
        netmon  is  meant  to do TCP connection tests at regular intervals, and
-       publish the status in an HTML page
+       publish the status in an HTML page. It manages emails loops  -  sending
+       emails  and  checking  they're  received on the target mail box, making
+       sure the whole chain in between works fine.
+
+       netmon includes a (very) minimalistic web server.
 
 
 OPTIONS

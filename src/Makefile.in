@@ -51,7 +51,7 @@ am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_netmon_OBJECTS = main.$(OBJEXT) util.$(OBJEXT) webserver.$(OBJEXT) \
 	st-undef.$(OBJEXT) st-unknown.$(OBJEXT) st-ok.$(OBJEXT) \
-	st-fail.$(OBJEXT)
+	st-fail.$(OBJEXT) netmon.html.$(OBJEXT)
 netmon_OBJECTS = $(am_netmon_OBJECTS)
 netmon_LDADD = $(LDADD)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
@@ -166,7 +166,8 @@ netmon_SOURCES = main.c main.h util.c util.h webserver.c \
 	img/st-undef.png img/st-undef.c \
 	img/st-unknown.png img/st-unknown.c \
 	img/st-ok.png img/st-ok.c \
-	img/st-fail.png img/st-fail.c
+	img/st-fail.png img/st-fail.c \
+  netmon.html.c
 
 all: all-am
 
@@ -250,6 +251,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netmon.html.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/st-fail.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/st-ok.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/st-undef.Po@am__quote@
@@ -531,8 +533,6 @@ uninstall-am: uninstall-binPROGRAMS
 	uninstall-am uninstall-binPROGRAMS
 
 
-# netmon_LDFLAGS=-lpthread -lssl
-
 img/st-undef.c: img/st-undef.png
 	img/rdtosrc.sh $<
 img/st-unknown.c: img/st-unknown.png
@@ -541,6 +541,9 @@ img/st-ok.c: img/st-ok.png
 	img/rdtosrc.sh $<
 img/st-fail.c: img/st-fail.png
 	img/rdtosrc.sh $<
+
+netmon.html.c: ${top_srcdir}/doc/netmon.html
+	./build-embdoc.sh
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

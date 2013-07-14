@@ -63,7 +63,7 @@ const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
   //   http://nagiosplug.sourceforge.net/developer-guidelines.html#AEN76
 enum {_NAGIOS_FIRST = 0, NAGIOS_OK = 0, NAGIOS_WARNING = 1, NAGIOS_CRITICAL = 2, NAGIOS_UNKNOWN = 3, _NAGIOS_LAST = 3};
 
-void web_create_img_files();
+void web_create_files_for_web();
 
 #if defined(_WIN32) || defined(_WIN64)
 
@@ -1695,7 +1695,7 @@ void manage_output(const struct tm *now_done, float elapsed) {
     fprintf(H, "<META HTTP-EQUIV=\"Refresh\" CONTENT=\"%li\">\n", g_html_refresh_interval);
     fputs("</head>\n", H);
     fputs("<body>\n", H);
-    fprintf(H, "<h1>%s</h1>\n", g_html_title);
+    fprintf(H, "<h1>%s</h1><br>\n", g_html_title);
     fputs("<hr>\n", H);
     fprintf(H, "<h3>Last check: %s</h3>\n", now);
     fprintf(H, "<p>Last check done in %6.3fs<br>\n", elapsed);
@@ -1781,6 +1781,7 @@ void manage_output(const struct tm *now_done, float elapsed) {
   if (H != NULL) {
     fputs("</table>\n", H);
     fputs("<p>* Time at which the status last changed\n</p>", H);
+    fprintf(H, "<p><a href=\"" MAN_EN "\">manual (english)</a></p>\n");
     fputs("</body>\n", H);
     fputs("</html>\n", H);
     fclose(H);
@@ -2986,7 +2987,7 @@ int main(int argc, char *argv[]) {
   if (strlen(g_test_alert) >= 1)
     test_alert();
 
-  web_create_img_files();
+  web_create_files_for_web();
 
     // Just to call WSAStartup, yes!
   os_init_network();

@@ -15,6 +15,9 @@
 
 #define LOOP_REF_SIZE 70
 
+#define MAN_EN      "man-en"
+#define FILE_MAN_EN "netmon.html"
+
 void os_set_sock_nonblocking_mode(int sock);
 
 enum {ST_UNDEF = 0, ST_UNKNOWN = 1, ST_OK = 2, ST_FAIL = 3, _ST_LAST = 3, _ST_NBELEMS = 4};

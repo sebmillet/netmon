@@ -26,7 +26,8 @@ Section: User Commands  (1)<BR>Updated: version 1.0<BR><A HREF="#index">Index</A
 <H2>DESCRIPTION</H2>
 
 <DL COMPACT>
-<DT>netmon is meant to do TCP connection tests at regular intervals, and publish the status in an HTML page<DD>
+<DT>netmon is meant to do TCP connection tests at regular intervals, and publish the status in an HTML page. It manages emails loops - sending emails and checking they're received on the target mail box, making sure the whole chain in between works fine.<DD>
+<DT>netmon includes a (very) minimalistic web server.<DD>
 <P>
 </DL>
 <A NAME="lbAE">&nbsp;</A>
@@ -111,7 +112,8 @@ used by examining the port. If the port is one of 443, 465,
 585, 993 or 995, netmon will use SSL over the TCP connection,
 otherwise it won't.
 <P>
-About host names
+<B>About host names</B>
+
 <BR>&nbsp;&nbsp;A&nbsp;host&nbsp;name&nbsp;can&nbsp;be&nbsp;followed&nbsp;by&nbsp;:port_number&nbsp;if&nbsp;appropriate,
 <BR>&nbsp;&nbsp;taking&nbsp;precedence&nbsp;on&nbsp;the&nbsp;corresponding&nbsp;port&nbsp;number&nbsp;variable.
 <BR>&nbsp;&nbsp;Thus&nbsp;for&nbsp;a&nbsp;TCP&nbsp;check&nbsp;definition,&nbsp;the&nbsp;line
@@ -120,7 +122,8 @@ About host names
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;host_name=smtp.myprovider.com
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;tcp_port=8080
 <P>
-About substitutions
+<B>About substitutions</B>
+
 <BR>&nbsp;&nbsp;The&nbsp;following&nbsp;parameters
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;program_command,&nbsp;log_file,&nbsp;log_string
 <BR>&nbsp;&nbsp;are&nbsp;subject&nbsp;to&nbsp;substitutions.
@@ -133,7 +136,8 @@ About substitutions
 <BR>&nbsp;&nbsp;What&nbsp;to&nbsp;do&nbsp;in&nbsp;case&nbsp;the&nbsp;variable&nbsp;does&nbsp;not&nbsp;exist&nbsp;is&nbsp;tuned&nbsp;by
 <BR>&nbsp;&nbsp;the&nbsp;print_subst_error&nbsp;variable.
 <P>
-<BR>&nbsp;&nbsp;List&nbsp;of&nbsp;substitutions&nbsp;inside&nbsp;alerts&nbsp;and&nbsp;checks:
+<B>List of substitutions inside alerts and checks</B>
+
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;DISPLAY_NAME&nbsp;&nbsp;Check&nbsp;display_name
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;HOST_NAME&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Check&nbsp;host_name
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;NOW_TIMESTAMP&nbsp;dd/mm/yy&nbsp;hh:mm:ss&nbsp;of&nbsp;current&nbsp;date/time
@@ -147,7 +151,8 @@ About substitutions
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;LOOP_COUNT&nbsp;&nbsp;&nbsp;&nbsp;Number&nbsp;of&nbsp;ticks&nbsp;since&nbsp;program&nbsp;started
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;TAB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;tab&nbsp;(ascii&nbsp;code&nbsp;9)
 <P>
-<BR>&nbsp;&nbsp;List&nbsp;of&nbsp;substitutions&nbsp;inside&nbsp;alerts&nbsp;only:
+<B>List of substitutions inside alerts only</B>
+
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;DESCRIPTION&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;of&nbsp;alert,&nbsp;example
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'My&nbsp;prog&nbsp;probe&nbsp;[none]&nbsp;in&nbsp;status&nbsp;Fail&nbsp;since&nbsp;21/01&nbsp;10:22'
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;STATUS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Check&nbsp;status&nbsp;string,&nbsp;can&nbsp;be
@@ -177,7 +182,8 @@ About substitutions
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;ALERT_MINUTE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Minute&nbsp;of&nbsp;alert&nbsp;timestamp&nbsp;(2&nbsp;digits)
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;ALERT_SECOND&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Second&nbsp;of&nbsp;alert&nbsp;timestamp&nbsp;(2&nbsp;digits)
 <P>
-<BR>&nbsp;&nbsp;[general]&nbsp;section
+<B>[general] section</B>
+
 <P>
 The [general] section sets global options to netmon, the most
 important one being
@@ -187,7 +193,8 @@ reference duration for the &quot;tick&quot; of the running program. Many
 other options, like alert_threshold, alert_repeat_every, ...,
 correspond to a number of elapsed ticks.
 <P>
-<BR>&nbsp;&nbsp;[check]&nbsp;sections
+<B>[check] sections</B>
+
 <P>
 The [check] section appears once per probe to do. So, you have
 as many [check] sections as you have probes. It is not a very
@@ -211,7 +218,8 @@ loop.
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;collect&nbsp;received&nbsp;emails&nbsp;on&nbsp;a&nbsp;POP3&nbsp;mail&nbsp;box&nbsp;to&nbsp;which&nbsp;sent
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;emails&nbsp;are&nbsp;addressed.
 <P>
-<BR>&nbsp;&nbsp;[alert]&nbsp;sections
+<B>[alert] sections</B>
+
 <P>
 Define alerts, referred to inside checks using the 'alerts'
 variable (matched against the 'name' variable of each alert.)
@@ -223,7 +231,7 @@ program and log.
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;Execute&nbsp;an&nbsp;arbitrary&nbsp;external&nbsp;program
 <BR>&nbsp;&nbsp;log
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;Write&nbsp;information&nbsp;into&nbsp;a&nbsp;log&nbsp;file
-<DT><B>The [general] section</B>
+<DT><B>Variables of the [general] section</B>
 
 <DD>
 <BR>
@@ -363,7 +371,7 @@ program and log.
 <BR>
 
 <P>
-<DT><B>The [check] sections</B>
+<DT><B>Variables of the [check] sections</B>
 
 <DD>
 <BR>
@@ -654,7 +662,7 @@ program and log.
 <BR>
 
 <P>
-<DT><B>The [alert] sections</B>
+<DT><B>Variables of the [alert] sections</B>
 
 <DD>
 <BR>
@@ -846,6 +854,6 @@ program and log.
 This document was created by
 <A HREF="/cgi-bin/man/man2html">man2html</A>,
 using the manual pages.<BR>
-Time: 19:50:31 GMT, July 08, 2013
+Time: 18:24:23 GMT, July 14, 2013
 </BODY>
 </HTML>

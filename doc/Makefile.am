@@ -1,8 +1,8 @@
 # doc/Makefile.am
 
 MANPAGEEN=${srcdir}/netmon.1
-HTMLPAGEEN=${srcdir}/netmonen.html
-TEXTPAGEEN=${srcdir}/netmonen.txt
+HTMLPAGEEN=${srcdir}/netmon.html
+TEXTPAGEEN=${srcdir}/netmon.txt
 
 dist_doc_DATA=${HTMLPAGEEN} ${TEXTPAGEEN}
 
