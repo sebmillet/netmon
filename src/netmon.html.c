@@ -862,7 +862,7 @@ const char *netmon[] = {
 "This document was created by",
 "<A HREF=\"/cgi-bin/man/man2html\">man2html</A>,",
 "using the manual pages.<BR>",
-"Time: 18:24:23 GMT, July 14, 2013",
+"Time: 18:47:21 GMT, July 14, 2013",
 "</BODY>",
 "</HTML>"
 };

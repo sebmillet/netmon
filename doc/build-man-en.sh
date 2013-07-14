@@ -1,12 +1,14 @@
 #!/bin/sh
 
-SRCEN=netmon-sample.ini
+SRCE0=netmon-sample.ini
+SRCEN=netmonen-m0.txt
 PREFEN=netmonen-prefix.1
 M1EN=netmonen-m1.1
 M2EN=netmonen-m2.1
 POSTEN=netmonen-postfix.1
 TARGETEN=netmon.1
 
+dos2unix -n $SRCE0 $SRCEN
 sed -n '/^;-$/,/^;--$/p' $SRCEN | egrep -v "^;-$" | egrep -v "^;--$" | sed 's/^; \?//' | sed 's/^\*\(.*\)\*$/.B \1/' > $M1EN
 
 all_comments=""
