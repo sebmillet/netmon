@@ -225,6 +225,8 @@ int perform_check_tcp(struct check_t *chk, const struct subst_t *subst, int subs
 int perform_check_program(struct check_t *chk, const struct subst_t *subst, int subst_len);
 int perform_check_loop(struct check_t *chk, const struct subst_t *subst, int subst_len);
 
+int main_post();
+
   // From webserver.c
 void *webserver(void *p);
 

@@ -17,6 +17,14 @@
 /*#define DEBUG_LOOP*/
 
 #define DEFAULT_CHECK_INTERVAL 120
+  // Maximum single sleep duration will be SLEEP_STEPS seconds.
+  // Why not just sleeping for g_check_interval seconds? In case
+  // a service stop is requested.
+#define SLEEP_STEPS            5
+  // Need a few seconds to stay alive while OS is terminating
+  // the service (Windows)
+#define SLEEP_POST_END         2
+
 #define DEFAULT_NB_KEEP_LAST_STATUS 15
 #define DEFAULT_DISPLAY_NAME_WIDTH 20
 #define DEFAULT_SMTP_SENDER  (PACKAGE_TARNAME "@localhost")
@@ -49,6 +57,9 @@
 #define LOOP_HEADER_REF "subject:"
 #define LAST_STATUS_CHANGE_DISPLAY_SECONDS  (60 * 60 * 23)
 
+#define WIN_SERVICE_NAME          PACKAGE_NAME
+#define WIN_SERVICE_DISPLAY_NAME  (PACKAGE_NAME " Service")
+
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
 const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
 
@@ -65,7 +76,7 @@ enum {_NAGIOS_FIRST = 0, NAGIOS_OK = 0, NAGIOS_WARNING = 1, NAGIOS_CRITICAL = 2,
 
 void web_create_files_for_web();
 
-#if defined(_WIN32) || defined(_WIN64)
+#ifdef MY_WINDOWS
 
   // WINDOWS
 
@@ -139,6 +150,10 @@ struct img_file_t img_files[_ST_NBELEMS];
 //
 
 int g_laxist = FALSE;
+
+int g_install = FALSE;
+int g_uninstall = FALSE;
+int g_daemon = FALSE;
 
 extern loglevel_t g_current_log_level;
 
@@ -402,8 +417,10 @@ int loops_nb_alloc = 0;
 int g_trace_network_traffic;
 
   // Used to catch interruption
-int flag_interrupted = FALSE;
-int quitting = FALSE;
+/*int quitting = FALSE;*/
+
+int service_stop_requested = FALSE;
+SERVICE_STATUS_HANDLE sst_handle;
 
   // Incremented at each interval as defined in the ini variable
   // check_interval.
@@ -1540,7 +1557,7 @@ int execute_alert_log(const struct exec_alert_t *exec_alert) {
 
   char *f_substitued = dollar_subst_alloc(alrt->log_file, exec_alert->subst, exec_alert->subst_len);
 
-  FILE *H = fopen(f_substitued, "a+");
+  FILE *H = fopen(f_substitued, "a");
 
   int ret = 0;
 
@@ -1789,6 +1806,19 @@ void manage_output(const struct tm *now_done, float elapsed) {
   }
 }
 
+int ntsvc_SetServiceStatus(const DWORD dwCurrentState, const DWORD dwControlsAccepted) {
+  SERVICE_STATUS sst = {
+    SERVICE_WIN32_OWN_PROCESS,
+    dwCurrentState,
+    dwControlsAccepted,
+    NO_ERROR,
+    0,
+    0,
+    10000
+  };
+  return SetServiceStatus(sst_handle, &sst);
+}
+
 //
 // Main loop
 //
@@ -1805,7 +1835,25 @@ void almost_neverending_loop() {
       get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
   }
 
-  while (1) {
+  ntsvc_SetServiceStatus(SERVICE_RUNNING, SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
+
+  int delay = 0;
+  int this_sleep = 0;
+  while (!service_stop_requested) {
+    if (delay > 0) {
+      if (this_sleep == 0) {
+        my_logf(LL_NORMAL, LP_DATETIME, "Now sleeping for %li second(s) (interval = %li)",
+          delay, g_check_interval);
+      }
+      this_sleep = delay < SLEEP_STEPS ? delay : SLEEP_STEPS;
+      delay -= this_sleep;
+      my_logf(LL_DEBUG, LP_DATETIME, "Will sleep %i second(s)", this_sleep);
+      my_logf(LL_DEBUG, LP_DATETIME, "Sleeping duration remaining after this one: %is second(s)", delay);
+
+      os_sleep(this_sleep);
+      continue;
+    }
+    this_sleep = 0;
 
     my_pthread_mutex_lock(&mutex);
     ++loop_count;
@@ -1821,6 +1869,10 @@ void almost_neverending_loop() {
       fatal_error("File %s, line %i, gettimeofday() error", __FILE__, __LINE__);
 
     for (II = 0; II < g_nb_checks; ++II) {
+
+      if (service_stop_requested)
+        break;
+
       struct check_t *chk = &checks[II];
       if (!chk->is_valid)
         continue;
@@ -2017,13 +2069,11 @@ void almost_neverending_loop() {
 //
 
     if (g_check_interval && g_test_mode == 0) {
-      int delay = (int)g_check_interval - (int)elapsed;
+      delay = (int)g_check_interval - (int)elapsed;
       if (delay < 1)
         delay = 1;
       if (delay > g_check_interval)
         delay = (int)g_check_interval;
-      my_logf(LL_NORMAL, LP_DATETIME, "Now sleeping for %li second(s) (interval = %li)", delay, g_check_interval);
-      os_sleep((unsigned int)delay);
     } else if (g_test_mode >=1) {
       if (g_test_mode == 1)
         break;
@@ -2032,52 +2082,54 @@ void almost_neverending_loop() {
       else if (g_test_mode == 3 && lc == TEST3_NB_LOOPS)
         break;
     }
-  };
+  }
+}
+
+void terminate(const char *how) {
+  if (service_stop_requested) {
+    ntsvc_SetServiceStatus(SERVICE_STOPPED, 0);
+    my_logs(LL_NORMAL, LP_DATETIME, "Service stop request received");
+  }
+  my_logf(LL_NORMAL, LP_DATETIME, "%s %s", PACKAGE_NAME, how);
+  my_log_close();
 }
 
 //
 // Manage atexit()
 //
-void atexit_handler() {
-  if (quitting)
-    return;
-  quitting = TRUE;
+/*void atexit_handler() {*/
+/*  if (quitting)*/
+/*    return;*/
+/*  quitting = TRUE;*/
 
-  // Works under Linux but not under Windows, I don't know why...
+/*  // Works under Linux but not under Windows, I don't know why...*/
 /*  clean_checks();*/
-
-  my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_NAME " stop");
-  my_logs(LL_NORMAL, LP_NOTHING, "");
-  my_log_close();
-}
+/*  terminate("stop");*/
+/*  my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_NAME " stop");*/
+/*  my_log_close();*/
+/*}*/
 
 //
 // Manage signals
 //
 void sigterm_handler(int sig) {
-    // To avoid warning "unused parameter"
-  (void)sig;
+UNUSED(sig);
 
-  flag_interrupted = TRUE;
-  my_logs(LL_VERBOSE, LP_DATETIME, "Received TERM signal, quitting...");
-  exit(EXIT_FAILURE);
+  terminate("terminated");
+  exit(EXIT_SUCCESS);
 }
 
 void sigabrt_handler(int sig) {
-    // To avoid warning "unused parameter"
-  (void)sig;
+UNUSED(sig);
 
-  flag_interrupted = TRUE;
-  my_logs(LL_VERBOSE, LP_DATETIME, "Received ABORT signal, quitting...");
+  terminate("aborted");
   exit(EXIT_FAILURE);
 }
 
 void sigint_handler(int sig) {
-    // To avoid warning "unused parameter"
-  (void)sig;
+UNUSED(sig);
 
-  flag_interrupted = TRUE;
-  my_logs(LL_VERBOSE, LP_DATETIME, "Received INT signal, quitting...");
+  terminate("interrupted");
   exit(EXIT_FAILURE);
 }
 
@@ -2107,6 +2159,10 @@ void printhelp() {
   printf("  -t --test N        Set test mode to N, 0 (default) = no test mode\n");
   printf("  -a --alert         Test the alert name written after the option and quit\n");
   printf("     --laxist        Continue if errors are found in the ini file (default: stop)\n");
+  printf("\n");
+  printf("  -d --daemon        Run as a daemon\n");
+  printf("     --install       Install NT service (Windows only)\n");
+  printf("     --uninstall     Uninstall NT service (Windows only)\n");
 }
 
 //
@@ -2142,6 +2198,9 @@ void parse_options(int argc, char *argv[]) {
     {"test", required_argument, NULL, 't'},
     {"alert", no_argument, NULL, 'a'},
     {"laxist", no_argument, NULL, '0'},
+    {"install", no_argument, NULL, '2'},
+    {"uninstall", no_argument, NULL, '3'},
+    {"daemon", no_argument, NULL, 'd'},
     {0, 0, 0, 0}
   };
 
@@ -2156,7 +2215,7 @@ void parse_options(int argc, char *argv[]) {
 
   while (1) {
 
-    c = getopt_long(argc, argv, "hvCt:l:c:a:pVq", long_options, &option_index);
+    c = getopt_long(argc, argv, "hvCt:l:c:a:pVqd", long_options, &option_index);
 
     if (c == -1) {
       break;
@@ -2178,6 +2237,7 @@ void parse_options(int argc, char *argv[]) {
 
       case 'a':
         strncpy(g_test_alert, optarg, sizeof(g_test_alert));
+        g_print_log = TRUE;
         break;
 
       case 'C':
@@ -2191,6 +2251,18 @@ void parse_options(int argc, char *argv[]) {
 
       case 'l':
         strncpy(g_log_file, optarg, sizeof(g_log_file));
+        break;
+
+      case '2':
+        g_install = TRUE;
+        break;
+
+      case '3':
+        g_uninstall = TRUE;
+        break;
+
+      case 'd':
+        g_daemon = TRUE;
         break;
 
       case '0':
@@ -2364,6 +2436,78 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number, int *n
   } else {
     (*nb_errors)++;
   }
+}
+
+//
+// Build complete path from different elements:
+//
+void build_file_complete_name(const char *path, const char *current, char *target, const size_t target_len) {
+  if ((strlen(current) >= 1 && (current[0] == '\\' || current[0] == '/')) ||
+      (strlen(current) >= 3 && isalpha(current[0]) && current[1] == ':' && current[2] == '\\')) {
+
+// First case: the "current" string is absolute ->
+// It is to be used as is.
+    strncpy(target, current, target_len);
+
+  } else {
+
+// Second case: the current string is relative ->
+// We have to build the complete path.
+    strncpy(target, path, target_len);
+    strncat(target, current, target_len);
+
+  }
+}
+
+//
+// Get path from complete filename
+// Returns an empty string if there's no path in the filename
+//
+// The return value is the in-place updated string.
+//
+char *get_path(char *f) {
+  char *pos = strrchr(f, '\\');
+  char *pos2 = strrchr(f, '/');
+  if ((pos != NULL && pos2 != NULL && pos2 < pos) ||
+      (pos == NULL && pos2 != NULL))
+    pos = pos2;
+
+  if (pos == NULL) {
+    f[0] = '\0';
+  } else {
+    *(pos + 1) = '\0';
+  }
+
+  return f;
+}
+
+//
+// Make sure g_html_directory is correct given the environment ->
+//   If the program runs normally (not a daemon/service), g_html_directory
+//   is just what's been provided in the ini file html_directory variable
+//   => DEFAULT_HTML_DIRECTORY if variable not provided in the ini, which
+//   is (as of 25/08/13) set to ".".
+//   As a result, the final target dir is current working directory (if
+//   relative path) followed by g_html_directory.
+//
+//   If the program runs as a service, the log file's path becomes the
+//   directory to start from, for relative paths.
+//
+//   In all cases, if g_html_directory is absolute, it IS the target
+//   directory.
+//
+void build_definitive_html_direcotry() {
+    char tmp[MAX_PATH];
+    char target[MAX_PATH];
+    strncpy(tmp, g_log_file, sizeof(tmp));
+    tmp[sizeof(tmp) - 1] = '\0';
+    get_path(tmp);
+
+    my_logf(LL_DEBUG, LP_DATETIME, "Dir base = '%s'", tmp);
+
+    build_file_complete_name(tmp, g_html_directory, target, sizeof(target));
+    strncpy(g_html_directory, target, sizeof(g_html_directory));
+    g_html_directory[sizeof(g_html_directory) - 1] = '\0';
 }
 
 //
@@ -2666,6 +2810,8 @@ void read_configuration_file(const char *cf, int *nb_errors) {
 
   fclose(FCFG);
 
+  build_definitive_html_direcotry();
+
   strncpy(g_html_complete_file_name, g_html_directory, sizeof(g_html_complete_file_name));
   fs_concatene(g_html_complete_file_name, g_html_file, sizeof(g_html_complete_file_name));
 
@@ -2933,6 +3079,118 @@ void test_alert() {
   exit(EXIT_SUCCESS);
 }
 
+//
+// Prints an error (the one referred to by GetLastError()) and quits
+void ntsvc_fatal_error(const char *prefix) {
+  char s_err[ERR_STR_BUFSIZE];
+  os_last_err_desc_n(s_err, sizeof(s_err), GetLastError());
+  fprintf(stderr, "%s: %s\n", prefix, s_err);
+  exit(EXIT_FAILURE);
+}
+
+//
+// Uninstall NT service, return 0 if OK, a non-null value otherwise
+//
+int ntsvc_uninstall(const char *prefix) {
+
+#ifdef MY_WINDOWS
+  SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+  if (scm == NULL)
+    ntsvc_fatal_error(prefix);
+
+  SC_HANDLE sccur = OpenService(scm, WIN_SERVICE_NAME, SC_MANAGER_ALL_ACCESS);
+  if (sccur != NULL) {
+    if (!DeleteService(sccur) || !CloseServiceHandle(sccur))
+      ntsvc_fatal_error(prefix);
+    else
+      return 0;
+  }
+  return 1;
+
+#else
+  option_error("option --uninstall available inside Windows only");
+#endif
+
+}
+
+//
+// Create NT service and quit
+//
+void ntsvc_install_and_quit(const char *argv0) {
+
+#ifdef MY_WINDOWS
+  ntsvc_uninstall("Windows Service install");
+
+  SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+  if (scm == NULL)
+    ntsvc_fatal_error("Windows Service install");
+
+  char tmp[MAX_PATH];
+  char e[MAX_PATH];
+  char cfg[MAX_PATH];
+  char log[MAX_PATH];
+  win_get_exe_file(argv0, tmp, sizeof(e));
+  strncpy(e, tmp, sizeof(e));
+
+  get_path(tmp);
+
+  build_file_complete_name(tmp, g_cfg_file, cfg, sizeof(cfg));
+  build_file_complete_name(tmp, g_log_file, log, sizeof(log));
+
+  char command[2 * MAX_PATH];
+  snprintf(command, sizeof(command), "\"%s\" -d -c \"%s\" -l \"%s\"", e, cfg, log);
+
+  SC_HANDLE scnew = CreateService(scm, WIN_SERVICE_NAME, WIN_SERVICE_DISPLAY_NAME, SC_MANAGER_ALL_ACCESS,
+    SERVICE_WIN32_OWN_PROCESS, SERVICE_AUTO_START, SERVICE_ERROR_NORMAL, command, NULL, NULL, NULL, NULL, NULL);
+  if (scnew == NULL) {
+    ntsvc_fatal_error("Windows Service install");
+  } else if (!CloseServiceHandle(scnew)) {
+    ntsvc_fatal_error("Windows Service install");
+  } else {
+    printf("Service '%s' installed successully\n", WIN_SERVICE_DISPLAY_NAME);
+    printf("Command line:\n%s\n", command);
+  }
+
+  exit(EXIT_SUCCESS);
+
+#else
+  option_error("option --install available inside Windows only");
+#endif
+
+}
+
+DWORD WINAPI ntsvc_HandlerProc(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext) {
+UNUSED(dwEventType);
+UNUSED(lpEventData);
+UNUSED(lpContext);
+
+  switch (dwControl) {
+    case SERVICE_CONTROL_INTERROGATE:
+      return NO_ERROR;
+
+    case SERVICE_CONTROL_SHUTDOWN:
+    case SERVICE_CONTROL_STOP:
+      ntsvc_SetServiceStatus(SERVICE_STOP_PENDING, 0);
+      service_stop_requested = TRUE;
+      return NO_ERROR;
+
+    default:
+      return ERROR_CALL_NOT_IMPLEMENTED;
+  }
+}
+
+VOID WINAPI ntsvc_main(DWORD dwArgc, LPTSTR *lpszArgv) {
+UNUSED(dwArgc);
+UNUSED(lpszArgv);
+
+  sst_handle = RegisterServiceCtrlHandlerEx(WIN_SERVICE_NAME, ntsvc_HandlerProc, NULL);
+  if (!sst_handle)
+    ntsvc_fatal_error("Windows Service initialization");
+
+  ntsvc_SetServiceStatus(SERVICE_START_PENDING, 0);
+  main_post();
+}
+
 int main(int argc, char *argv[]) {
 
   dbg_write("** DEBUG ACTIVATED **\n");
@@ -2948,8 +3206,39 @@ int main(int argc, char *argv[]) {
 
   parse_options(argc, argv);
 
+  if (g_install)
+    ntsvc_install_and_quit(argv[0]);
+  else if (g_uninstall) {
+    if (!ntsvc_uninstall("Windows Service uninstall")) {
+      printf("Uninstalled Windows service '%s'\n", WIN_SERVICE_DISPLAY_NAME);
+      exit(EXIT_SUCCESS);
+    } else {
+      ntsvc_fatal_error("Windows Service uninstall");
+    }
+  }
+
+#ifdef MY_WINDOWS
+  if (g_daemon) {
+    SERVICE_TABLE_ENTRY svc_table[] = {
+      {WIN_SERVICE_NAME, ntsvc_main},
+      {NULL, NULL}
+    };
+    StartServiceCtrlDispatcher(svc_table);
+    os_sleep(SLEEP_POST_END);
+    return EXIT_SUCCESS;
+  }
+#endif
+
+  return main_post();
+}
+
+int main_post() {
   my_log_open();
-  my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_STRING " start");
+
+  if (g_daemon)
+    my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_STRING " service start");
+  else
+    my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_STRING " start");
 
   int nb_errors = 0;
   read_configuration_file(g_cfg_file, &nb_errors);
@@ -2984,34 +3273,28 @@ int main(int argc, char *argv[]) {
   alerts_display();
   config_display();
 
+/*  atexit(atexit_handler);*/
+  signal(SIGTERM, sigterm_handler);
+  signal(SIGABRT, sigabrt_handler);
+  signal(SIGINT, sigint_handler);
+
+    // Just to call WSAStartup, yes!
+  os_init_network();
+
   if (strlen(g_test_alert) >= 1)
     test_alert();
 
   web_create_files_for_web();
 
-    // Just to call WSAStartup, yes!
-  os_init_network();
-
   if (g_webserver_on) {
     pthread_t id;
     if (pthread_create(&id, NULL, webserver, NULL) != 0)
-      fatal_error("main(): pthread_create() error");
+      fatal_error("unable to create web server thread");
   }
-
-  atexit(atexit_handler);
-  signal(SIGTERM, sigterm_handler);
-  signal(SIGABRT, sigabrt_handler);
-  signal(SIGINT, sigint_handler);
 
   almost_neverending_loop();
 
-  if (quitting) {
-    return EXIT_FAILURE;
-  }
-  quitting = TRUE;
-
-  my_logs(LL_VERBOSE, LP_DATETIME, PACKAGE_NAME " end");
-  my_log_close();
+  terminate("end");
 
   return EXIT_SUCCESS;
 }

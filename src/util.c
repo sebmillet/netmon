@@ -2,6 +2,12 @@
 
 // Copyright Sébastien Millet, 2013
 
+#ifdef HAVE_CONFIG_H
+#include "../config.h"
+#else
+#include "../extracfg.h"
+#endif
+
 #include "util.h"
 
 #include <stdarg.h>
@@ -29,7 +35,7 @@ long int g_print_subst_error = DEFAULT_PRINT_SUBST_ERROR;
 int g_date_df = (DEFAULT_DATE_FORMAT == DF_FRENCH);
 int g_print_log = DEFAULT_PRINT_LOG;
 long int g_log_usec = DEFAULT_LOG_USEC;
-FILE *log_fd;
+FILE *log_fd = NULL;
 
 static pthread_mutex_t util_mutex;
 
@@ -38,7 +44,7 @@ const struct connection_table_t connection_table[] = {
   {conn_ssl_read,   "SSL<<< ", conn_ssl_write,   "SSL>>> "}   // CONNTYPE_SSL
 };
 
-#if defined(_WIN32) || defined(_WIN64)
+#ifdef MY_WINDOWS
 
   // * ******* *
   // * WINDOWS *
@@ -81,11 +87,10 @@ int os_last_err() {
   return r;
 }
 
-char *os_last_err_desc(char *s, size_t s_bufsize) {
+char *os_last_err_desc_n(char *s, const size_t s_len, const long unsigned e) {
   LPVOID lpMsgBuf;
-  DWORD last_err = WSAGetLastError();
   FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-    NULL, last_err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, NULL);
+    NULL, e, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, NULL);
   char tmp[ERR_STR_BUFSIZE];
   strncpy(tmp, (char *)lpMsgBuf, sizeof(tmp));
   int n = strlen(tmp);
@@ -93,9 +98,13 @@ char *os_last_err_desc(char *s, size_t s_bufsize) {
     if (tmp[n - 2] == '\r' && tmp[n - 1] == '\n')
       tmp[n - 2] = '\0';
   }
-  snprintf(s, s_bufsize, "code=%lu (%s)", last_err, tmp);
+  snprintf(s, s_len, "code=%lu (%s)", e, tmp);
   //WSACleanup();
   return s;
+}
+
+char *os_last_err_desc(char *s, const size_t s_len) {
+  return os_last_err_desc_n(s, s_len, WSAGetLastError());
 }
 
 void os_init_network() {
@@ -124,6 +133,16 @@ int add_reader_access_right(const char *f) {
 UNUSED(f);
 
   return 0;
+}
+
+//
+// Puts in p the complete file name of the current executable
+//
+void win_get_exe_file(const char *argv0, char *p, size_t p_len) {
+  if (!GetModuleFileName(NULL, p, p_len)) {
+    strncpy(p, argv0, p_len);
+    p[p_len - 1] = '\0';
+  }
 }
 
 #define strcasecmp _stricmp
@@ -200,6 +219,9 @@ int add_reader_access_right(const char *f) {
     my_logf(LL_ERROR, LP_DATETIME, "Unable to change mode of file '%s': ", f, s_err);
   }
   return -1;
+}
+
+void win_get_exe_file(const char *argv0, char *p, size_t p_len) {
 }
 
 #endif
@@ -369,6 +391,12 @@ void fatal_error(const char *format, ...) {
 
   char str[REGULAR_STR_STRBUFSIZE];
   vsnprintf(str, sizeof(str), format, args);
+
+  if (my_is_log_open()) {
+    my_logf(LL_ERROR, LP_DATETIME, "FATAL: %s", str);
+    my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_NAME " aborted");
+  }
+
   strncat(str, "\n", sizeof(str));
   fprintf(stderr, str, NULL);
   va_end(args);
@@ -389,8 +417,15 @@ void my_log_open() {
 // Closes the program log
 //
 void my_log_close() {
-  if (log_fd)
+  if (log_fd != NULL)
     fclose(log_fd);
+}
+
+//
+// Is log open?
+//
+int my_is_log_open() {
+  return (log_fd != NULL);
 }
 
 //
@@ -898,7 +933,7 @@ int conn_read_line_alloc(connection_t *conn, char **out, int trace, size_t *size
       return -1;
     }
 
-    if (i >= *size) {
+    if ((unsigned)i >= *size) {
       if (*size * 2 <= MAX_READLINE_SIZE) {
         *size *= 2;
         *out = (char *)realloc(*out, *size);

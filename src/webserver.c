@@ -12,7 +12,7 @@
 #include <wchar.h>
 #include <sys/stat.h>
 
-#if defined(_WIN32) || defined(_WIN64)
+#ifdef MY_WINDOWS
 
   // WINDOWS
 
@@ -39,7 +39,7 @@
 #define DEFAULT_HTML_NB_COLUMNS 2
 
 #define WEBSERVER_LOG_PREFIX  "WEBSERVER"
-#if defined(_WIN32) || defined(_WIN64)
+#ifdef MY_WINDOWS
 #define DEFAULT_WEBSERVER_ON TRUE
 #define DEFAULT_WEBSERVER_PORT 80
 #else
@@ -141,7 +141,7 @@ void web_create_files_for_web() {
     my_logf(LL_ERROR, LP_DATETIME, "Unable to create %s", buf);
   } else {
     int j;
-    for (j = 0; j < netmon_len; ++j) {
+    for (j = 0; (unsigned)j < netmon_len; ++j) {
       fputs(netmon[j], IMG);
     }
     fclose(IMG);

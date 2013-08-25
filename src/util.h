@@ -10,6 +10,12 @@
 #include <openssl/ssl.h>
 
 #if defined(_WIN32) || defined(_WIN64)
+#define MY_WINDOWS
+#else
+#define MY_LINUX
+#endif
+
+#ifdef MY_WINDOWS
   // WINDOWS
 #include <winsock2.h>
 #else
@@ -32,7 +38,7 @@
 #endif
 #define GETTIMEOFDAY_ERROR -1
 
-#if defined(_WIN32) || defined(_WIN64)
+#ifdef MY_WINDOWS
 typedef int socklen_t;
 #endif
 
@@ -129,6 +135,7 @@ void set_log_timestamp(char *s, size_t s_len,
 
 void my_log_open();
 void my_log_close();
+int my_is_log_open();
 char *trim(char *str);
 
 void fatal_error(const char *format, ...);
@@ -146,7 +153,8 @@ int add_reader_access_right(const char *f);
 void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, int *minute, int *second,
        long int *usec, long int *gmtoff);
 
-char *os_last_err_desc(char *s, size_t s_bufsize);
+char *os_last_err_desc(char *s, const size_t s_bufsize);
+char *os_last_err_desc_n(char *s, const size_t s_len, const long unsigned e);
 int os_last_network_op_is_in_progress();
 
 void my_pthread_mutex_lock(pthread_mutex_t *m);
@@ -157,6 +165,8 @@ void util_my_pthread_init();
 void os_init_network();
 int os_last_err();
 int s_begins_with(const char *s, const char *begins_with);
+
+void win_get_exe_file(const char *argv0, char *p, size_t p_len);
 
 void conn_init(connection_t *conn, int type);
 void conn_close(connection_t *conn);
