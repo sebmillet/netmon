@@ -54,30 +54,42 @@ OPTIONS
        --laxist
 	      Continue if errors are found in the config file (default: stop)
 
+       --install
+	      Install NT service (Windows only)
+
+       --uninstall
+	      Uninstall NT service (Windows only)
+
+       -d, --daemon
+	      Runs as a daemon (Linux) or as a service (Windows)
+
 INITIALIZATION FILES
        netmon.ini
 	      Windows-like configuration file
 
-	      netmon.ini help
+       The  file  netmon-sample.ini,  provided	with  netmon, contains all ini
+       variables with a short help.
+
+       netmon.ini help
 
 	      A string value can be written as is, as in
 		host_name=localhost or with surrounding double-quotes, as in
-		host_name="localhost"  The equal sign can be preceeded or fol‐
+		host_name="localhost" The equal sign can be preceeded or  fol‐
 	      lowed by spaces, as in
 		host_name = Localhost
 
-	      When multiple values are possible, they are separated by	a  ','
+	      When  multiple  values are possible, they are separated by a ','
 	      character, as in
 		alerts = mylog, myprg, mysmtp
 
-	      Sections	can  appear  in any order.  Inside sections, variables
+	      Sections can appear in any order.   Inside  sections,  variables
 	      can appear in any order.
 
-	      For settings referring to  a  TCP  connection,  the  '..._crypt'
-	      variable	(tcp_crypt, smtp_crypt, etc.) is optional. If no crypt
-	      specification is set, netmon will guess whether  SSL  is	to  be
+	      For  settings  referring	to  a  TCP connection, the '..._crypt'
+	      variable (tcp_crypt, smtp_crypt, etc.) is optional. If no  crypt
+	      specification  is  set,  netmon  will guess whether SSL is to be
 	      used by examining the port. If the port is one of 443, 465, 585,
-	      993 or 995, netmon will use SSL over the TCP connection,	other‐
+	      993  or 995, netmon will use SSL over the TCP connection, other‐
 	      wise it won't.
 
 	      About host names
@@ -148,18 +160,18 @@ INITIALIZATION FILES
 
 	      [general] section
 
-	      The  [general]  section  sets global options to netmon, the most
+	      The [general] section sets global options to  netmon,  the  most
 	      important one being
-		check_interval This option is the number  of  seconds  between
-	      checks.  It is the reference duration for the "tick" of the run‐
-	      ning  program.  Many  other   options,   like   alert_threshold,
-	      alert_repeat_every,  ...,  correspond  to  a  number  of elapsed
+		check_interval	This  option  is the number of seconds between
+	      checks. It is the reference duration for the "tick" of the  run‐
+	      ning   program.	Many   other  options,	like  alert_threshold,
+	      alert_repeat_every, ...,	correspond  to	a  number  of  elapsed
 	      ticks.
 
 	      [check] sections
 
-	      The [check] section appears once per probe to do. So,  you  have
-	      as  many	[check]  sections as you have probes. It is not a very
+	      The  [check]  section appears once per probe to do. So, you have
+	      as many [check] sections as you have probes. It is  not  a  very
 	      ini-proof approach but that is how it is. Probes can be of three
 	      kinds set by the method variable. It is tcp, program and loop.
 		tcp
@@ -181,9 +193,9 @@ INITIALIZATION FILES
 
 	      [alert] sections
 
-	      Define  alerts,  referred  to  inside  checks using the 'alerts'
-	      variable (matched against the 'name' variable  of  each  alert.)
-	      Alerts  can  be of three kinds set by the method variable, smtp,
+	      Define alerts, referred to  inside  checks  using  the  'alerts'
+	      variable	(matched  against  the 'name' variable of each alert.)
+	      Alerts can be of three kinds set by the method  variable,  smtp,
 	      program and log.
 		smtp
 		  Sends an email via SMTP
@@ -265,7 +277,7 @@ INITIALIZATION FILES
 
 
        display_name_width
-		Used for terminal display (-C option), not much  used.	Number
+		Used  for  terminal display (-C option), not much used. Number
 	      of
 		characters reserved to display the check's display name.
 		Optional
@@ -293,7 +305,7 @@ INITIALIZATION FILES
 
        print_subst_error
 		When replacing ${VARNAME} with the variable's value, tells
-		whether  a  non-existent  variable  should  be	replaced by ""
+		whether a non-existent	variable  should  be  replaced	by  ""
 	      (empty
 		string) or leave the variable name surrounded by '?' to
 		highlight the substitution was not possible.
@@ -359,7 +371,7 @@ INITIALIZATION FILES
 
 
        alert_repeat_every
-		Number of "ticks" (re check_interval) after which to  re-trig‐
+		Number	of "ticks" (re check_interval) after which to re-trig‐
 	      ger
 		the alert(s), after the first one (as per alert_threshold) has
 		been triggered.
@@ -368,7 +380,7 @@ INITIALIZATION FILES
 
 
        alert_repeat_max
-		Maximum  number  of  times an alert is *repeated*. As we count
+		Maximum number of times an alert is *repeated*.  As  we  count
 	      the
 		number of *repetitions*, the total number of times alerts are
 		triggered is equal to 'alert_repeat_max + 1'.
@@ -464,7 +476,7 @@ INITIALIZATION FILES
 		ticks.
 		Optional
 		Defaults to 2
-		For check_interval set to 120 and a value of  2,  there'll  be
+		For  check_interval  set  to 120 and a value of 2, there'll be
 	      one
 		probe email every four minutes.
 
@@ -604,7 +616,7 @@ INITIALIZATION FILES
 
 
        repeat_every
-		Number	of  ticks  (re	check_interval) after which an already
+		Number of ticks (re check_interval)  after  which  an  already
 	      once
 		triggered alert is triggered again.
 		Optional
@@ -614,7 +626,7 @@ INITIALIZATION FILES
 
 
        repeat_max
-		Number of "ticks" (re check_interval) after which to  re-trig‐
+		Number	of "ticks" (re check_interval) after which to re-trig‐
 	      ger
 		the alert, after the first one (as per alert_threshold) has
 		been triggered.
@@ -640,7 +652,7 @@ INITIALIZATION FILES
 		fails. For an 'smtp' alert, failure occurs if the sending is
 		not successful (unable to connect, bad answer from server,
 		etc.) For a 'program' alert, a non-null return code is a
-		failure.  For  a  'log' alert, failure can occur if writing in
+		failure. For a 'log' alert, failure can occur  if  writing  in
 	      the
 		log failed (unable to open the log file.)
 		When an alert execution fails, the retry occurs at next tick.
@@ -726,10 +738,10 @@ INITIALIZATION FILES
 AUTHOR
        Written by Sébastien Millet <sebastien.millet1@club-internet.fr>
 
-       Permission is granted to copy, distribute and/or modify	this  document
-       under  the terms of the GNU General Public License, Version 3 published
+       Permission  is  granted to copy, distribute and/or modify this document
+       under the terms of the GNU General Public License, Version 3  published
        by the Free Software Foundation.
 
 
 
-July 2013			  version 1.1			     netmon(1)
+August 2013			  version 1.1			     netmon(1)

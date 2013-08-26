@@ -1,6 +1,6 @@
 .\" Written by Sébastien Millet
 .\"
-.TH netmon 1 "version 1.1" "July 2013"
+.TH netmon 1 "version 1.1" "August 2013"
 
 .SH NAME
 .TP
@@ -50,11 +50,24 @@ Test alert \fIalert-name\fP, then quit
 .TP
 .B \-\-laxist
 Continue if errors are found in the config file (default: stop)
+.TP
+.B \-\-install
+Install NT service (Windows only)
+.TP
+.B \-\-uninstall
+Uninstall NT service (Windows only)
+.TP
+.B \-d,\ \-\-daemon
+Runs as a daemon (Linux) or as a service (Windows)
 .SH "INITIALIZATION FILES"
 .TP
 .B netmon.ini
 Windows-like configuration file
-
+.TP
+.br
+The file \fBnetmon\-sample.ini\fP, provided with netmon, contains all ini variables with a short help.
+.TP
+.br
 .B netmon.ini help
 
 A string value can be written as is, as in

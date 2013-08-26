@@ -5,6 +5,7 @@
 #include "main.h"
 
 #include <stdio.h>
+#include <unistd.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -420,7 +421,67 @@ int g_trace_network_traffic;
 /*int quitting = FALSE;*/
 
 int service_stop_requested = FALSE;
+
+#ifdef MY_WINDOWS
+
 SERVICE_STATUS_HANDLE sst_handle;
+
+int ntsvc_SetServiceStatus(const DWORD dwCurrentState, const DWORD dwControlsAccepted) {
+  SERVICE_STATUS sst = {
+    SERVICE_WIN32_OWN_PROCESS,
+    dwCurrentState,
+    dwControlsAccepted,
+    NO_ERROR,
+    0,
+    0,
+    10000
+  };
+  return SetServiceStatus(sst_handle, &sst);
+}
+
+DWORD WINAPI ntsvc_HandlerProc(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext) {
+UNUSED(dwEventType);
+UNUSED(lpEventData);
+UNUSED(lpContext);
+
+  switch (dwControl) {
+    case SERVICE_CONTROL_INTERROGATE:
+      return NO_ERROR;
+
+    case SERVICE_CONTROL_SHUTDOWN:
+    case SERVICE_CONTROL_STOP:
+      ntsvc_SetServiceStatus(SERVICE_STOP_PENDING, 0);
+      service_stop_requested = TRUE;
+      return NO_ERROR;
+
+    default:
+      return ERROR_CALL_NOT_IMPLEMENTED;
+  }
+}
+
+VOID WINAPI ntsvc_main(DWORD dwArgc, LPTSTR *lpszArgv) {
+UNUSED(dwArgc);
+UNUSED(lpszArgv);
+
+  sst_handle = RegisterServiceCtrlHandlerEx(WIN_SERVICE_NAME, ntsvc_HandlerProc, NULL);
+  if (!sst_handle)
+    ntsvc_fatal_error("Windows Service initialization");
+
+  ntsvc_SetServiceStatus(SERVICE_START_PENDING, 0);
+  main_post();
+}
+
+//
+// Prints an error (the one referred to by GetLastError()) and quits
+//
+void ntsvc_fatal_error(const char *prefix) {
+  char s_err[ERR_STR_BUFSIZE];
+  os_last_err_desc_n(s_err, sizeof(s_err), GetLastError());
+  fprintf(stderr, "%s: %s\n", prefix, s_err);
+  exit(EXIT_FAILURE);
+}
+
+#endif
 
   // Incremented at each interval as defined in the ini variable
   // check_interval.
@@ -1806,19 +1867,6 @@ void manage_output(const struct tm *now_done, float elapsed) {
   }
 }
 
-int ntsvc_SetServiceStatus(const DWORD dwCurrentState, const DWORD dwControlsAccepted) {
-  SERVICE_STATUS sst = {
-    SERVICE_WIN32_OWN_PROCESS,
-    dwCurrentState,
-    dwControlsAccepted,
-    NO_ERROR,
-    0,
-    0,
-    10000
-  };
-  return SetServiceStatus(sst_handle, &sst);
-}
-
 //
 // Main loop
 //
@@ -1835,7 +1883,9 @@ void almost_neverending_loop() {
       get_datetime_of_day(&wday, &year, &month, &day, &hour, &minute, &second, &usec, &gmtoff);
   }
 
+#ifdef MY_WINDOWS
   ntsvc_SetServiceStatus(SERVICE_RUNNING, SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN);
+#endif
 
   int delay = 0;
   int this_sleep = 0;
@@ -2087,27 +2137,14 @@ void almost_neverending_loop() {
 
 void terminate(const char *how) {
   if (service_stop_requested) {
+#ifdef MY_WINDOWS
     ntsvc_SetServiceStatus(SERVICE_STOPPED, 0);
+#endif
     my_logs(LL_NORMAL, LP_DATETIME, "Service stop request received");
   }
   my_logf(LL_NORMAL, LP_DATETIME, "%s %s", PACKAGE_NAME, how);
   my_log_close();
 }
-
-//
-// Manage atexit()
-//
-/*void atexit_handler() {*/
-/*  if (quitting)*/
-/*    return;*/
-/*  quitting = TRUE;*/
-
-/*  // Works under Linux but not under Windows, I don't know why...*/
-/*  clean_checks();*/
-/*  terminate("stop");*/
-/*  my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_NAME " stop");*/
-/*  my_log_close();*/
-/*}*/
 
 //
 // Manage signals
@@ -2160,7 +2197,7 @@ void printhelp() {
   printf("  -a --alert         Test the alert name written after the option and quit\n");
   printf("     --laxist        Continue if errors are found in the ini file (default: stop)\n");
   printf("\n");
-  printf("  -d --daemon        Run as a daemon\n");
+  printf("  -d --daemon        Run as a daemon (Linux) / service (Windows)\n");
   printf("     --install       Install NT service (Windows only)\n");
   printf("     --uninstall     Uninstall NT service (Windows only)\n");
 }
@@ -2502,8 +2539,6 @@ void build_definitive_html_direcotry() {
     strncpy(tmp, g_log_file, sizeof(tmp));
     tmp[sizeof(tmp) - 1] = '\0';
     get_path(tmp);
-
-    my_logf(LL_DEBUG, LP_DATETIME, "Dir base = '%s'", tmp);
 
     build_file_complete_name(tmp, g_html_directory, target, sizeof(target));
     strncpy(g_html_directory, target, sizeof(g_html_directory));
@@ -3080,15 +3115,6 @@ void test_alert() {
 }
 
 //
-// Prints an error (the one referred to by GetLastError()) and quits
-void ntsvc_fatal_error(const char *prefix) {
-  char s_err[ERR_STR_BUFSIZE];
-  os_last_err_desc_n(s_err, sizeof(s_err), GetLastError());
-  fprintf(stderr, "%s: %s\n", prefix, s_err);
-  exit(EXIT_FAILURE);
-}
-
-//
 // Uninstall NT service, return 0 if OK, a non-null value otherwise
 //
 int ntsvc_uninstall(const char *prefix) {
@@ -3159,38 +3185,6 @@ void ntsvc_install_and_quit(const char *argv0) {
 
 }
 
-DWORD WINAPI ntsvc_HandlerProc(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext) {
-UNUSED(dwEventType);
-UNUSED(lpEventData);
-UNUSED(lpContext);
-
-  switch (dwControl) {
-    case SERVICE_CONTROL_INTERROGATE:
-      return NO_ERROR;
-
-    case SERVICE_CONTROL_SHUTDOWN:
-    case SERVICE_CONTROL_STOP:
-      ntsvc_SetServiceStatus(SERVICE_STOP_PENDING, 0);
-      service_stop_requested = TRUE;
-      return NO_ERROR;
-
-    default:
-      return ERROR_CALL_NOT_IMPLEMENTED;
-  }
-}
-
-VOID WINAPI ntsvc_main(DWORD dwArgc, LPTSTR *lpszArgv) {
-UNUSED(dwArgc);
-UNUSED(lpszArgv);
-
-  sst_handle = RegisterServiceCtrlHandlerEx(WIN_SERVICE_NAME, ntsvc_HandlerProc, NULL);
-  if (!sst_handle)
-    ntsvc_fatal_error("Windows Service initialization");
-
-  ntsvc_SetServiceStatus(SERVICE_START_PENDING, 0);
-  main_post();
-}
-
 int main(int argc, char *argv[]) {
 
   dbg_write("** DEBUG ACTIVATED **\n");
@@ -3213,11 +3207,18 @@ int main(int argc, char *argv[]) {
       printf("Uninstalled Windows service '%s'\n", WIN_SERVICE_DISPLAY_NAME);
       exit(EXIT_SUCCESS);
     } else {
+
+#ifdef MY_WINDOWS
       ntsvc_fatal_error("Windows Service uninstall");
+#endif
+
     }
   }
 
 #ifdef MY_WINDOWS
+
+// Windows service logic
+
   if (g_daemon) {
     SERVICE_TABLE_ENTRY svc_table[] = {
       {WIN_SERVICE_NAME, ntsvc_main},
@@ -3227,6 +3228,38 @@ int main(int argc, char *argv[]) {
     os_sleep(SLEEP_POST_END);
     return EXIT_SUCCESS;
   }
+#endif
+
+#ifdef MY_LINUX
+
+// Linux daemon logic
+
+  if (g_daemon) {
+    pid_t pid = fork();
+    if (pid < 0) {
+      fatal_error("Unable to fork");
+      exit(EXIT_FAILURE);
+    } else if (pid > 0)
+        // Close parent process
+      exit(EXIT_SUCCESS);
+
+    umask(0);
+
+    pid_t sid = setsid();
+    if(sid < 0)
+      fatal_error("setsid() error");
+
+    chdir("/");
+
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+
+    FILE *f = fopen("/home/sebastien/l.txt", "a");
+    fprintf(f, "DAEMON LAUNCHED\n");
+    fclose(f);
+  }
+
 #endif
 
   return main_post();
@@ -3273,7 +3306,6 @@ int main_post() {
   alerts_display();
   config_display();
 
-/*  atexit(atexit_handler);*/
   signal(SIGTERM, sigterm_handler);
   signal(SIGABRT, sigabrt_handler);
   signal(SIGINT, sigint_handler);
