@@ -157,6 +157,7 @@ int g_uninstall = FALSE;
 int g_daemon = FALSE;
 
 extern loglevel_t g_current_log_level;
+int g_log_level_updated_by_option = FALSE;
 
 extern char g_log_file[SMALLSTRSIZE];
 
@@ -240,6 +241,17 @@ const char *l_crypts[] = {
 
 extern long int g_log_usec;
 int g_log_usec_set = FALSE;
+long int g_ini_asked_log_level;
+int g_ini_asked_log_level_set = FALSE;
+const char *l_log_levels[] = {
+  "error",    // LL_ERROR
+  "warning",  // LL_WARNING
+  "normal",   // LL_NORMAL
+  "verbose",  // LL_VERBOSE
+  "debug",    // LL_DEBUG
+  "trace"     // LL_DEBUGTRACE
+};
+
 long int g_date_format;
 int g_date_format_set = FALSE;
 extern int g_date_df;
@@ -339,6 +351,8 @@ const struct readcfg_var_t readcfg_vars[] = {
 
 // GENERAL
 
+  {"log_level", V_STRKEY, CS_GENERAL, &g_ini_asked_log_level, NULL, NULL, 0, &g_ini_asked_log_level_set, FALSE, l_log_levels,
+    sizeof(l_log_levels) / sizeof(*l_log_levels), -1},
   {"date_format", V_STRKEY, CS_GENERAL, &g_date_format, NULL, NULL, 0, &g_date_format_set, FALSE, l_date_formats,
     sizeof(l_date_formats) / sizeof(*l_date_formats), -1},
   {"print_subst_error", V_YESNO, CS_GENERAL, &g_print_subst_error, NULL, NULL, 0, &g_print_subst_error_set, FALSE, NULL, 0, -1},
@@ -459,6 +473,16 @@ UNUSED(lpContext);
   }
 }
 
+//
+// Prints an error (the one referred to by GetLastError()) and quits
+//
+void ntsvc_fatal_error(const char *prefix) {
+  char s_err[ERR_STR_BUFSIZE];
+  os_last_err_desc_n(s_err, sizeof(s_err), GetLastError());
+  fprintf(stderr, "%s: %s\n", prefix, s_err);
+  exit(EXIT_FAILURE);
+}
+
 VOID WINAPI ntsvc_main(DWORD dwArgc, LPTSTR *lpszArgv) {
 UNUSED(dwArgc);
 UNUSED(lpszArgv);
@@ -469,16 +493,6 @@ UNUSED(lpszArgv);
 
   ntsvc_SetServiceStatus(SERVICE_START_PENDING, 0);
   main_post();
-}
-
-//
-// Prints an error (the one referred to by GetLastError()) and quits
-//
-void ntsvc_fatal_error(const char *prefix) {
-  char s_err[ERR_STR_BUFSIZE];
-  os_last_err_desc_n(s_err, sizeof(s_err), GetLastError());
-  fprintf(stderr, "%s: %s\n", prefix, s_err);
-  exit(EXIT_FAILURE);
 }
 
 #endif
@@ -782,7 +796,7 @@ int perform_check_program(struct check_t *chk, const struct subst_t *subst, int 
 
   int r1 = system(s_substitued);
   int r2 = os_wexitstatus(r1);
-  my_logf(LL_VERBOSE, LP_DATETIME, "%s return code: %i", prefix, r2);
+  my_logf(r2 == NAGIOS_OK ? LL_VERBOSE : LL_ERROR, LP_DATETIME, "%s return code: %i", prefix, r2);
   free(s_substitued);
   if (r2 < _NAGIOS_FIRST)
     r2 = NAGIOS_UNKNOWN;
@@ -2311,10 +2325,12 @@ void parse_options(int argc, char *argv[]) {
         break;
 
       case 'v':
+        g_log_level_updated_by_option = TRUE;
         g_current_log_level++;
         break;
 
       case 'q':
+        g_log_level_updated_by_option = TRUE;
         g_current_log_level--;
         break;
 
@@ -2327,12 +2343,10 @@ void parse_options(int argc, char *argv[]) {
   }
   if (optind < argc)
     option_error("Trailing options");
-  if (g_current_log_level < LL_ERROR)
+  if ((int)g_current_log_level < LL_ERROR)
     g_current_log_level = LL_ERROR;
-  if (g_current_log_level > LL_DEBUGTRACE)
+  if ((int)g_current_log_level > LL_DEBUGTRACE)
     g_current_log_level = LL_DEBUGTRACE;
-
-  g_trace_network_traffic = (g_current_log_level == LL_DEBUGTRACE);
 }
 
 //
@@ -2853,6 +2867,11 @@ void read_configuration_file(const char *cf, int *nb_errors) {
 /*  dbg_write("Output HTML file = %s\n", g_html_complete_file_name);*/
 
   g_print_log = save_g_print_log;
+
+  if (!g_log_level_updated_by_option && g_ini_asked_log_level_set && g_ini_asked_log_level != FIND_STRING_NOT_FOUND) {
+    g_current_log_level = (loglevel_t)g_ini_asked_log_level;
+    my_logf(LL_ERROR, LP_DATETIME, "Log level set from ini file to %s", l_log_levels[(int)g_current_log_level]);
+  }
 }
 
 //
@@ -3077,9 +3096,18 @@ void config_display() {
     }
     t[sizeof(t) - 1] = '\0';
 
-    my_logf(LL_NORMAL, LP_DATETIME, "To check: '%s' [%s:%i], %s%s%s, %s%s", chk->display_name, chk->srv.server, chk->srv.port,
-      chk->tcp_expect_set ? "expect \"" : "no expect", chk->tcp_expect_set ? chk->tcp_expect : "", chk->tcp_expect_set ? "\"" : "",
-      chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? t : "");
+    if (chk->method == CM_TCP) {
+      my_logf(LL_NORMAL, LP_DATETIME, "To check: TCP - '%s' [%s:%i], %s%s%s, %s%s", chk->display_name, chk->srv.server, chk->srv.port,
+        chk->tcp_expect_set ? "expect \"" : "no expect", chk->tcp_expect_set ? chk->tcp_expect : "", chk->tcp_expect_set ? "\"" : "",
+        chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? t : "");
+    } else if (chk->method == CM_PROGRAM) {
+      my_logf(LL_NORMAL, LP_DATETIME, "To check: PROGRAM - '%s' [%s], %s%s", chk->display_name, chk->prg_command, 
+        chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? t : "");
+    } else if (chk->method == CM_LOOP) {
+      my_logf(LL_NORMAL, LP_DATETIME, "To check: LOOP - '%s', %s, %s(%s), %s%s", chk->display_name,
+        chk->loop_smtp.srv.server, chk->loop_pop3.srv.server, chk->loop_pop3.user,
+        chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? t : "");
+    }
   }
 }
 
@@ -3275,6 +3303,9 @@ int main_post() {
 
   int nb_errors = 0;
   read_configuration_file(g_cfg_file, &nb_errors);
+
+  g_trace_network_traffic = (g_current_log_level == LL_DEBUGTRACE);
+
     // Match alerts as written in the alerts option of checks (checks[]) with
     // defined alerts (alerts[])
   identify_alerts(&nb_errors);

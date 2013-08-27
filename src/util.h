@@ -83,7 +83,9 @@ void dbg_write(const char *fmt, ...);
 #define UNUSED(x) (void)(x)
 
   // Level of log
-typedef enum {LL_ERROR = -1, LL_WARNING = 0, LL_NORMAL = 1, LL_VERBOSE = 2, LL_DEBUG = 3, LL_DEBUGTRACE = 4} loglevel_t;
+typedef enum {LL_ERROR = 0, LL_WARNING = 1, LL_NORMAL = 2, LL_VERBOSE = 3, LL_DEBUG = 4, LL_DEBUGTRACE = 5} loglevel_t;
+#define LL_DEFAULT LL_NORMAL
+
   // Type of prefix output in the log
 typedef enum {LP_DATETIME, LP_NOTHING, LP_INDENT} logdisp_t;
   // Return value of socket-based functions

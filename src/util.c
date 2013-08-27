@@ -28,7 +28,7 @@ const int crypt_ports[] = {443, 465, 585, 993, 995};
 long int g_connect_timeout = DEFAULT_CONNECT_TIMEOUT;
 long int g_netio_timeout = DEFAULT_NETIO_TIMEOUT;
 
-loglevel_t g_current_log_level = LL_NORMAL;
+loglevel_t g_current_log_level = LL_DEFAULT;
 
 char g_log_file[SMALLSTRSIZE];
 long int g_print_subst_error = DEFAULT_PRINT_SUBST_ERROR;
@@ -891,10 +891,10 @@ int conn_establish_connection(connection_t *conn, const conn_def_t *srv, const i
       if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0) {
         ;
       } else if (s_begins_with(response, expect)) {
-        my_logf(LL_DEBUG, LP_DATETIME, "%s received the expected answer: '%s' (expected '%s')", prefix, response, expect);
+        my_logf(LL_VERBOSE, LP_DATETIME, "%s received expected answer: '%s' (expected '%s')", prefix, response, expect);
         ret = CONNRES_OK;
       } else {
-        my_logf(LL_VERBOSE, LP_DATETIME, "%s received an unexpected answer: '%s' (expected '%s')", prefix, response, expect);
+        my_logf(LL_ERROR, LP_DATETIME, "%s received unexpected answer: '%s' (expected '%s')", prefix, response, expect);
         ret = CONNRES_UNEXPECTED_ANSWER;
       }
       free(response);
