@@ -59,8 +59,8 @@ html_title = netmon 1.1
 html_refresh_interval = 20
 Valid check(s) defined: 2
 Run web server: no
-To check: 'My prog probe' [none:0], no expect, alerts: print
-To check: 'My loop' [:0], no expect, alerts: print
+To check: PROGRAM - 'My prog probe' [./check.sh ${LOOP_COUNT}], alerts: print
+To check: LOOP - 'My loop', mysmtp, mypop(myemail), alerts: print
 Will create image files in html directory
 Test mode 3: waiting to be at the middle of a second elapse to start
 Starting check...

@@ -328,6 +328,21 @@ INITIALIZATION FILES
 		no => Time stamps like "16/10/93 21:45:51"
 
 
+       log_level
+		Set the log level.
+		The options of the command line (-v, -q) take precedence
+		over the ini variable.
+		Optional
+		Defaults to "normal"
+		Possible values (self explanatory...) are
+		error
+		warning
+		normal
+		verbose
+		debug
+		debugtrace (debug + network traffic)
+
+
        Variables of the [check] sections
 
        display_name

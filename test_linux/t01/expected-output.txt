@@ -135,9 +135,9 @@ html_title = netmon 1.1
 html_refresh_interval = 20
 Valid check(s) defined: 3
 Run web server: no
-To check: 'my Localhost' [localhost:21219], no expect, no alert
-To check: 'ab544abcbcbczc31415911' [ab544abcbcbczc31415911:18], no expect, no alert
-To check: 'my program check' [none:18], no expect, no alert
+To check: TCP - 'my Localhost' [localhost:21219], no expect, no alert
+To check: TCP - 'ab544abcbcbczc31415911' [ab544abcbcbczc31415911:18], no expect, no alert
+To check: PROGRAM - 'my program check' [exit 127], no alert
 Will create image files in html directory
 Starting check...
 Performing check tcp(my Localhost)

@@ -247,11 +247,11 @@ html_title = netmon 1.1
 html_refresh_interval = 20
 Valid check(s) defined: 5
 Run web server: no
-To check: 'Local FTP' [Localhost:21], expect "221 ", alerts: main, critical, sms
-To check: 'Local HTTP' [127.0.0.1:80], no expect, no alert
-To check: 'Local SMTP' [My SMTP:25], expect "220 ", no alert
-To check: 'My POP3' [localhost:13529], expect "+OK ", no alert
-To check: 'Test avec nom inconnu' [a.b.c:25], no expect, alerts: 
+To check: TCP - 'Local FTP' [Localhost:21], expect "221 ", alerts: main, critical, sms
+To check: TCP - 'Local HTTP' [127.0.0.1:80], no expect, no alert
+To check: TCP - 'Local SMTP' [My SMTP:25], expect "220 ", no alert
+To check: TCP - 'My POP3' [localhost:13529], expect "+OK ", no alert
+To check: TCP - 'Test avec nom inconnu' [a.b.c:25], no expect, alerts: 
 Will create image files in html directory
 Starting check...
 Performing check tcp(Local FTP)
@@ -260,7 +260,7 @@ Running gethosbyname() on Localhost
 TCP check(Local FTP): will connect to Localhost:21, connect timeout = 5, netio timeout = 10
 TCP check(Local FTP): connected to Localhost:21
 <<< 220 (vsFTPd 2.3.5)
-TCP check(Local FTP): received an unexpected answer: '220 (vsFTPd 2.3.5)' (expected '221 ')
+TCP check(Local FTP): received unexpected answer: '220 (vsFTPd 2.3.5)' (expected '221 ')
 TCP check(Local FTP): disconnected from Localhost:21
 Local FTP -> ** KO **
 Performing check tcp(Local HTTP)
