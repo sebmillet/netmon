@@ -1,9 +1,12 @@
-2013-08-26 Sébastien Millet <sebastien.millet1@club-internet.fr>
+2013-08-28 Sébastien Millet <sebastien.millet1@club-internet.fr>
 
 	* Release 1.1 built
 	* main.c, implemented NT service management (--install, --uninstall options)
 	* main.c, implemented -d (--daemon) option, to run as a daemon (Linux) or service (Windows)
 	* Updated doc with new options --install, --uninstall, -d (--daemon)
+	* main.c, fixed an issue that prevented to use -a under Windows for smtp alerts
+	* main.c, main.h, implmented tcp_close variable in the ini file
+	* main.c, implemented log_level variable in the ini file
 
 2013-04-30 Sébastien Millet <sebastien.millet1@club-internet.fr>
 

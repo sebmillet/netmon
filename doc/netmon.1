@@ -461,6 +461,17 @@ program and log.
 .br
 
 .TP
+\fItcp_close\fP
+  "tcp" check only -> command to send to the server just before
+  to close the connection. On protocols like SMTP and POP3 it
+  is "QUIT".
+  Optional
+  No default value
+  If not set, just close the connection without sending any
+  command.
+.br
+
+.TP
 \fItcp_connect_timeout\fP
   "tcp" check only -> timeout in seconds to establish the TCP
   connection.

@@ -145,13 +145,11 @@ TCP check(my Localhost): connecting to localhost:21219...
 Running gethosbyname() on localhost
 TCP check(my Localhost): will connect to localhost:21219, connect timeout = 5, netio timeout = 10
 TCP check(my Localhost): network error connecting to localhost:21219, code=111 (Connection refused)
-TCP check(my Localhost): disconnected from localhost:21219
 my Localhost -> ** KO **
 Performing check tcp(ab544abcbcbczc31415911)
 TCP check(ab544abcbcbczc31415911): connecting to ab544abcbcbczc31415911:18...
 Running gethosbyname() on ab544abcbcbczc31415911
 Unknown host ab544abcbcbczc31415911, code=110 (Connection timed out)
-TCP check(ab544abcbcbczc31415911): disconnected from ab544abcbcbczc31415911:18
 ab544abcbcbczc31415911 -> ** ?? **
 Performing check program(my program check)
 Program check(my program check): will execute the command:

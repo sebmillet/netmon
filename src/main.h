@@ -89,6 +89,8 @@ struct check_t {
     // CM_TCP method
   char *tcp_expect;
   int tcp_expect_set;
+  char *tcp_close;
+  int tcp_close_set;
 
     // CM_PROGRAM method
   char *prg_command;

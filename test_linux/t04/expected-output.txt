@@ -254,13 +254,11 @@ TCP check(My POP3): connecting to localhost:13529...
 Running gethosbyname() on localhost
 TCP check(My POP3): will connect to localhost:13529, connect timeout = 5, netio timeout = 10
 TCP check(My POP3): network error connecting to localhost:13529, code=111 (Connection refused)
-TCP check(My POP3): disconnected from localhost:13529
 My POP3 -> ** KO **
 Performing check tcp(Test avec nom inconnu)
 TCP check(Test avec nom inconnu): connecting to a.b.c:25...
 Running gethosbyname() on a.b.c
 Unknown host a.b.c, code=110 (Connection timed out)
-TCP check(Test avec nom inconnu): disconnected from a.b.c:25
 Test avec nom inconnu -> ** ?? **
 Check done in 0.123450s
 netmon end

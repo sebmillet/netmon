@@ -306,6 +306,7 @@ const struct readcfg_var_t readcfg_vars[] = {
   {"tcp_netio_timeout", V_INT, CS_CHECK, &(chk00.srv.netio_timeout), NULL, NULL, 0,
     &(chk00.srv.netio_timeout_set), FALSE, NULL, 0, CM_TCP},
   {"tcp_expect", V_STR, CS_CHECK, NULL, &(chk00.tcp_expect), NULL, 0, &(chk00.tcp_expect_set), FALSE, NULL, 0, CM_TCP},
+  {"tcp_close", V_STR, CS_CHECK, NULL, &(chk00.tcp_close), NULL, 0, &(chk00.tcp_close_set), FALSE, NULL, 0, CM_TCP},
 
 // CHECKS -> PROGRAM method
 
@@ -546,6 +547,9 @@ void check_t_destroy(struct check_t *chk) {
   if (chk->tcp_expect != NULL)
     free(chk->tcp_expect);
 
+  if (chk->tcp_close != NULL)
+    free(chk->tcp_close);
+
   if (chk->prg_command != NULL)
     free(chk->prg_command);
 
@@ -616,6 +620,9 @@ void check_t_create(struct check_t *chk) {
 
   chk->tcp_expect_set = FALSE;
   chk->tcp_expect = NULL;
+
+  chk->tcp_close_set = FALSE;
+  chk->tcp_close = NULL;
 
   chk->prg_command = NULL;
   chk->prg_command_set = FALSE;
@@ -777,11 +784,20 @@ UNUSED(subst_len);
 
   int cr = conn_establish_connection(&conn, &chk->srv, 0, chk->tcp_expect_set ? chk->tcp_expect : NULL,
     prefix, g_trace_network_traffic);
+  int backup_cr = cr;
+
+  if (cr == CONNRES_OK && chk->tcp_close_set) {
+    if (conn_line_sendf(&conn, g_trace_network_traffic, "%s", chk->tcp_close)) {
+      cr = CONNRES_NETIO;
+    }
+  }
 
   conn_close(&conn);
   assert(conn_is_closed(&conn));
 
-  my_logf(LL_VERBOSE, LP_DATETIME, "%s disconnected from %s:%i", prefix, chk->srv.server, chk->srv.port);
+  if (backup_cr == CONNRES_OK)
+    my_logf(LL_VERBOSE, LP_DATETIME, "%s disconnected from %s:%i", prefix, chk->srv.server, chk->srv.port);
+
   if (cr == CONNRES_OK)
     return ST_OK;
   if (cr == CONNRES_RESOLVE_ERROR)

@@ -81,12 +81,6 @@ static void os_set_sock_blocking_mode(int sock) {
     fatal_error("ioctlsocket failed with error: %ld", iResult);
 }
 
-int os_last_err() {
-  int r = WSAGetLastError();
-  //WSACleanup();
-  return r;
-}
-
 char *os_last_err_desc_n(char *s, const size_t s_len, const long unsigned e) {
   LPVOID lpMsgBuf;
   FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -99,7 +93,7 @@ char *os_last_err_desc_n(char *s, const size_t s_len, const long unsigned e) {
       tmp[n - 2] = '\0';
   }
   snprintf(s, s_len, "code=%lu (%s)", e, tmp);
-  //WSACleanup();
+  WSACleanup();
   return s;
 }
 
@@ -179,10 +173,6 @@ static void os_set_sock_blocking_mode(int sock) {
   long arg = fcntl(sock, F_GETFL, NULL);
   arg &= ~O_NONBLOCK;
   fcntl(sock, F_SETFL, arg);
-}
-
-int os_last_err() {
-  return errno;
 }
 
 char *os_last_err_desc(char *s, size_t s_bufsize) {

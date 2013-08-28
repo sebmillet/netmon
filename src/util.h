@@ -170,7 +170,6 @@ void my_pthread_mutex_init(pthread_mutex_t *m);
 void util_my_pthread_init();
 
 void os_init_network();
-int os_last_err();
 int s_begins_with(const char *s, const char *begins_with);
 
 void win_get_exe_file(const char *argv0, char *p, size_t p_len);

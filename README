@@ -28,9 +28,7 @@ II.   WHY NETMON?
 
 I wanted a minimalistic program compatible with Windows and Linux out of the
 box.
-Shinken is perfect but Windows compatibility is done to the expense of massive
-compatibility layers. Also I wanted something small and very simple to
-configure.
+Also I wanted something small and very simple to configure.
 
 
 

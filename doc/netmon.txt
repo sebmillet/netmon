@@ -436,6 +436,16 @@ INITIALIZATION FILES
 		expected string contains leading or trailing spaces.
 
 
+       tcp_close
+		"tcp" check only -> command to send to the server just before
+		to close the connection. On protocols like SMTP and POP3 it
+		is "QUIT".
+		Optional
+		No default value
+		If not set, just close the connection without sending any
+		command.
+
+
        tcp_connect_timeout
 		"tcp" check only -> timeout in seconds to establish the TCP
 		connection.
