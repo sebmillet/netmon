@@ -2219,10 +2219,11 @@ void printhelp() {
   printf("  -C --stdout        Print status on stdout\n");
   printf("  -t --test N        Set test mode to N, 0 (default) = no test mode\n");
   printf("  -a --alert         Test the alert name written after the option and quit\n");
-  printf("     --laxist        Continue if errors are found in the ini file (default: stop)\n");
+  printf("     --laxist        Continue if errors are found in the ini file\n");
+  printf("                     (default: stop)\n");
   printf("  -d --daemon        Run as a daemon (Linux) / service (Windows)\n");
-  printf("                     Linux: in the ini file, you must set the html_directory variable\n");
-  printf("                     (in the [General] section) to an absolute path.\n");
+  printf("                     Linux: in the ini file, you must set the html_directory\n");
+  printf("                     variable (in the [General] section) to an absolute path.\n");
   printf("     --install       Install NT service (Windows only)\n");
   printf("     --uninstall     Uninstall NT service (Windows only)\n");
 }
