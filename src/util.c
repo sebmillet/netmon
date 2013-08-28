@@ -93,7 +93,7 @@ char *os_last_err_desc_n(char *s, const size_t s_len, const long unsigned e) {
       tmp[n - 2] = '\0';
   }
   snprintf(s, s_len, "code=%lu (%s)", e, tmp);
-  WSACleanup();
+/*  WSACleanup();*/
   return s;
 }
 
