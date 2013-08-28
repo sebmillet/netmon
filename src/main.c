@@ -5,7 +5,13 @@
 #include "main.h"
 
 #include <stdio.h>
+
+#ifdef MY_LINUX
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#endif
+
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1914,7 +1920,7 @@ void almost_neverending_loop() {
       my_logf(LL_DEBUG, LP_DATETIME, "Will sleep %i second(s)", this_sleep);
       my_logf(LL_DEBUG, LP_DATETIME, "Sleeping duration remaining after this one: %is second(s)", delay);
 
-      os_sleep(this_sleep);
+      os_sleep((unsigned int)this_sleep);
       continue;
     }
     this_sleep = 0;
@@ -2198,7 +2204,11 @@ void option_error(const char *s) {
 //
 void printhelp() {
   printf("Usage: " PACKAGE_NAME " [options...]\n");
-  printf("Do TCP connection tests periodically and output status information\n\n");
+  printf("Do TCP connection tests periodically and output status information.\n");
+  printf("Also can do \"Email loop\" checks.\n");
+  printf("Renders status in an included, minimalistic, web server.\n");
+  printf("See " PACKAGE "-sample.ini for help about " PACKAGE " configuration.\n");
+  printf("\n");
   printf("  -h --help          Display this help text\n");
   printf("  -V --version       Display version information and exit\n");
   printf("  -v --verbose       Be more talkative\n");
@@ -2210,8 +2220,9 @@ void printhelp() {
   printf("  -t --test N        Set test mode to N, 0 (default) = no test mode\n");
   printf("  -a --alert         Test the alert name written after the option and quit\n");
   printf("     --laxist        Continue if errors are found in the ini file (default: stop)\n");
-  printf("\n");
   printf("  -d --daemon        Run as a daemon (Linux) / service (Windows)\n");
+  printf("                     Linux: in the ini file, you must set the html_directory variable\n");
+  printf("                     (in the [General] section) to an absolute path.\n");
   printf("     --install       Install NT service (Windows only)\n");
   printf("     --uninstall     Uninstall NT service (Windows only)\n");
 }
@@ -2490,12 +2501,24 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number, int *n
 }
 
 //
+// Return TRUE if path is absolute (Windows or Linux)
+//
+// FIXME
+//   Should rather rely on cleaner OS abstraction libs...
+//   The code below is a hack.
+//   Yes.
+//
+int is_path_absolute(const char *p) {
+  return ((strlen(p) >= 1 && (p[0] == '\\' || p[0] == '/')) ||
+      (strlen(p) >= 3 && isalpha(p[0]) && p[1] == ':' && p[2] == '\\'));
+}
+
+//
 // Build complete path from different elements:
 //
 void build_file_complete_name(const char *path, const char *current, char *target, const size_t target_len) {
-  if ((strlen(current) >= 1 && (current[0] == '\\' || current[0] == '/')) ||
-      (strlen(current) >= 3 && isalpha(current[0]) && current[1] == ':' && current[2] == '\\')) {
 
+  if (is_path_absolute(current)) {
 // First case: the "current" string is absolute ->
 // It is to be used as is.
     strncpy(target, current, target_len);
@@ -2872,6 +2895,24 @@ void read_configuration_file(const char *cf, int *nb_errors) {
     g_current_log_level = (loglevel_t)g_ini_asked_log_level;
     my_logf(LL_ERROR, LP_DATETIME, "Log level set from ini file to %s", l_log_levels[(int)g_current_log_level]);
   }
+
+#ifdef MY_LINUX
+
+  if (g_daemon) {
+    if (!is_path_absolute(g_html_directory)) {
+      fprintf(stderr, "To launch " PACKAGE " daemon, the HTML directory must be specified as an absolute path, as in "
+        "\"/var/www\"\n");
+      fprintf(stderr, "  To do it, use the html_directory variable of the [General] section of the ini file.\n");
+      fprintf(stderr, "  Example:\n");
+      fprintf(stderr, "    [General]\n");
+      fprintf(stderr, "    html_directory=\"/var/www\"\n");
+      fprintf(stderr, "    ...\n");
+      fatal_error("Cannot start daemon, stopping");
+    }
+  }
+
+#endif
+
 }
 
 //
@@ -3162,7 +3203,12 @@ int ntsvc_uninstall(const char *prefix) {
   return 1;
 
 #else
+
   option_error("option --uninstall available inside Windows only");
+
+    // Never executed, written to avoid a warning
+  return 0;
+
 #endif
 
 }
@@ -3258,38 +3304,6 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
-#ifdef MY_LINUX
-
-// Linux daemon logic
-
-  if (g_daemon) {
-    pid_t pid = fork();
-    if (pid < 0) {
-      fatal_error("Unable to fork");
-      exit(EXIT_FAILURE);
-    } else if (pid > 0)
-        // Close parent process
-      exit(EXIT_SUCCESS);
-
-    umask(0);
-
-    pid_t sid = setsid();
-    if(sid < 0)
-      fatal_error("setsid() error");
-
-    chdir("/");
-
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
-
-    FILE *f = fopen("/home/sebastien/l.txt", "a");
-    fprintf(f, "DAEMON LAUNCHED\n");
-    fclose(f);
-  }
-
-#endif
-
   return main_post();
 }
 
@@ -3336,6 +3350,36 @@ int main_post() {
   checks_display();
   alerts_display();
   config_display();
+
+#ifdef MY_LINUX
+
+// Linux daemon logic
+
+  if (g_daemon) {
+    pid_t pid = fork();
+    if (pid < 0) {
+      fatal_error("Unable to fork");
+      exit(EXIT_FAILURE);
+    } else if (pid > 0)
+        // Close parent process
+      exit(EXIT_SUCCESS);
+
+    umask(0);
+
+    printf("Daemon pid = %lu\n", (long unsigned)getpid());
+
+    pid_t sid = setsid();
+    if(sid < 0)
+      fatal_error("setsid() error");
+
+    chdir("/");
+
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+  }
+
+#endif
 
   signal(SIGTERM, sigterm_handler);
   signal(SIGABRT, sigabrt_handler);
