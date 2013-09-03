@@ -1654,7 +1654,13 @@ int execute_alert_log(const struct exec_alert_t *exec_alert) {
 
   char *f_substitued = dollar_subst_alloc(alrt->log_file, exec_alert->subst, exec_alert->subst_len);
 
+    // FIXME
+  my_logf(LL_DEBUG, LP_DATETIME, "LOG alert running, mark 01 - will open '%s'", f_substitued);
+
   FILE *H = fopen(f_substitued, "a");
+  //
+    // FIXME
+  my_logf(LL_DEBUG, LP_DATETIME, "LOG alert running, mark 02");
 
   int ret = 0;
 
@@ -1792,6 +1798,8 @@ void manage_output(const struct tm *now_done, float elapsed) {
     printf("  . = ok, X = fail, ? = unknown, <space> = undefined\n");
   }
 
+  my_pthread_mutex_lock(&mutex);
+
   FILE *H = NULL;
   if (g_test_mode == 0) {
     H = fopen(g_html_complete_file_name, "w+");
@@ -1901,6 +1909,9 @@ void manage_output(const struct tm *now_done, float elapsed) {
     fclose(H);
     add_reader_access_right(g_html_complete_file_name);
   }
+
+  my_pthread_mutex_unlock(&mutex);
+
 }
 
 //

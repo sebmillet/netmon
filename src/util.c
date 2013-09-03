@@ -23,6 +23,10 @@
 
 #include <openssl/err.h>
 
+  // Call fflush each time a string is written in the log.
+  // Useful to debug...
+#define FLUSH_LOG
+
 const int crypt_ports[] = {443, 465, 585, 993, 995};
 
 long int g_connect_timeout = DEFAULT_CONNECT_TIMEOUT;
@@ -422,7 +426,15 @@ int my_is_log_open() {
 // Do string substitution
 // The subst_t array can be NULL (meaning, no substitution to do), in that case n MUST be set to 0
 //
+
+  // FIXME
+extern pthread_mutex_t mutex;
+
 char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
+
+    // FIXME
+  my_pthread_mutex_lock(&mutex);
+
   size_t sc_len = strlen(s) + 1;
   char *sc = (char *)malloc(sc_len);
   strncpy(sc, s, sc_len);
@@ -486,6 +498,10 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
       }
     }
   }
+
+    // FIXME
+  my_pthread_mutex_unlock(&mutex);
+
   return sc;
 }
 
@@ -571,7 +587,11 @@ void my_log_core_output(const char *s, size_t dt_len) {
   if (log_fd) {
     fputs(s, log_fd);
     fputs("\n", log_fd);
+
+#ifdef FLUSH_LOG
     fflush(log_fd);
+#endif
+
   }
   if (g_print_log) {
     const char *t = s;
@@ -582,7 +602,11 @@ void my_log_core_output(const char *s, size_t dt_len) {
       ++t;
     }
     puts(t);
+
+#ifdef FLUSH_LOG
     fflush(stdout);
+#endif
+
   }
 
   my_pthread_mutex_unlock(&util_mutex);

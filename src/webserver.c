@@ -232,7 +232,7 @@ void http_send_error_page(connection_t *conn, const char *e, const char *t) {
 // Date & time to str for network HTTP usage
 //
 char *my_ctime_r(const time_t *timep, char *buf, size_t buflen) {
-  my_pthread_mutex_lock(&mutex);
+/*  my_pthread_mutex_lock(&mutex);*/
 
   char *c = ctime(timep);
   if (c == NULL)
@@ -241,7 +241,7 @@ char *my_ctime_r(const time_t *timep, char *buf, size_t buflen) {
   buf[buflen - 1] = '\0';
   trim(buf);
 
-  my_pthread_mutex_unlock(&mutex);
+/*  my_pthread_mutex_unlock(&mutex);*/
 
   return buf;
 }
@@ -341,21 +341,41 @@ int manage_web_transaction(connection_t *conn) {
     return -1;
   }
 
+    // FIXME
+  my_logf(LL_DEBUG, LP_DATETIME, "Mark 01", path);
+
   char dt_fileupdate[50];
   char dt_now[50];
   struct timeval tv;
   if (my_ctime_r(&s.st_mtime, dt_fileupdate, sizeof(dt_fileupdate)) == 0 ||
       gettimeofday(&tv, NULL) != 0 ||
       my_ctime_r(&tv.tv_sec, dt_now, sizeof(dt_now)) == 0) {
+    my_logf(LL_DEBUG, LP_DATETIME, "Mark 01a", path);
     http_send_error_page(conn, "500 Server error", "Internal server error");
     return -1;
   }
 
+    // FIXME
+  my_logf(LL_DEBUG, LP_DATETIME, "Mark 02", path);
+
+  my_pthread_mutex_lock(&mutex);
+
+  my_logf(LL_DEBUG, LP_DATETIME, "path opened: '%s'", path);
   FILE *F = fopen(path, "rb");
+
+  my_logf(LL_DEBUG, LP_DATETIME, "Mark 02.001", path);
+
   if (F == NULL) {
+    my_logf(LL_DEBUG, LP_DATETIME, "Mark 02a", path);
     http_send_error_page(conn, "404 Not found", "File not found");
+    my_logf(LL_DEBUG, LP_DATETIME, "Mark 02b", path);
+    my_pthread_mutex_unlock(&mutex);
     return -1;
   }
+
+    // FIXME
+  my_logf(LL_DEBUG, LP_DATETIME, "Mark 03", path);
+
   char *pos;
   char *content_type = "application/octet-stream";
   if ((pos = strrchr(path, '.')) != NULL) {
@@ -368,6 +388,9 @@ int manage_web_transaction(connection_t *conn) {
       content_type = "text/ascii";
   }
 
+    // FIXME
+  my_logf(LL_DEBUG, LP_DATETIME, "Mark 04", path);
+
     // No way to work with binary files and kep-alive? I don't find...
   keep_alive = FALSE;
 
@@ -379,10 +402,16 @@ int manage_web_transaction(connection_t *conn) {
   conn_line_sendf(conn, g_trace_network_traffic, "Last-modified: %s", dt_fileupdate);
   conn_line_sendf(conn, g_trace_network_traffic, "");
 
+    // FIXME
+  my_logf(LL_DEBUG, LP_DATETIME, "Mark 05", path);
+
   char *buffer = (char *)malloc(buffer_size);
   size_t n;
   ssize_t e;
   while (feof(F) == 0) {
+
+      // FIXME
+    my_logf(LL_DEBUG, LP_DATETIME, "Mark 06", path);
 
     if ((n = fread(buffer, 1, sizeof(buffer), F)) == 0) {
       if (feof(F) == 0) {
@@ -392,6 +421,9 @@ int manage_web_transaction(connection_t *conn) {
       }
     }
 
+      // FIXME
+    my_logf(LL_DEBUG, LP_DATETIME, "Mark 07", path);
+
     e = conn->sock_write(conn, buffer, n);
     if (e == SOCKET_ERROR) {
       my_logf(LL_ERROR, LP_DATETIME, "Socket error");
@@ -400,10 +432,21 @@ int manage_web_transaction(connection_t *conn) {
     }
   }
 
+    // FIXME
+  my_logf(LL_DEBUG, LP_DATETIME, "Mark 08", path);
+
   conn_line_sendf(conn, g_trace_network_traffic, "");
+
+    // FIXME
+  my_logf(LL_DEBUG, LP_DATETIME, "Mark 09", path);
 
   free(buffer);
   fclose(F);
+
+    // FIXME
+  my_logf(LL_DEBUG, LP_DATETIME, "Mark 10", path);
+
+  my_pthread_mutex_unlock(&mutex);
 
   return keep_alive ? 0 : -1;
 }
