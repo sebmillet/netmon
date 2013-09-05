@@ -166,6 +166,10 @@ void win_get_exe_file(const char *argv0, char *p, size_t p_len) {
 
 const char FS_SEPARATOR = '/';
 
+void os_usleep(unsigned long int usec) {
+  usleep((useconds_t)usec);
+}
+
 void os_sleep(unsigned int seconds) {
   sleep(seconds);
 }
@@ -440,14 +444,9 @@ int my_is_log_open() {
 // The subst_t array can be NULL (meaning, no substitution to do), in that case n MUST be set to 0
 //
 
-  // FIXME
 extern pthread_mutex_t mutex;
 
 char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
-
-    // FIXME
-  my_pthread_mutex_lock(&mutex);
-
   size_t sc_len = strlen(s) + 1;
   char *sc = (char *)malloc(sc_len);
   strncpy(sc, s, sc_len);
@@ -511,9 +510,6 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
       }
     }
   }
-
-    // FIXME
-  my_pthread_mutex_unlock(&mutex);
 
   return sc;
 }

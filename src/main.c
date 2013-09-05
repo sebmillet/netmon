@@ -168,6 +168,11 @@ PROCESS_INFORMATION g_webserver_pi;
 int g_web_server_pi_is_set = FALSE;
 #endif
 
+#ifdef MY_LINUX
+pid_t g_web_server_pid;
+int g_web_server_pid_is_set = FALSE;
+#endif
+
 extern loglevel_t g_current_log_level;
 int g_log_level_updated_by_option = FALSE;
 
@@ -1658,13 +1663,7 @@ int execute_alert_log(const struct exec_alert_t *exec_alert) {
 
   char *f_substitued = dollar_subst_alloc(alrt->log_file, exec_alert->subst, exec_alert->subst_len);
 
-    // FIXME
-  my_logf(LL_DEBUG, LP_DATETIME, "LOG alert running, mark 01 - will open '%s'", f_substitued);
-
   FILE *H = my_fopen(f_substitued, "a", 1, 0);
-  //
-    // FIXME
-  my_logf(LL_DEBUG, LP_DATETIME, "LOG alert running, mark 02");
 
   int ret = 0;
 
@@ -2191,6 +2190,12 @@ void terminate(const char *how) {
 #ifdef MY_WINDOWS
   if (g_web_server_pi_is_set) {
     TerminateProcess(g_webserver_pi.hProcess, EXIT_SUCCESS);
+  }
+#endif
+
+#ifdef MY_LINUX
+  if (g_web_server_pid_is_set) {
+    kill(g_web_server_pid, SIGTERM);
   }
 #endif
 
@@ -3430,10 +3435,6 @@ UNUSED(argc);
 
 #endif
 
-  signal(SIGTERM, sigterm_handler);
-  signal(SIGABRT, sigabrt_handler);
-  signal(SIGINT, sigint_handler);
-
     // Just to call WSAStartup, yes!
   os_init_network();
 
@@ -3444,6 +3445,7 @@ UNUSED(argc);
 
   if (g_webserver_on) {
 
+#ifdef MY_WINDOWS
     if (g_webserver) {
       my_log_open();
       webserver(NULL);
@@ -3466,12 +3468,24 @@ UNUSED(argc);
         g_web_server_pi_is_set = TRUE;
       }
     }
+#endif
 
-/*    pthread_t id;*/
-/*    if (pthread_create(&id, NULL, webserver, NULL) != 0)*/
-/*      fatal_error("unable to create web server thread");*/
+#ifdef MY_LINUX
+    if ((g_web_server_pid = fork()) == 0) {
+      webserver(NULL);
+      exit(EXIT_SUCCESS);
+    } else if (g_web_server_pid < 0) {
+      my_logf(LL_ERROR, LP_DATETIME, "Unable to launch web server");
+    } else {
+      g_web_server_pid_is_set = TRUE;
+    }
+#endif
 
   }
+
+  signal(SIGTERM, sigterm_handler);
+  signal(SIGABRT, sigabrt_handler);
+  signal(SIGINT, sigint_handler);
 
   almost_neverending_loop();
 
