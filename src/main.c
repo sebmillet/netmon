@@ -6,11 +6,11 @@
 
 #include <stdio.h>
 
-#ifdef MY_LINUX
+/*#ifdef MY_LINUX*/
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#endif
+/*#endif*/
 
 #include <stdarg.h>
 #include <stdlib.h>
@@ -161,6 +161,12 @@ int g_laxist = FALSE;
 int g_install = FALSE;
 int g_uninstall = FALSE;
 int g_daemon = FALSE;
+int g_webserver = FALSE;
+
+#ifdef MY_WINDOWS
+PROCESS_INFORMATION g_webserver_pi;
+int g_web_server_pi_is_set = FALSE;
+#endif
 
 extern loglevel_t g_current_log_level;
 int g_log_level_updated_by_option = FALSE;
@@ -491,15 +497,13 @@ void ntsvc_fatal_error(const char *prefix) {
 }
 
 VOID WINAPI ntsvc_main(DWORD dwArgc, LPTSTR *lpszArgv) {
-UNUSED(dwArgc);
-UNUSED(lpszArgv);
-
   sst_handle = RegisterServiceCtrlHandlerEx(WIN_SERVICE_NAME, ntsvc_HandlerProc, NULL);
   if (!sst_handle)
     ntsvc_fatal_error("Windows Service initialization");
 
   ntsvc_SetServiceStatus(SERVICE_START_PENDING, 0);
-  main_post();
+
+  main_post(dwArgc, lpszArgv);
 }
 
 #endif
@@ -1657,7 +1661,7 @@ int execute_alert_log(const struct exec_alert_t *exec_alert) {
     // FIXME
   my_logf(LL_DEBUG, LP_DATETIME, "LOG alert running, mark 01 - will open '%s'", f_substitued);
 
-  FILE *H = fopen(f_substitued, "a");
+  FILE *H = my_fopen(f_substitued, "a", 1, 0);
   //
     // FIXME
   my_logf(LL_DEBUG, LP_DATETIME, "LOG alert running, mark 02");
@@ -1802,7 +1806,7 @@ void manage_output(const struct tm *now_done, float elapsed) {
 
   FILE *H = NULL;
   if (g_test_mode == 0) {
-    H = fopen(g_html_complete_file_name, "w+");
+    H = my_fopen(g_html_complete_file_name, "w", 3, 1000);
     if (H == NULL)
       my_logf(LL_ERROR, LP_DATETIME, "Unable to open HTML output file %s", g_html_complete_file_name);
     else
@@ -2183,6 +2187,13 @@ void almost_neverending_loop() {
 }
 
 void terminate(const char *how) {
+
+#ifdef MY_WINDOWS
+  if (g_web_server_pi_is_set) {
+    TerminateProcess(g_webserver_pi.hProcess, EXIT_SUCCESS);
+  }
+#endif
+
   if (service_stop_requested) {
 #ifdef MY_WINDOWS
     ntsvc_SetServiceStatus(SERVICE_STOPPED, 0);
@@ -2291,6 +2302,9 @@ void parse_options(int argc, char *argv[]) {
     {"install", no_argument, NULL, '2'},
     {"uninstall", no_argument, NULL, '3'},
     {"daemon", no_argument, NULL, 'd'},
+#ifdef MY_WINDOWS
+    {"webserver", no_argument, NULL, '4'},
+#endif
     {0, 0, 0, 0}
   };
 
@@ -2349,6 +2363,10 @@ void parse_options(int argc, char *argv[]) {
 
       case '3':
         g_uninstall = TRUE;
+        break;
+
+      case '4':
+        g_webserver = TRUE;
         break;
 
       case 'd':
@@ -2598,7 +2616,7 @@ char *get_path(char *f) {
 //   In all cases, if g_html_directory is absolute, it IS the target
 //   directory.
 //
-void build_definitive_html_direcotry() {
+void build_definitive_html_directory() {
     char tmp[MAX_PATH];
     char target[MAX_PATH];
     strncpy(tmp, g_log_file, sizeof(tmp));
@@ -2615,7 +2633,7 @@ void build_definitive_html_direcotry() {
 //
 void read_configuration_file(const char *cf, int *nb_errors) {
   FILE *FCFG = NULL;
-  if ((FCFG = fopen(cf, "r")) == NULL) {
+  if ((FCFG = my_fopen(cf, "r", 1, 0)) == NULL) {
     fatal_error("Configuration file '%s': unable to open", cf);
   }
   my_logf(LL_VERBOSE, LP_DATETIME, "Reading configuration from '%s'", cf);
@@ -2910,7 +2928,7 @@ void read_configuration_file(const char *cf, int *nb_errors) {
 
   fclose(FCFG);
 
-  build_definitive_html_direcotry();
+  build_definitive_html_directory();
 
   strncpy(g_html_complete_file_name, g_html_directory, sizeof(g_html_complete_file_name));
   fs_concatene(g_html_complete_file_name, g_html_file, sizeof(g_html_complete_file_name));
@@ -3332,11 +3350,14 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
-  return main_post();
+  return main_post(argc, argv);
 }
 
-int main_post() {
-  my_log_open();
+int main_post(int argc, char *argv[]) {
+UNUSED(argc);
+
+  if (!g_webserver)
+    my_log_open();
 
   if (g_daemon)
     my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_STRING " service start");
@@ -3422,9 +3443,34 @@ int main_post() {
   web_create_files_for_web();
 
   if (g_webserver_on) {
-    pthread_t id;
-    if (pthread_create(&id, NULL, webserver, NULL) != 0)
-      fatal_error("unable to create web server thread");
+
+    if (g_webserver) {
+      my_log_open();
+      webserver(NULL);
+      my_log_close();
+      exit(EXIT_SUCCESS);
+    } else {
+      char exe[MAX_PATH];
+      win_get_exe_file(argv[0], exe, sizeof(exe));
+      char cmd[MAX_PATH * 2];
+      snprintf(cmd, sizeof(cmd), "\"%s\" --webserver -c \"%s\" -l \"%s\"", exe, g_cfg_file, g_log_file);
+
+      STARTUPINFO si;
+      ZeroMemory(&si, sizeof(si));
+      si.cb = sizeof(si);
+      ZeroMemory(&g_webserver_pi, sizeof(g_webserver_pi));
+
+      if(!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &g_webserver_pi)) {
+        my_logf(LL_ERROR, LP_DATETIME, "Unable to launch web server");
+      } else {
+        g_web_server_pi_is_set = TRUE;
+      }
+    }
+
+/*    pthread_t id;*/
+/*    if (pthread_create(&id, NULL, webserver, NULL) != 0)*/
+/*      fatal_error("unable to create web server thread");*/
+
   }
 
   almost_neverending_loop();

@@ -154,6 +154,7 @@ int os_wexitstatus(const int r);
 int find_string(const char **table, int n, const char *elem);
 ssize_t my_getline(char **lineptr, size_t *n, FILE *stream);
 void os_sleep(unsigned int seconds);
+void os_usleep(unsigned long int usec);
 void fs_concatene(char *dst, const char *src, size_t dst_len);
 void set_current_tm(struct tm *ts);
 int add_reader_access_right(const char *f);
@@ -163,6 +164,8 @@ void get_datetime_of_day(int *wday, int *year, int *month, int *day, int *hour, 
 char *os_last_err_desc(char *s, const size_t s_bufsize);
 char *os_last_err_desc_n(char *s, const size_t s_len, const long unsigned e);
 int os_last_network_op_is_in_progress();
+
+FILE *my_fopen(const char *filename, const char *mode, const int nb_retries, const unsigned long int usec_delay);
 
 void my_pthread_mutex_lock(pthread_mutex_t *m);
 void my_pthread_mutex_unlock(pthread_mutex_t *m);

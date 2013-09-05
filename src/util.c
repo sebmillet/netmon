@@ -66,9 +66,12 @@ long int os_gmtoff() {
   return -(TimeZoneInfo.Bias + TimeZoneInfo.DaylightBias) * 60;
 }
 
+void os_usleep(unsigned long int usec) {
+  Sleep(usec);
+}
+
 void os_sleep(unsigned int seconds) {
-  unsigned long int msecs = (unsigned long int)seconds * 1000;
-  Sleep(msecs);
+  os_usleep(seconds * 1000L);
 }
 
 static void os_set_sock_nonblocking_mode(int sock) {
@@ -233,6 +236,16 @@ void dbg_write(const char *fmt, ...) {
   va_end(args);
 }
 #endif
+
+FILE *my_fopen(const char *filename, const char *mode, const int nb_retries, const unsigned long int usec_delay) {
+  int retry;
+  FILE *f = NULL;
+  for (retry = 1; retry <= nb_retries; ++retry, os_usleep(usec_delay)) {
+    if ((f = fopen(filename, mode)) != NULL)
+      break;
+  }
+  return f;
+}
 
 void my_pthread_mutex_init(pthread_mutex_t *m) {
   if ((errno = pthread_mutex_init(m, NULL)) != 0) {
@@ -402,7 +415,7 @@ void fatal_error(const char *format, ...) {
 //
 void my_log_open() {
   if (strlen(g_log_file) >= 1)
-    log_fd = fopen(g_log_file, "a");
+    log_fd = my_fopen(g_log_file, "a", 1, 0);
   else
     log_fd = NULL;
 }

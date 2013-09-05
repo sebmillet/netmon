@@ -111,7 +111,7 @@ void web_create_files_for_web() {
   for (i = 0; i <= _ST_LAST; ++i) {
     strncpy(buf, g_html_directory, sizeof(buf));
     fs_concatene(buf, img_files[i].file_name, sizeof(buf));
-    FILE *IMG = fopen(buf, "wb+");
+    FILE *IMG = my_fopen(buf, "wb", 1, 0);
 
     if (IMG == NULL) {
       my_logf(LL_ERROR, LP_DATETIME, "Unable to create %s", buf);
@@ -135,7 +135,7 @@ void web_create_files_for_web() {
 
   strncpy(buf, g_html_directory, sizeof(buf));
   fs_concatene(buf, FILE_MAN_EN, sizeof(buf));
-  FILE *IMG = fopen(buf, "w+");
+  FILE *IMG = my_fopen(buf, "w", 1, 0);
 
   if (IMG == NULL) {
     my_logf(LL_ERROR, LP_DATETIME, "Unable to create %s", buf);
@@ -361,7 +361,7 @@ int manage_web_transaction(connection_t *conn) {
   my_pthread_mutex_lock(&mutex);
 
   my_logf(LL_DEBUG, LP_DATETIME, "path opened: '%s'", path);
-  FILE *F = fopen(path, "rb");
+  FILE *F = my_fopen(path, "rb", 5, 800);
 
   my_logf(LL_DEBUG, LP_DATETIME, "Mark 02.001", path);
 
