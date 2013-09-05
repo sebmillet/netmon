@@ -6,11 +6,11 @@
 
 #include <stdio.h>
 
-/*#ifdef MY_LINUX*/
+#ifdef MY_LINUX
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-/*#endif*/
+#endif
 
 #include <stdarg.h>
 #include <stdlib.h>
