@@ -39,16 +39,16 @@
     <optimize>$(OPTIMIZE_FLAG)</optimize>
     <cflags>-DPTW32_STATIC_LIB</cflags>
     <include>"$(INCOPENSSL)"</include>
-    <include>"$(INCPTHREADS)"</include>
+<!--    <include>"$(INCPTHREADS)"</include>-->
     <lib-path>"$(LIBOPENSSL)"</lib-path>
-    <lib-path>"$(LIBPTHREADS)"</lib-path>
+<!--    <lib-path>"$(LIBPTHREADS)"</lib-path>-->
     <sys-lib>ssl</sys-lib>
     <sys-lib>crypto</sys-lib>
     <sys-lib>Ws2_32</sys-lib>
     <sys-lib>Gdi32</sys-lib>
     <sys-lib>Advapi32</sys-lib>
     <sys-lib>Shell32</sys-lib>
-    <sys-lib>pthreadGC2</sys-lib>
+<!--    <sys-lib>pthreadGC2</sys-lib>-->
   </exe>
 </makefile>
 

@@ -1007,25 +1007,25 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
 
     // FIXME, used to be malloc'ed but the instruction free(tmp) (later)
     // crashes the code...
-/*  int l = strlen(fmt) + 100;*/
-/*  char *tmp;*/
-/*  tmp = (char *)malloc(l + 1);*/
-  char tmp[1000];
+  int l = strlen(fmt) + 100;
+  char *tmp;
+  tmp = (char *)malloc(l + 1);
+/*  char tmp[1000];*/
 
   va_list args;
   va_start(args, fmt);
-/*  vsnprintf(tmp, l, fmt, args);*/
-  vsnprintf(tmp, sizeof(tmp), fmt, args);
+  vsnprintf(tmp, l, fmt, args);
+/*  vsnprintf(tmp, sizeof(tmp), fmt, args);*/
   va_end(args);
 
   if (trace)
     my_logf(LL_DEBUGTRACE, LP_DATETIME, "%s%s", conn->log_prefix_sent, tmp);
 
-  strncat(tmp, "\015\012", sizeof(tmp));
+  strncat(tmp, "\015\012", l);
 
   ssize_t e = conn->sock_write(conn, tmp, strlen(tmp));
 
-/*  free(tmp);*/
+  free(tmp);
 
   if (e == SOCKET_ERROR) {
     char s_err[ERR_STR_BUFSIZE];
