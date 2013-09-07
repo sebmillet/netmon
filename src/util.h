@@ -9,6 +9,19 @@
 #include <stdio.h>
 #include <openssl/ssl.h>
 
+#define DEBUG_MALLOC
+
+#ifdef DEBUG_MALLOC
+#define DEBUG_MALLOC_LOGFILE "/home/sebastien/travail/cpp/seb/netmon/memdbg.log"
+#define MYMALLOC(a)   debug_malloc(a, #a, __FILE__, __LINE__)
+#define MYREALLOC(a, b)  debug_realloc(a, b, #a, __FILE__, __LINE__)
+#define MYFREE(a)  debug_realloc(a, #a, __FILE__, __LINE__)
+#else
+#define MYMALLOC(a)   malloc(a)
+#define MYREALLOC(a)  realloc(a)
+#define MYFREE(a)     free(a)
+#endif
+
 #if defined(_WIN32) || defined(_WIN64)
 #define MY_WINDOWS
 #else
@@ -191,4 +204,12 @@ ssize_t conn_plain_read(connection_t *conn, void *buf, const size_t buf_len);
 ssize_t conn_plain_write(connection_t *conn, void *buf, const size_t buf_len);
 ssize_t conn_ssl_read(connection_t *conn, void *buf, const size_t buf_len);
 ssize_t conn_ssl_write(connection_t *conn, void *buf, const size_t buf_len);
+
+#ifdef DEBUG_MALLOC
+void *debug_malloc(size_t size, const char *var, const char *source_file, const long int line);
+void *debug_realloc(void *ptr, size_t size, const char *var, const char *source_file, const long int line);
+void debug_free(void *ptr, const char *var, const char *source_file, const long int line);
+#endif
+
+void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt, size_t dt_len);
 

@@ -241,6 +241,51 @@ void dbg_write(const char *fmt, ...) {
 }
 #endif
 
+//
+// Debug calls to malloc...
+// Linked to DEBUG_MALLOC macro definition
+//
+void *debug_malloc(size_t size, const char *var, const char *source_file, const long int line) {
+  FILE *F = fopen(DEBUG_MALLOC_LOGFILE, "a");
+  if (F != NULL) {
+    char dt[REGULAR_STR_STRBUFSIZE];
+    my_log_core_get_dt_str(LP_DATETIME, dt, sizeof(dt));
+    fprintf(F, "%s\tMALLOC.\t%s\t%lu\t\"%s\"\t%li\n", dt, var, size, source_file, line);
+    fclose(F);
+  }
+  return malloc(size);
+}
+
+//
+// Debug calls to realloc...
+// Linked to DEBUG_MALLOC macro definition
+//
+void *debug_realloc(void *ptr, size_t size, const char *var, const char *source_file, const long int line) {
+  FILE *F = fopen(DEBUG_MALLOC_LOGFILE, "a");
+  if (F != NULL) {
+    char dt[REGULAR_STR_STRBUFSIZE];
+    my_log_core_get_dt_str(LP_DATETIME, dt, sizeof(dt));
+    fprintf(F, "%s\tREALLOC\t%s\t%lu\t\"%s\"\t%li\n", dt, var, size, source_file, line);
+    fclose(F);
+  }
+  return realloc(ptr, size);
+}
+
+//
+// Debug calls to free...
+// Linked to DEBUG_MALLOC macro definition
+//
+void debug_free(void *ptr, const char *var, const char *source_file, const long int line) {
+  FILE *F = fopen(DEBUG_MALLOC_LOGFILE, "a");
+  if (F != NULL) {
+    char dt[REGULAR_STR_STRBUFSIZE];
+    my_log_core_get_dt_str(LP_DATETIME, dt, sizeof(dt));
+    fprintf(F, "%s\tFREE...\t%s\t\t\"%s\"\t%li\n", dt, var, source_file, line);
+    fclose(F);
+  }
+  free(ptr);
+}
+
 FILE *my_fopen(const char *filename, const char *mode, const int nb_retries, const unsigned long int usec_delay) {
   int retry;
   FILE *f = NULL;
@@ -1007,21 +1052,21 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
 
     // FIXME, used to be malloc'ed but the instruction free(tmp) (later)
     // crashes the code...
-  int l = strlen(fmt) + 100;
+  int l = (int)(strlen(fmt) + 100);
   char *tmp;
-  tmp = (char *)malloc(l + 1);
+  tmp = (char *)malloc((size_t)(l + 1));
 /*  char tmp[1000];*/
 
   va_list args;
   va_start(args, fmt);
-  vsnprintf(tmp, l, fmt, args);
+  vsnprintf(tmp, (size_t)l, fmt, args);
 /*  vsnprintf(tmp, sizeof(tmp), fmt, args);*/
   va_end(args);
 
   if (trace)
     my_logf(LL_DEBUGTRACE, LP_DATETIME, "%s%s", conn->log_prefix_sent, tmp);
 
-  strncat(tmp, "\015\012", l);
+  strncat(tmp, "\015\012", sizeof(tmp));
 
   ssize_t e = conn->sock_write(conn, tmp, strlen(tmp));
 
