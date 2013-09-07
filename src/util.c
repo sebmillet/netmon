@@ -241,16 +241,18 @@ void dbg_write(const char *fmt, ...) {
 }
 #endif
 
+#ifdef DEBUG_DYNMEM
+
 //
 // Debug calls to malloc...
-// Linked to DEBUG_MALLOC macro definition
+// Linked to DEBUG_DYNMEM macro definition
 //
 void *debug_malloc(size_t size, const char *var, const char *source_file, const long int line) {
   FILE *F = fopen(DEBUG_MALLOC_LOGFILE, "a");
   if (F != NULL) {
     char dt[REGULAR_STR_STRBUFSIZE];
     my_log_core_get_dt_str(LP_DATETIME, dt, sizeof(dt));
-    fprintf(F, "%s\tMALLOC.\t%s\t%lu\t\"%s\"\t%li\n", dt, var, size, source_file, line);
+    fprintf(F, "%s\tMALLOC.\t%s\t%lu\t%s:%li\n", dt, var, (long unsigned int)size, source_file, line);
     fclose(F);
   }
   return malloc(size);
@@ -258,14 +260,14 @@ void *debug_malloc(size_t size, const char *var, const char *source_file, const 
 
 //
 // Debug calls to realloc...
-// Linked to DEBUG_MALLOC macro definition
+// Linked to DEBUG_DYNMEM macro definition
 //
 void *debug_realloc(void *ptr, size_t size, const char *var, const char *source_file, const long int line) {
   FILE *F = fopen(DEBUG_MALLOC_LOGFILE, "a");
   if (F != NULL) {
     char dt[REGULAR_STR_STRBUFSIZE];
     my_log_core_get_dt_str(LP_DATETIME, dt, sizeof(dt));
-    fprintf(F, "%s\tREALLOC\t%s\t%lu\t\"%s\"\t%li\n", dt, var, size, source_file, line);
+    fprintf(F, "%s\tREALLOC\t%s\t%lu\t%s:%li\n", dt, var, (long unsigned int)size, source_file, line);
     fclose(F);
   }
   return realloc(ptr, size);
@@ -273,18 +275,20 @@ void *debug_realloc(void *ptr, size_t size, const char *var, const char *source_
 
 //
 // Debug calls to free...
-// Linked to DEBUG_MALLOC macro definition
+// Linked to DEBUG_DYNMEM macro definition
 //
 void debug_free(void *ptr, const char *var, const char *source_file, const long int line) {
   FILE *F = fopen(DEBUG_MALLOC_LOGFILE, "a");
   if (F != NULL) {
     char dt[REGULAR_STR_STRBUFSIZE];
     my_log_core_get_dt_str(LP_DATETIME, dt, sizeof(dt));
-    fprintf(F, "%s\tFREE...\t%s\t\t\"%s\"\t%li\n", dt, var, source_file, line);
+    fprintf(F, "%s\tFREE...\t%s\t\t%s:%li\n", dt, var, source_file, line);
     fclose(F);
   }
   free(ptr);
 }
+
+#endif  // DEBUG_DYNMEM
 
 FILE *my_fopen(const char *filename, const char *mode, const int nb_retries, const unsigned long int usec_delay) {
   int retry;
@@ -333,7 +337,7 @@ char *errno_error(char *s, size_t s_len) {
 ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
   if (*lineptr == NULL || *n == 0) {
     *n = MY_GETLINE_INITIAL_ALLOCATE;
-    *lineptr = (char *)malloc(*n);
+    *lineptr = (char *)MYMALLOC(*n, lineptr);
     if (*lineptr == NULL) {
       errno = ENOMEM;
       return -1;
@@ -352,7 +356,7 @@ ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
         (*n) += increase;
 
       char *old_lineptr = *lineptr;
-      *lineptr = (char *)realloc(*lineptr, *n);
+      *lineptr = (char *)MYREALLOC(*lineptr, *n);
       write_head += (*lineptr - old_lineptr);
 
       if (*lineptr == NULL) {
@@ -493,7 +497,7 @@ int my_is_log_open() {
 
 char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
   size_t sc_len = strlen(s) + 1;
-  char *sc = (char *)malloc(sc_len);
+  char *sc = (char *)MYMALLOC(sc_len, sc);
   strncpy(sc, s, sc_len);
 
   char var[SMALLSTRSIZE];
@@ -534,12 +538,12 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
 /*        dbg_write("=== before: '%s'\n", sc);*/
 
         size_t buf_len = strlen(c + 1) + 1;
-        char *buf = (char *)malloc(buf_len);
+        char *buf = (char *)MYMALLOC(buf_len, buf);
         strncpy(buf, c + 1, buf_len);
         *p = '\0';
         size_t need_len = strlen(sc) + strlen(rep) + strlen(buf) + 1;
         if (need_len > sc_len) {
-          char *new_sc = (char *)realloc(sc, need_len);
+          char *new_sc = (char *)MYREALLOC(sc, need_len);
 
 /*          dbg_write("Reallocated from %lu to %lu\n", sc_len, need_len);*/
 
@@ -549,7 +553,7 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
         }
         strncat(sc, rep, sc_len);
         strncat(sc, buf, sc_len);
-        free(buf);
+        MYFREE(buf);
 
 /*        dbg_write("=== after:  '%s'\n", sc);*/
       }
@@ -965,7 +969,7 @@ int conn_establish_connection(connection_t *conn, const conn_def_t *srv, const i
         my_logf(LL_ERROR, LP_DATETIME, "%s received unexpected answer: '%s' (expected '%s')", prefix, response, expect);
         ret = CONNRES_UNEXPECTED_ANSWER;
       }
-      free(response);
+      MYFREE(response);
     } else {
       ret = CONNRES_OK;
     }
@@ -990,7 +994,7 @@ int conn_read_line_alloc(connection_t *conn, char **out, int trace, size_t *size
 
   if (*out == NULL) {
     *size = (size_t)INITIAL_READLINE_BUFFER_SIZE;
-    *out = (char *)malloc(*size);
+    *out = (char *)MYMALLOC(*size, out);
   }
 
   for (;;) {
@@ -1004,7 +1008,7 @@ int conn_read_line_alloc(connection_t *conn, char **out, int trace, size_t *size
     if ((unsigned)i >= *size) {
       if (*size * 2 <= MAX_READLINE_SIZE) {
         *size *= 2;
-        *out = (char *)realloc(*out, *size);
+        *out = (char *)MYREALLOC(*out, *size);
       } else {
         (*out)[*size - 1] = '\0';
         break;
@@ -1052,25 +1056,23 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
 
     // FIXME, used to be malloc'ed but the instruction free(tmp) (later)
     // crashes the code...
-  int l = (int)(strlen(fmt) + 100);
-  char *tmp;
-  tmp = (char *)malloc((size_t)(l + 1));
-/*  char tmp[1000];*/
+  size_t l = (long int)(strlen(fmt) + 100);
+  char *to_send = (char *)MYMALLOC(l + 1, to_send);
 
   va_list args;
   va_start(args, fmt);
-  vsnprintf(tmp, (size_t)l, fmt, args);
-/*  vsnprintf(tmp, sizeof(tmp), fmt, args);*/
+  vsnprintf(to_send, l, fmt, args);
   va_end(args);
 
   if (trace)
-    my_logf(LL_DEBUGTRACE, LP_DATETIME, "%s%s", conn->log_prefix_sent, tmp);
+    my_logf(LL_DEBUGTRACE, LP_DATETIME, "%s%s", conn->log_prefix_sent, to_send);
 
-  strncat(tmp, "\015\012", sizeof(tmp));
+  strncat(to_send, "\015\012", l);
+  to_send[l] = '\0';
 
-  ssize_t e = conn->sock_write(conn, tmp, strlen(tmp));
+  ssize_t e = conn->sock_write(conn, to_send, strlen(to_send));
 
-  free(tmp);
+  MYFREE(to_send);
 
   if (e == SOCKET_ERROR) {
     char s_err[ERR_STR_BUFSIZE];
@@ -1087,32 +1089,31 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
 //
 int conn_round_trip(connection_t *conn, const char *expect, int trace, const char *fmt, ...) {
   size_t l = strlen(fmt) + 100;
-  char *tmp;
-  tmp = (char *)malloc(l + 1);
+  char *formatted_str = (char *)MYMALLOC(l + 1, formatted_str);
 
   va_list args;
   va_start(args, fmt);
-  vsnprintf(tmp, l, fmt, args);
+  vsnprintf(formatted_str, l, fmt, args);
   va_end(args);
 
-  int e = conn_line_sendf(conn, trace, tmp);
-  free(tmp);
+  int e = conn_line_sendf(conn, trace, formatted_str);
+  MYFREE(formatted_str);
   if (e)
     return CONNRES_NETIO;
 
   char *response = NULL;
   size_t response_size;
   if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0) {
-    free(response);
+    MYFREE(response);
     return CONNRES_NETIO;
   }
 
   if (s_begins_with(response, expect)) {
-    free(response);
+    MYFREE(response);
     return CONNRES_OK;
   }
 
-  free(response);
+  MYFREE(response);
   return CONNRES_UNEXPECTED_ANSWER;
 }
 

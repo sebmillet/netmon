@@ -9,17 +9,29 @@
 #include <stdio.h>
 #include <openssl/ssl.h>
 
-#define DEBUG_MALLOC
+  //
+  // FIXME
+  //
+  // !!!!!     WARNING      !!!!!
+  // !!!!! USE WITH CAUTION !!!!!
+  //
+  // EACH CALL TO MYMALLOC, MYREALLOC AND MYFREE WILL
+  // BE SUBJECT TO A WRITE IN A LOG FILE
+  //
+#define DEBUG_DYNMEM
 
-#ifdef DEBUG_MALLOC
-#define DEBUG_MALLOC_LOGFILE "/home/sebastien/travail/cpp/seb/netmon/memdbg.log"
-#define MYMALLOC(a)   debug_malloc(a, #a, __FILE__, __LINE__)
-#define MYREALLOC(a, b)  debug_realloc(a, b, #a, __FILE__, __LINE__)
-#define MYFREE(a)  debug_realloc(a, #a, __FILE__, __LINE__)
+#ifdef DEBUG_DYNMEM
+//
+//#define DEBUG_MALLOC_LOGFILE "/home/sebastien/travail/cpp/seb/netmon/memdbg.log"
+#define DEBUG_MALLOC_LOGFILE "C:\\seb\\netmon\\memdbg.log"
+
+#define MYMALLOC(a, b)  debug_malloc(a, #b, __FILE__, __LINE__)
+#define MYREALLOC(a, b) debug_realloc(a, b, #a, __FILE__, __LINE__)
+#define MYFREE(a)       debug_free(a, #a, __FILE__, __LINE__)
 #else
-#define MYMALLOC(a)   malloc(a)
-#define MYREALLOC(a)  realloc(a)
-#define MYFREE(a)     free(a)
+#define MYMALLOC(a, b)  malloc(a)
+#define MYREALLOC(a, b) realloc(a, b)
+#define MYFREE(a)       free(a)
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -69,7 +81,7 @@ typedef int socklen_t;
 
 #define MY_GETLINE_INITIAL_ALLOCATE 100
 #define MY_GETLINE_MIN_INCREASE     100
-#define MY_GETLINE_COEF_INCREASE    2
+#define MY_GETLINE_COEF_INCREASE    1
 
 enum {DF_FRENCH = 0, DF_ENGLISH = 1};
 #define DEFAULT_DATE_FORMAT DF_FRENCH
@@ -205,7 +217,7 @@ ssize_t conn_plain_write(connection_t *conn, void *buf, const size_t buf_len);
 ssize_t conn_ssl_read(connection_t *conn, void *buf, const size_t buf_len);
 ssize_t conn_ssl_write(connection_t *conn, void *buf, const size_t buf_len);
 
-#ifdef DEBUG_MALLOC
+#ifdef DEBUG_DYNMEM
 void *debug_malloc(size_t size, const char *var, const char *source_file, const long int line);
 void *debug_realloc(void *ptr, size_t size, const char *var, const char *source_file, const long int line);
 void debug_free(void *ptr, const char *var, const char *source_file, const long int line);

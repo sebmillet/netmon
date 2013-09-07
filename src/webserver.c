@@ -61,6 +61,33 @@ const char *ST_TO_BGCOLOR_FORHTML[_ST_NBELEMS] = {
   "#FF0000"  // ST_FAIL
 };
 
+const char *POEM =
+  "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">"
+  "<html lang=\"fr\"><head><meta charset=\"UTF-8\"/><title>Poème</title></head><body>\015\012"
+  "<h3>Charles Baudelaire</h3>\015\012"
+  "<h4>Recueil&nbsp;: Les fleurs du mal</h4><hr>\015\012"
+  "<h4>L'avertisseur</h4>\015\012"
+  "<p>Tout homme digne de ce nom<br>\015\012"
+  "A dans le coeur un Serpent jaune,<br>\015\012"
+  "Installé comme sur un trône,<br>\015\012"
+  "Qui, s'il dit&nbsp;: &laquo;Je veux !&raquo; répond&nbsp;: &laquo;Non !&raquo;<br>\015\012"
+  "<br>\015\012"
+  "Plonge tes yeux dans les yeux fixes<br>\015\012"
+  "Des Satyresses ou des Nixes,<br>\015\012"
+  "La Dent dit&nbsp;: &laquo;Pense à ton devoir&nbsp;!&raquo;<br>\015\012"
+  "<br>\015\012"
+  "Fais des enfants, plante des arbres,<br>\015\012"
+  "Polis des vers, sculpte des marbres,<br>\015\012"
+  "La Dent dit : &laquo;Vivras-tu ce soir&nbsp?&raquo;<br>\015\012"
+  "<br>\015\012"
+  "Quoi qu'il ébauche ou qu'il espère,<br>\015\012"
+  "L'homme ne vit pas un moment<br>\015\012"
+  "Sans subir l'avertissement<br>\015\012"
+  "De l'insupportable Vipère.<br>\015\012"
+  "</p></body></html>\015\012";
+const char *POEM_URL = "poem";
+const char *POEM_TYPE = "text/html";
+
 char g_html_directory[BIGSTRSIZE] = DEFAULT_HTML_DIRECTORY;
 char g_html_file[SMALLSTRSIZE] = DEFAULT_HTML_FILE;
 char g_html_title[SMALLSTRSIZE] = PACKAGE_STRING;
@@ -86,9 +113,9 @@ extern const char *netmon[];
 extern size_t const netmon_len;
 
 extern int g_trace_network_traffic;
-size_t buffer_size = 10000;
-
-/*extern pthread_mutex_t mutex;*/
+  // FIXME
+/*size_t buffer_size = 10000;*/
+size_t buffer_size = 30;
 
 //
 // Create files used for HTML display
@@ -203,6 +230,9 @@ int server_accept(connection_t *listen_conn, struct sockaddr_in* remote_sin, int
   my_logf(LL_VERBOSE, LP_DATETIME, "%s: listening on port %u...", prefix, listen_port);
   remote_sin_len = sizeof(*remote_sin);
   connect_conn->sock = accept(listen_conn->sock, (struct sockaddr *)remote_sin, &remote_sin_len);
+
+  my_logf(LL_DEBUG, LP_DATETIME, "%s: accept() function returned");
+
   if (connect_conn->sock == -1) {
     my_logf(LL_ERROR, LP_DATETIME, "%s: cannot accept, error %s", prefix, os_last_err_desc(s_err, sizeof(s_err)));
     conn_close(connect_conn);
@@ -232,17 +262,12 @@ void http_send_error_page(connection_t *conn, const char *e, const char *t) {
 // Date & time to str for network HTTP usage
 //
 char *my_ctime_r(const time_t *timep, char *buf, size_t buflen) {
-/*  my_pthread_mutex_lock(&mutex);*/
-
   char *c = ctime(timep);
   if (c == NULL)
     return c;
   strncpy(buf, c, buflen);
   buf[buflen - 1] = '\0';
   trim(buf);
-
-/*  my_pthread_mutex_unlock(&mutex);*/
-
   return buf;
 }
 
@@ -257,7 +282,7 @@ int manage_web_transaction(connection_t *conn) {
   size_t size;
   int read_res = 0;
   if ((read_res = conn_read_line_alloc(conn, &received, g_trace_network_traffic, &size)) < 0) {
-    free(received);
+    MYFREE(received);
     return -1;
   }
 
@@ -265,7 +290,7 @@ int manage_web_transaction(connection_t *conn) {
 
   char *p = received;
   if (strncmp(p, "GET", 3)) {
-    free(received);
+    MYFREE(received);
     http_send_error_page(conn, "400 Bad Request", "Could not understand request");
     return -1;
   }
@@ -289,7 +314,7 @@ int manage_web_transaction(connection_t *conn) {
   while (*p == ' ')
     ++p;
   if (strncmp(p, "HTTP/1.1", 8)) {
-    free(received);
+    MYFREE(received);
     http_send_error_page(conn, "400 Bad Request", "Could not understand request");
     return -1;
   }
@@ -298,7 +323,7 @@ int manage_web_transaction(connection_t *conn) {
   if (t != NULL)
     tmpurl = t + 1;
   if (strstr(received, "..") != 0) {
-    free(received);
+    MYFREE(received);
     http_send_error_page(conn, "401 Unauthorized", "Not allowed to go up in directory tree");
     return -1;
   }
@@ -309,7 +334,7 @@ int manage_web_transaction(connection_t *conn) {
   int keep_alive = TRUE;
   while (strlen(received) != 0) {
     if ((read_res = conn_read_line_alloc(conn, &received, g_trace_network_traffic, &size)) < 0) {
-      free(received);
+      MYFREE(received);
       return -1;
     }
 
@@ -319,59 +344,81 @@ int manage_web_transaction(connection_t *conn) {
     }
   }
 
-  free(received);
+  MYFREE(received);
 
   my_logf(LL_DEBUG, LP_DATETIME, WEBSERVER_LOG_PREFIX ": client requested '%s'", url);
 
   char path[BIGSTRSIZE];
   strncpy(path, g_html_directory, sizeof(path));
+
+  const char *internal_content = NULL;
+  const char *type_internal_content = NULL;
+  size_t size_internal_content = 0;
+
   if (strcasecmp(url, MAN_EN) == 0)
     fs_concatene(path, FILE_MAN_EN, sizeof(path));
-  else
+  else if (strcasecmp(url, POEM_URL) == 0) {
+    internal_content = POEM;
+    size_internal_content = strlen(internal_content);
+    my_logf(LL_DEBUG, LP_DATETIME, "Size of poem: %lu", size_internal_content);
+    type_internal_content = POEM_TYPE;
+  } else {
     fs_concatene(path, strlen(url) == 0 ? g_html_file : url, sizeof(path));
-
-  my_logf(LL_DEBUG, LP_DATETIME, "Will stat file '%s'", path);
+  }
 
   struct stat s;
-  if (stat(path, &s)) {
-    char s_err[SMALLSTRSIZE];
-    errno_error(s_err, sizeof(s_err));
-    my_logf(LL_ERROR, LP_DATETIME, "%s", s_err);
-    http_send_error_page(conn, "404 Not found", s_err);
-    return -1;
+
+  if (internal_content == NULL) {
+    my_logf(LL_DEBUG, LP_DATETIME, "Will stat file '%s'", path);
+
+    if (stat(path, &s)) {
+      char s_err[SMALLSTRSIZE];
+      errno_error(s_err, sizeof(s_err));
+      my_logf(LL_ERROR, LP_DATETIME, "%s", s_err);
+      http_send_error_page(conn, "404 Not found", s_err);
+      return -1;
+    }
   }
 
   char dt_fileupdate[50];
   char dt_now[50];
   struct timeval tv;
-  if (my_ctime_r(&s.st_mtime, dt_fileupdate, sizeof(dt_fileupdate)) == 0 ||
-      gettimeofday(&tv, NULL) != 0 ||
+
+  FILE *F = NULL;
+
+  const char *content_type = "application/octet-stream";
+
+  if (internal_content == NULL) {
+    if (my_ctime_r(&s.st_mtime, dt_fileupdate, sizeof(dt_fileupdate)) == 0) {
+      http_send_error_page(conn, "500 Server error", "Internal server error");
+      return -1;
+    }
+  }
+  if (gettimeofday(&tv, NULL) != 0 ||
       my_ctime_r(&tv.tv_sec, dt_now, sizeof(dt_now)) == 0) {
     http_send_error_page(conn, "500 Server error", "Internal server error");
     return -1;
   }
-
-/*  my_pthread_mutex_lock(&mutex);*/
-
-  my_logf(LL_DEBUG, LP_DATETIME, "path opened: '%s'", path);
-  FILE *F = my_fopen(path, "rb", 5, 800);
-
-  if (F == NULL) {
-    http_send_error_page(conn, "404 Not found", "File not found");
-/*    my_pthread_mutex_unlock(&mutex);*/
-    return -1;
-  }
-
-  char *pos;
-  char *content_type = "application/octet-stream";
-  if ((pos = strrchr(path, '.')) != NULL) {
-    ++pos;
-    if (strcasecmp(pos, "png") == 0)
-      content_type = "image/png";
-    else if (strcasecmp(pos, "htm") == 0 || strcasecmp(pos, "html") == 0)
-      content_type = "text/html";
-    else if (strcasecmp(pos, "ini") == 0 || strcasecmp(pos, "log") == 0)
-      content_type = "text/ascii";
+  if (internal_content == NULL) {
+    my_logf(LL_DEBUG, LP_DATETIME, "path opened: '%s'", path);
+    F = my_fopen(path, "rb", 5, 800);
+    if (F == NULL) {
+      http_send_error_page(conn, "404 Not found", "File not found");
+      return -1;
+    }
+    char *pos;
+    if ((pos = strrchr(path, '.')) != NULL) {
+      ++pos;
+      if (strcasecmp(pos, "png") == 0)
+        content_type = "image/png";
+      else if (strcasecmp(pos, "htm") == 0 || strcasecmp(pos, "html") == 0)
+        content_type = "text/html";
+      else if (strcasecmp(pos, "ini") == 0 || strcasecmp(pos, "log") == 0)
+        content_type = "text/ascii";
+    }
+  } else {
+    strncpy(dt_fileupdate, dt_now, sizeof(dt_fileupdate));
+    content_type = type_internal_content;
   }
 
     // No way to work with binary files and kep-alive? I don't find...
@@ -385,33 +432,51 @@ int manage_web_transaction(connection_t *conn) {
   conn_line_sendf(conn, g_trace_network_traffic, "Last-modified: %s", dt_fileupdate);
   conn_line_sendf(conn, g_trace_network_traffic, "");
 
-  char *buffer = (char *)malloc(buffer_size);
+  my_logf(LL_DEBUG, LP_DATETIME, "Will send content over the network");
+
   size_t n;
   ssize_t e;
-  while (feof(F) == 0) {
-
-    if ((n = fread(buffer, 1, sizeof(buffer), F)) == 0) {
-      if (feof(F) == 0) {
-        my_logf(LL_ERROR, LP_DATETIME, "Error reading file %s", path);
+  if (internal_content == NULL) {
+    char *buffer = (char *)MYMALLOC(buffer_size, buffer);
+    while (feof(F) == 0) {
+      if ((n = fread(buffer, 1, buffer_size, F)) == 0) {
+        if (feof(F) == 0) {
+          my_logf(LL_ERROR, LP_DATETIME, "Error reading file %s", path);
+          keep_alive = FALSE;
+          MYFREE(buffer);
+          fclose(F);
+          break;
+        }
+      }
+      e = conn->sock_write(conn, buffer, n);
+      if (e == SOCKET_ERROR) {
+        my_logf(LL_ERROR, LP_DATETIME, "Socket error");
         keep_alive = FALSE;
+        MYFREE(buffer);
+        fclose(F);
         break;
       }
     }
-
-    e = conn->sock_write(conn, buffer, n);
-    if (e == SOCKET_ERROR) {
-      my_logf(LL_ERROR, LP_DATETIME, "Socket error");
+    MYFREE(buffer);
+    fclose(F);
+    conn_line_sendf(conn, g_trace_network_traffic, "");
+  } else {
+    n = size_internal_content;
+    char *walker = (char *)internal_content;
+    while (n >= 1) {
+      size_t to_send = (n >= buffer_size ? buffer_size : n);
+      n -= to_send;
+      e = conn->sock_write(conn, walker, to_send);
+      if (e == SOCKET_ERROR) {
+        my_logf(LL_ERROR, LP_DATETIME, "Socket error");
         keep_alive = FALSE;
-      break;
+        break;
+      }
+      walker += to_send;
     }
   }
 
-  conn_line_sendf(conn, g_trace_network_traffic, "");
-
-  free(buffer);
-  fclose(F);
-
-/*  my_pthread_mutex_unlock(&mutex);*/
+  my_logf(LL_DEBUG, LP_DATETIME, "Finished sending content over the network");
 
   return keep_alive ? 0 : -1;
 }

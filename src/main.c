@@ -526,53 +526,53 @@ long int loop_count = 0;
 
 void conn_def_t_destroy(conn_def_t *srv) {
   if (srv->server != NULL)
-    free(srv->server);
+    MYFREE(srv->server);
 }
 
 void rfc821_enveloppe_t_destroy(struct rfc821_enveloppe_t *s) {
   conn_def_t_destroy(&s->srv);
   if (s->self != NULL)
-    free(s->self);
+    MYFREE(s->self);
   if (s->sender != NULL)
-    free(s->sender);
+    MYFREE(s->sender);
   if (s->recipients != NULL)
-    free(s->recipients);
+    MYFREE(s->recipients);
 }
 
 void pop3_account_t_destroy(struct pop3_account_t *p) {
   conn_def_t_destroy(&p->srv);
   if (p->user != NULL)
-    free(p->user);
+    MYFREE(p->user);
   if (p->password != NULL)
-    free(p->password);
+    MYFREE(p->password);
 }
 
 void check_t_destroy(struct check_t *chk) {
   if (chk->display_name != NULL)
-    free(chk->display_name);
+    MYFREE(chk->display_name);
 
   conn_def_t_destroy(&chk->srv);
 
   if (chk->tcp_expect != NULL)
-    free(chk->tcp_expect);
+    MYFREE(chk->tcp_expect);
 
   if (chk->tcp_close != NULL)
-    free(chk->tcp_close);
+    MYFREE(chk->tcp_close);
 
   if (chk->prg_command != NULL)
-    free(chk->prg_command);
+    MYFREE(chk->prg_command);
 
   rfc821_enveloppe_t_destroy(&chk->loop_smtp);
   if (chk->loop_id != NULL)
-    free(chk->loop_id);
+    MYFREE(chk->loop_id);
   pop3_account_t_destroy(&chk->loop_pop3);
 
   if (chk->alerts != NULL)
-    free(chk->alerts);
+    MYFREE(chk->alerts);
   if (chk->str_prev_status != NULL)
-    free(chk->str_prev_status);
+    MYFREE(chk->str_prev_status);
   if (chk->alert_ctrl != NULL)
-    free(chk->alert_ctrl);
+    MYFREE(chk->alert_ctrl);
 }
 
 //
@@ -672,7 +672,7 @@ void check_t_getready(struct check_t *chk) {
   if (chk->str_prev_status != NULL)
     return;
   if (g_nb_keep_last_status >= 1) {
-    chk->str_prev_status = (char *)malloc((unsigned long)g_nb_keep_last_status + 1);
+    chk->str_prev_status = (char *)MYMALLOC((unsigned long)g_nb_keep_last_status + 1, chk->str_prev_status);
     memset(chk->str_prev_status, ST_TO_CHAR[ST_UNDEF], (unsigned long int)g_nb_keep_last_status);
     chk->str_prev_status[g_nb_keep_last_status] = '\0';
   }
@@ -828,7 +828,7 @@ int perform_check_program(struct check_t *chk, const struct subst_t *subst, int 
   int r1 = system(s_substitued);
   int r2 = os_wexitstatus(r1);
   my_logf(r2 == NAGIOS_OK ? LL_VERBOSE : LL_ERROR, LP_DATETIME, "%s return code: %i", prefix, r2);
-  free(s_substitued);
+  MYFREE(s_substitued);
   if (r2 < _NAGIOS_FIRST)
     r2 = NAGIOS_UNKNOWN;
   else if (r2 > _NAGIOS_LAST)
@@ -918,10 +918,10 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix,
   } while (s_begins_with(response, "250-"));
   if (!s_begins_with(response, "250 ")) {
     my_logf(LL_ERROR, LP_DATETIME, "%s unexpected answer from server '%s'", prefix, response);
-    free(response);
+    MYFREE(response);
     return ERR_SMTP_BAD_ANSWER_TO_EHLO;
   }
-  free(response);
+  MYFREE(response);
   env->from_orig = env->sender_set ? env->sender : DEFAULT_SMTP_SENDER;
   strncpy(from_buf, env->from_orig, from_buf_len);
   from_buf[from_buf_len - 1] = '\0';
@@ -936,7 +936,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix,
   env->nb_recipients_wanted = 0;
   env->nb_recipients_ok = 0;
   size_t l = strlen(env->recipients) + 1;
-  char *recipients = (char *)malloc(l);
+  char *recipients = (char *)MYMALLOC(l, recipients);
   strncpy(recipients, env->recipients, l);
   char *r = recipients;
   char *next = NULL;
@@ -952,14 +952,14 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env, const char *prefix,
       if (res == CONNRES_OK)
         env->nb_recipients_ok++;
       else if (res != CONNRES_OK && res != CONNRES_UNEXPECTED_ANSWER) {
-        free(recipients);
+        MYFREE(recipients);
         return ERR_SMTP_NETIO;
       }
     }
 
     r = (next == NULL ? &r[strlen(r)] : next);
   }
-  free(recipients);
+  MYFREE(recipients);
 
   if (env->nb_recipients_ok == 0) {
     my_logf(LL_ERROR, LP_DATETIME, "%s no recipient accepted, closing connection", prefix);
@@ -987,12 +987,12 @@ int smtp_mail_sending_post(connection_t *conn, const char *prefix, char *email_r
   char *response = NULL;
   size_t response_size;
   if (conn_read_line_alloc(conn, &response, g_trace_network_traffic, &response_size) < 0) {
-    free(response);
+    MYFREE(response);
     conn_close(conn);
     return ERR_SMTP_NETIO;
   }
   if (!s_begins_with(response, "250 ")) {
-    free(response);
+    MYFREE(response);
     my_logf(LL_ERROR, LP_DATETIME, "%s remote end did not confirm email reception", prefix);
     conn_close(conn);
     return ERR_SMTP_EMAIL_RECEPTION_NOT_CONFIRMED;
@@ -1001,22 +1001,22 @@ int smtp_mail_sending_post(connection_t *conn, const char *prefix, char *email_r
 
 #define QUEUED_AS " queued as "
   size_t l = strlen(response + 1);
-  char *tmp = (char *)malloc(l);
+  char *queued_ref = (char *)MYMALLOC(l, queued_ref);
   int ii;
   for (ii = 0; response[ii] != '\0'; ++ii) {
     if (isupper(response[ii]))
-      tmp[ii] = (char)toupper(response[ii]);
+      queued_ref[ii] = (char)toupper(response[ii]);
     else
-      tmp[ii] = response[ii];
+      queued_ref[ii] = response[ii];
   }
-  tmp[ii] = '\0';
-  if ((e = strstr(tmp, QUEUED_AS)) != NULL) {
-    strncpy(email_ref, response + (e - tmp) + strlen(QUEUED_AS), email_ref_len);
+  queued_ref[ii] = '\0';
+  if ((e = strstr(queued_ref, QUEUED_AS)) != NULL) {
+    strncpy(email_ref, response + (e - queued_ref) + strlen(QUEUED_AS), email_ref_len);
     email_ref[email_ref_len - 1] = '\0';
     my_logf(LL_DEBUG, LP_DATETIME, "%s email received by smart host, ref '%s'", prefix, email_ref);
   }
-  free(tmp);
-  free(response);
+  MYFREE(queued_ref);
+  MYFREE(response);
 
   conn_line_sendf(conn, g_trace_network_traffic, "QUIT");
   conn_close(conn);
@@ -1094,7 +1094,7 @@ UNUSED(subst_len);
   ++last_loop;
   if (last_loop >= loops_nb_alloc) {
     loops_nb_alloc += LOOP_ARRAY_REALLOC_STEP;
-    loops = (struct loop_t *)realloc(loops, (unsigned long int)loops_nb_alloc * sizeof(struct loop_t));
+    loops = (struct loop_t *)MYREALLOC(loops, (unsigned long int)loops_nb_alloc * sizeof(struct loop_t));
   }
 
   struct loop_t *loop = &loops[last_loop];
@@ -1241,7 +1241,7 @@ UNUSED(subst_len);
   char *response = NULL;
   size_t response_size;
   if (conn_read_line_alloc(&conn, &response, g_trace_network_traffic, &response_size) < 0) {
-    free(response);
+    MYFREE(response);
     return ERR_POP3_NETIO;
   }
   char *space = NULL;
@@ -1250,7 +1250,7 @@ UNUSED(subst_len);
     space = strchr(strN, ' ');
   if (!s_begins_with(response, "+OK ") || space == NULL) {
     my_logf(LL_ERROR, LP_DATETIME, "%s unexpected answer from server '%s'", prefix, response);
-    free(response);
+    MYFREE(response);
     conn_close(&conn);
     return ERR_POP3_STAT_ERROR;
   }
@@ -1263,7 +1263,7 @@ UNUSED(subst_len);
       break;
     else {
       my_logf(LL_ERROR, LP_DATETIME, "%s unable to analyze answer from server: '%s'", prefix, response);
-      free(response);
+      MYFREE(response);
       conn_close(&conn);
       return ERR_POP3_STAT_ERROR;
     }
@@ -1282,7 +1282,7 @@ UNUSED(subst_len);
 // 1. Retrieve email headers
 
     if ((r = conn_round_trip(&conn, "+OK ", g_trace_network_traffic, "TOP %d 0", I)) == CONNRES_NETIO) {
-      free(response);
+      MYFREE(response);
       return ERR_POP3_NETIO;
     } else if (r == CONNRES_UNEXPECTED_ANSWER) {
       my_logf(LL_ERROR, LP_DATETIME, "%s unable to analyze email #%d", prefix, I);
@@ -1292,7 +1292,7 @@ UNUSED(subst_len);
     char *header_value = NULL;
     do {
       if (conn_read_line_alloc(&conn, &response, g_trace_network_traffic, &response_size) < 0) {
-        free(response);
+        MYFREE(response);
         return ERR_POP3_NETIO;
       }
 
@@ -1301,7 +1301,7 @@ UNUSED(subst_len);
         char *hv = response + strlen(LOOP_HEADER_REF);
         hv = trim(hv);
         size_t l = strlen(hv) + 1;
-        header_value = (char *)malloc(l);
+        header_value = (char *)MYMALLOC(l, header_value);
         strncpy(header_value, hv, l);
         header_value[l - 1] = '\0';
       }
@@ -1314,8 +1314,8 @@ UNUSED(subst_len);
       loop_manage_retrieved_email(header_value, prefix);
 
       if ((r = conn_round_trip(&conn, "+OK ", g_trace_network_traffic, "DELE %d", I)) == CONNRES_NETIO) {
-        free(header_value);
-        free(response);
+        MYFREE(header_value);
+        MYFREE(response);
         return ERR_POP3_NETIO;
       } else if (r == CONNRES_UNEXPECTED_ANSWER) {
         my_logf(LL_ERROR, LP_DATETIME, "%s cannot delete email %d of reference '%s'", prefix, I, header_value);
@@ -1328,10 +1328,10 @@ UNUSED(subst_len);
       my_logf(LL_DEBUG, LP_DATETIME, "%s Email %d of reference '%s' is not mine, ignoring", prefix, I, header_value);
     }
     if (header_value != NULL)
-      free(header_value);
+      MYFREE(header_value);
   }
 
-  free(response);
+  MYFREE(response);
 
   conn_line_sendf(&conn, g_trace_network_traffic, "QUIT");
   my_logf(LL_DEBUG, LP_DATETIME, "%s closing POP3 connection", prefix);
@@ -1601,7 +1601,7 @@ int execute_alert_smtp(const struct exec_alert_t *exec_alert) {
   char prefix[SMALLSTRSIZE];
 
   size_t l = strlen(exec_alert->alrt->smtp_env.srv.server) + 1;
-  char *smart_hosts = (char *)malloc(l);
+  char *smart_hosts = (char *)MYMALLOC(l, smart_hosts);
   strncpy(smart_hosts, exec_alert->alrt->smtp_env.srv.server, l);
   char *h = smart_hosts;
   char *next = NULL;
@@ -1628,7 +1628,7 @@ int execute_alert_smtp(const struct exec_alert_t *exec_alert) {
 
     h = (next == NULL ? &h[strlen(h)] : next);
   }
-  free (smart_hosts);
+  MYFREE(smart_hosts);
 
   return nb_attempts_done == 0 ? -1 : err_smtp;
 }
@@ -1648,7 +1648,7 @@ int execute_alert_program(const struct exec_alert_t *exec_alert) {
   int r1 = system(s_substitued);
   int r2 = os_wexitstatus(r1);
   my_logf(LL_VERBOSE, LP_DATETIME, "%s return code: %i", prefix, r2);
-  free(s_substitued);
+  MYFREE(s_substitued);
   return r2;
 }
 
@@ -1677,12 +1677,12 @@ int execute_alert_log(const struct exec_alert_t *exec_alert) {
 
     my_logf(LL_VERBOSE, LP_DATETIME, "%s wrote in log '%s':", prefix, f_substitued);
     my_logs(LL_VERBOSE, LP_INDENT, s_substitued);
-    free(s_substitued);
+    MYFREE(s_substitued);
 
     fclose(H);
   }
 
-  free(f_substitued);
+  MYFREE(f_substitued);
   return ret;
 }
 
@@ -2022,13 +2022,13 @@ void almost_neverending_loop() {
 
         // Update status history
       if (g_nb_keep_last_status >= 1) {
-        char *buf = (char *)malloc((unsigned long int)g_nb_keep_last_status + 1);
-        strncpy(buf, chk->str_prev_status + 1, (unsigned long int)g_nb_keep_last_status + 1);
-        strncpy(chk->str_prev_status, buf, (unsigned long int)g_nb_keep_last_status + 1);
+        char *shift_status = (char *)MYMALLOC((unsigned long int)g_nb_keep_last_status + 1, shift_status);
+        strncpy(shift_status, chk->str_prev_status + 1, (unsigned long int)g_nb_keep_last_status + 1);
+        strncpy(chk->str_prev_status, shift_status, (unsigned long int)g_nb_keep_last_status + 1);
         char t[] = "A";
         t[0] = ST_TO_CHAR[chk->status];
         strncat(chk->str_prev_status, t, (unsigned long int)g_nb_keep_last_status + 1);
-        free(buf);
+        MYFREE(shift_status);
       }
 
 // Manage alert
@@ -2275,7 +2275,12 @@ void printhelp() {
 // Print version information
 //
 void printversion() {
-#ifdef DEBUG
+#ifdef DEBUG_DYNMEM
+  printf("\n!!! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! !!!\n");
+  printf("!!! MEMORY DEBUG TURNED ON, USE WITH CAUTION !!!\n");
+  printf("!!! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! !!!\n\n");
+#endif
+#if defined(DEBUG) || defined(DEBUG_DYNMEM)
   printf(PACKAGE_STRING "d\n");
 #else
   printf(PACKAGE_STRING "\n");
@@ -2472,7 +2477,7 @@ void check_t_check(struct check_t *chk, const char *cf, int line_number, int *nb
   ++g_nb_valid_checks;
 
   if (!chk->srv.server_set) {
-    chk->srv.server = (char *)malloc(1);
+    chk->srv.server = (char *)MYMALLOC(1, chk->srv.server);
     strncpy(chk->srv.server, "", 1);
     chk->srv.server_set = TRUE;
   }
@@ -2536,7 +2541,7 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number, int *n
     }
     if (!alrt->log_string_set) {
       size_t n = strlen(DEFAULT_ALERT_LOG_STRING) + 1;
-      alrt->log_string = (char *)malloc(n);
+      alrt->log_string = (char *)MYMALLOC(n, alrt->log_string);
       strncpy(alrt->log_string, DEFAULT_ALERT_LOG_STRING, n);
       alrt->log_string_set = TRUE;
     }
@@ -2850,7 +2855,7 @@ void read_configuration_file(const char *cf, int *nb_errors) {
                     // Variable of type string, need to malloc
                   assert(*cfg->p_pchar_target == NULL)
                   size_t nn = strlen(value) + 1;
-                  *cfg->p_pchar_target = (char *)malloc(nn);
+                  *cfg->p_pchar_target = (char *)MYMALLOC(nn, *cfg->p_pchar_target);
                   strncpy(*cfg->p_pchar_target, value, nn);
                   *cfg->pint_var_set = TRUE;
 
@@ -2929,7 +2934,7 @@ void read_configuration_file(const char *cf, int *nb_errors) {
   assert(g_nb_alerts == cur_alert + 1)
 
   if (line != NULL)
-    free(line);
+    MYFREE(line);
 
   fclose(FCFG);
 
@@ -3003,10 +3008,10 @@ void identify_alerts(int *nb_errors) {
         ++n;
     }
     chk->nb_alerts = n;
-    chk->alert_ctrl = (struct alert_ctrl_t *)malloc(sizeof(struct alert_ctrl_t) * (long unsigned int)n);
+    chk->alert_ctrl = (struct alert_ctrl_t *)MYMALLOC(sizeof(struct alert_ctrl_t) * (long unsigned int)n, chk->alert_ctrl);
     size_t b = strlen(chk->alerts) + 2;
 
-    char *t = (char *)malloc(b);
+    char *t = (char *)MYMALLOC(b, t);
     strncpy(t, chk->alerts, b);
 
     char *next_curs = t;
@@ -3032,7 +3037,7 @@ void identify_alerts(int *nb_errors) {
       }
     }
     chk->nb_alerts = idx;
-    free(t);
+    MYFREE(t);
   }
 
   g_print_log = save_g_print_log;
