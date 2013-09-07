@@ -37,7 +37,7 @@ if test "${enable_debug}" = yes ; then
   CFLAGS="$CFLAGS -DDEBUG -g"
 fi
 
-# Hack to successfully link wuth gcc version 4.6, cf. URL
+# Hack to successfully link with gcc version 4.6, cf. URL
 # http://ubuntuforums.org/showthread.php?p=11347972&posted=1#post11347972
 # It is gruiiik, but don't know how to change the options order
 # in gcc call.
@@ -62,7 +62,7 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([atexit gethostbyname gettimeofday memset select socket strcasecmp strerror strncasecmp strstr])
 
-AC_CHECK_LIB(pthread, pthread_create)
+dnl AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(ssl, SSL_library_init)
 
 AC_OUTPUT(Makefile src/Makefile doc/Makefile)

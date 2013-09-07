@@ -88,7 +88,7 @@ extern size_t const netmon_len;
 extern int g_trace_network_traffic;
 size_t buffer_size = 10000;
 
-extern pthread_mutex_t mutex;
+/*extern pthread_mutex_t mutex;*/
 
 //
 // Create files used for HTML display
@@ -351,14 +351,14 @@ int manage_web_transaction(connection_t *conn) {
     return -1;
   }
 
-  my_pthread_mutex_lock(&mutex);
+/*  my_pthread_mutex_lock(&mutex);*/
 
   my_logf(LL_DEBUG, LP_DATETIME, "path opened: '%s'", path);
   FILE *F = my_fopen(path, "rb", 5, 800);
 
   if (F == NULL) {
     http_send_error_page(conn, "404 Not found", "File not found");
-    my_pthread_mutex_unlock(&mutex);
+/*    my_pthread_mutex_unlock(&mutex);*/
     return -1;
   }
 
@@ -411,7 +411,7 @@ int manage_web_transaction(connection_t *conn) {
   free(buffer);
   fclose(F);
 
-  my_pthread_mutex_unlock(&mutex);
+/*  my_pthread_mutex_unlock(&mutex);*/
 
   return keep_alive ? 0 : -1;
 }

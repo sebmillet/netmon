@@ -41,7 +41,7 @@ int g_print_log = DEFAULT_PRINT_LOG;
 long int g_log_usec = DEFAULT_LOG_USEC;
 FILE *log_fd = NULL;
 
-static pthread_mutex_t util_mutex;
+/*static pthread_mutex_t util_mutex;*/
 
 const struct connection_table_t connection_table[] = {
   {conn_plain_read, "<<< ", conn_plain_write, ">>> "},  // CONNTYPE_PLAIN
@@ -251,28 +251,28 @@ FILE *my_fopen(const char *filename, const char *mode, const int nb_retries, con
   return f;
 }
 
-void my_pthread_mutex_init(pthread_mutex_t *m) {
-  if ((errno = pthread_mutex_init(m, NULL)) != 0) {
-    char s_err[SMALLSTRSIZE];
-    fatal_error("pthread_mutex_init(): %s", errno_error(s_err, sizeof(s_err)));
-  }
-}
+/*void my_pthread_mutex_init(pthread_mutex_t *m) {*/
+/*  if ((errno = pthread_mutex_init(m, NULL)) != 0) {*/
+/*    char s_err[SMALLSTRSIZE];*/
+/*    fatal_error("pthread_mutex_init(): %s", errno_error(s_err, sizeof(s_err)));*/
+/*  }*/
+/*}*/
 
-void util_my_pthread_init() {
-  my_pthread_mutex_init(&util_mutex);
-}
+/*void util_my_pthread_init() {*/
+/*  my_pthread_mutex_init(&util_mutex);*/
+/*}*/
 
-void my_pthread_mutex_lock(pthread_mutex_t *m) {
-  char s_err[SMALLSTRSIZE];
-  if ((errno = pthread_mutex_lock(m)) != 0)
-    fatal_error("pthread_mutex_lock(): %s", errno_error(s_err, sizeof(s_err)));
-}
+/*void my_pthread_mutex_lock(pthread_mutex_t *m) {*/
+/*  char s_err[SMALLSTRSIZE];*/
+/*  if ((errno = pthread_mutex_lock(m)) != 0)*/
+/*    fatal_error("pthread_mutex_lock(): %s", errno_error(s_err, sizeof(s_err)));*/
+/*}*/
 
-void my_pthread_mutex_unlock(pthread_mutex_t *m) {
-  char s_err[SMALLSTRSIZE];
-  if ((errno = pthread_mutex_unlock(m)) != 0)
-    fatal_error("pthread_mutex_unlock(): %s", errno_error(s_err, sizeof(s_err)));
-}
+/*void my_pthread_mutex_unlock(pthread_mutex_t *m) {*/
+/*  char s_err[SMALLSTRSIZE];*/
+/*  if ((errno = pthread_mutex_unlock(m)) != 0)*/
+/*    fatal_error("pthread_mutex_unlock(): %s", errno_error(s_err, sizeof(s_err)));*/
+/*}*/
 
 //
 // Converts errno into a readable string
@@ -444,7 +444,7 @@ int my_is_log_open() {
 // The subst_t array can be NULL (meaning, no substitution to do), in that case n MUST be set to 0
 //
 
-extern pthread_mutex_t mutex;
+/*extern pthread_mutex_t mutex;*/
 
 char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
   size_t sc_len = strlen(s) + 1;
@@ -591,7 +591,7 @@ void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt, size_t dt_len) {
 // Output log string, used by my_log only
 //
 void my_log_core_output(const char *s, size_t dt_len) {
-  my_pthread_mutex_lock(&util_mutex);
+/*  my_pthread_mutex_lock(&util_mutex);*/
 
   if (log_fd) {
     fputs(s, log_fd);
@@ -618,7 +618,7 @@ void my_log_core_output(const char *s, size_t dt_len) {
 
   }
 
-  my_pthread_mutex_unlock(&util_mutex);
+/*  my_pthread_mutex_unlock(&util_mutex);*/
 }
 
 //
