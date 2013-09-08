@@ -689,11 +689,27 @@ void check_t_getready(struct check_t *chk) {
 //
 // Free pointers in the checks variables
 //
-void clean_checks() {
+void destroy_checks() {
   int i;
   for (i = 0; i < g_nb_checks; ++i) {
     check_t_destroy(&checks[i]);
   }
+}
+
+void alert_t_destroy(struct alert_t *alrt) {
+  if (alrt->name != NULL)
+    MYFREE(alrt->name);
+
+  rfc821_enveloppe_t_destroy(&alrt->smtp_env);
+
+  if (alrt->prg_command != NULL)
+    MYFREE(alrt->prg_command);
+
+  if (alrt->log_file != NULL)
+    MYFREE(alrt->log_file);
+
+  if (alrt->log_string != NULL)
+    MYFREE(alrt->log_string);
 }
 
 //
@@ -735,6 +751,16 @@ void alert_t_create(struct alert_t *alrt) {
   alrt->log_file_set = FALSE;
   alrt->log_string = NULL;
   alrt->log_string_set = FALSE;
+}
+
+//
+// Free pointers in the alerts variables
+//
+void destroy_alerts() {
+  int i;
+  for (i = 0; i < g_nb_alerts; ++i) {
+    alert_t_destroy(&alerts[i]);
+  }
 }
 
 //
@@ -2205,6 +2231,10 @@ void terminate(const char *how) {
 #endif
     my_logs(LL_NORMAL, LP_DATETIME, "Service stop request received");
   }
+
+  destroy_checks();
+  destroy_alerts();
+
   my_logf(LL_NORMAL, LP_DATETIME, "%s %s", PACKAGE_NAME, how);
   my_log_close();
 }

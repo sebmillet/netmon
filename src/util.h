@@ -22,8 +22,8 @@
 
 #ifdef DEBUG_DYNMEM
 //
-//#define DEBUG_MALLOC_LOGFILE "/home/sebastien/travail/cpp/seb/netmon/memdbg.log"
-#define DEBUG_MALLOC_LOGFILE "C:\\seb\\netmon\\memdbg.log"
+#define DEBUG_MALLOC_LOGFILE "/home/sebastien/travail/cpp/seb/netmon/memdbg.log"
+//#define DEBUG_MALLOC_LOGFILE "C:\\seb\\netmon\\memdbg.log"
 
 #define MYMALLOC(a, b)  debug_malloc(a, #b, __FILE__, __LINE__)
 #define MYREALLOC(a, b) debug_realloc(a, b, #a, __FILE__, __LINE__)
