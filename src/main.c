@@ -2234,6 +2234,8 @@ void terminate(const char *how) {
 
   destroy_checks();
   destroy_alerts();
+  if (loops != NULL)
+    MYFREE(loops);
 
   my_logf(LL_NORMAL, LP_DATETIME, "%s %s", PACKAGE_NAME, how);
   my_log_close();
