@@ -27,7 +27,7 @@
   //    WRITING IN THIS LOG FILE
   //    CLOSING OF THIS LOG FILE
   //
-#define DEBUG_DYNMEM
+//#define DEBUG_DYNMEM
 
 #ifdef DEBUG_DYNMEM
 
