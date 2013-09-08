@@ -4,6 +4,12 @@
 
 //#define DEBUG
 
+#if defined(_WIN32) || defined(_WIN64)
+#define MY_WINDOWS
+#else
+#define MY_LINUX
+#endif
+
 #include <sys/types.h>
 //#include <pthread.h>
 #include <stdio.h>
@@ -21,9 +27,13 @@
 #define DEBUG_DYNMEM
 
 #ifdef DEBUG_DYNMEM
-//
+
+#ifdef MY_LINUX
 #define DEBUG_MALLOC_LOGFILE "/home/sebastien/travail/cpp/seb/netmon/memdbg.log"
-//#define DEBUG_MALLOC_LOGFILE "C:\\seb\\netmon\\memdbg.log"
+#endif
+#ifdef MY_WINDOWS
+#define DEBUG_MALLOC_LOGFILE "C:\\seb\\netmon\\memdbg.log"
+#endif
 
 #define MYMALLOC(a, b)  debug_malloc(a, #b, __FILE__, __LINE__)
 #define MYREALLOC(a, b) debug_realloc(a, b, #a, __FILE__, __LINE__)
@@ -32,12 +42,6 @@
 #define MYMALLOC(a, b)  malloc(a)
 #define MYREALLOC(a, b) realloc(a, b)
 #define MYFREE(a)       free(a)
-#endif
-
-#if defined(_WIN32) || defined(_WIN64)
-#define MY_WINDOWS
-#else
-#define MY_LINUX
 #endif
 
 #ifdef MY_WINDOWS
