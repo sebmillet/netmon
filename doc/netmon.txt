@@ -9,6 +9,13 @@ NAME
 SYNOPSIS
        netmon [-c config-file] [-l log-file] [OPTIONS]...
 
+       Linux: run netmon "as is" or with -d option for daemon-style.
+
+       Windows:  run  netmon.exe --install to install netmon as a Windows ser‐
+       vice,
+	      allowing automatic startup when Windows starts, without  session
+	      opening.
+
 
 DESCRIPTION
        netmon  is  meant  to do TCP connection tests at regular intervals, and
@@ -16,7 +23,7 @@ DESCRIPTION
        emails  and  checking  they're  received on the target mail box, making
        sure the whole chain in between works fine.
 
-       netmon includes a (very) minimalistic web server.
+       netmon includes a minimalistic web server.
 
 
 OPTIONS
@@ -769,4 +776,4 @@ AUTHOR
 
 
 
-August 2013			  version 1.1			     netmon(1)
+September 2013			  version 1.1			     netmon(1)

@@ -1,6 +1,6 @@
 .\" Written by Sébastien Millet
 .\"
-.TH netmon 1 "version 1.1" "August 2013"
+.TH netmon 1 "version 1.1" "September 2013"
 
 .SH NAME
 .TP
@@ -9,12 +9,17 @@ netmon \- a program to monitor remote TCP ports
 .SH SYNOPSIS
 .TP
 \fBnetmon\fP [-c config-file] [-l log-file] [\fIOPTIONS\fP]...
+.TP
+Linux: run \fBnetmon\fP "as is" or with -d option for daemon-style.
+.TP
+Windows: run \fBnetmon.exe --install\fP to install netmon as a Windows service,
+allowing automatic startup when Windows starts, without session opening.
 
 .SH DESCRIPTION
 .TP
 netmon is meant to do TCP connection tests at regular intervals, and publish the status in an HTML page. It manages emails loops - sending emails and checking they're received on the target mail box, making sure the whole chain in between works fine.
 .TP
-netmon includes a (very) minimalistic web server.
+netmon includes a minimalistic web server.
 
 .SH OPTIONS
 .TP

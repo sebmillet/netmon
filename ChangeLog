@@ -1,4 +1,4 @@
-2013-08-28 Sébastien Millet <sebastien.millet1@club-internet.fr>
+2013-09-08 Sébastien Millet <sebastien.millet1@club-internet.fr>
 
 	* Release 1.1 built
 	* main.c, implemented NT service management (--install, --uninstall options)
@@ -9,6 +9,7 @@
 	* main.c, implemented log_level variable in the ini file
 	* All, replaced multi-threaded logic with multi-processes, pthread seems unstable to be
 		used in a mingw-compiled Windows service application.
+	* Implemented a way to debug memory management (DEBUG_DYNMEM in src/util.h)
 
 2013-04-30 Sébastien Millet <sebastien.millet1@club-internet.fr>
 
