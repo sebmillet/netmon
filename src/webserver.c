@@ -70,15 +70,15 @@ const char *POEM =
   "<p>Tout homme digne de ce nom<br>\015\012"
   "A dans le coeur un Serpent jaune,<br>\015\012"
   "Installé comme sur un trône,<br>\015\012"
-  "Qui, s'il dit&nbsp;: &laquo;Je veux !&raquo; répond&nbsp;: &laquo;Non !&raquo;<br>\015\012"
+  "Qui, s'il dit&nbsp;: &laquo;&nbsp;Je veux !&nbsp;&raquo; répond&nbsp;: &laquo;&nbsp;Non !&nbsp;&raquo;<br>\015\012"
   "<br>\015\012"
   "Plonge tes yeux dans les yeux fixes<br>\015\012"
   "Des Satyresses ou des Nixes,<br>\015\012"
-  "La Dent dit&nbsp;: &laquo;Pense à ton devoir&nbsp;!&raquo;<br>\015\012"
+  "La Dent dit&nbsp;: &laquo;&nbsp;Pense à ton devoir&nbsp;!&nbsp;&raquo;<br>\015\012"
   "<br>\015\012"
   "Fais des enfants, plante des arbres,<br>\015\012"
   "Polis des vers, sculpte des marbres,<br>\015\012"
-  "La Dent dit : &laquo;Vivras-tu ce soir&nbsp?&raquo;<br>\015\012"
+  "La Dent dit : &laquo;&nbsp;Vivras-tu ce soir&nbsp?&nbsp;&raquo;<br>\015\012"
   "<br>\015\012"
   "Quoi qu'il ébauche ou qu'il espère,<br>\015\012"
   "L'homme ne vit pas un moment<br>\015\012"
@@ -113,9 +113,8 @@ extern const char *netmon[];
 extern size_t const netmon_len;
 
 extern int g_trace_network_traffic;
-  // FIXME
-/*size_t buffer_size = 10000;*/
-size_t buffer_size = 30;
+
+const size_t buffer_size = 5000;
 
 //
 // Create files used for HTML display
@@ -354,6 +353,7 @@ int manage_web_transaction(connection_t *conn) {
   const char *internal_content = NULL;
   const char *type_internal_content = NULL;
   size_t size_internal_content = 0;
+  size_t content_length = 0;
 
   if (strcasecmp(url, MAN_EN) == 0)
     fs_concatene(path, FILE_MAN_EN, sizeof(path));
@@ -378,6 +378,7 @@ int manage_web_transaction(connection_t *conn) {
       http_send_error_page(conn, "404 Not found", s_err);
       return -1;
     }
+    content_length = (size_t)s.st_size;
   }
 
   char dt_fileupdate[50];
@@ -419,6 +420,7 @@ int manage_web_transaction(connection_t *conn) {
   } else {
     strncpy(dt_fileupdate, dt_now, sizeof(dt_fileupdate));
     content_type = type_internal_content;
+    content_length = size_internal_content;
   }
 
     // No way to work with binary files and kep-alive? I don't find...
@@ -426,7 +428,7 @@ int manage_web_transaction(connection_t *conn) {
 
   conn_line_sendf(conn, g_trace_network_traffic, "HTTP/1.1 200 OK");
   conn_line_sendf(conn, g_trace_network_traffic, "Connection: %s", keep_alive ? "keep-alive" : "close");
-  conn_line_sendf(conn, g_trace_network_traffic, "Content-length: %li", (long int)s.st_size);
+  conn_line_sendf(conn, g_trace_network_traffic, "Content-length: %lu", (long unsigned int)content_length);
   conn_line_sendf(conn, g_trace_network_traffic, "Content-type: %s", content_type);
   conn_line_sendf(conn, g_trace_network_traffic, "Date: %s", dt_now);
   conn_line_sendf(conn, g_trace_network_traffic, "Last-modified: %s", dt_fileupdate);

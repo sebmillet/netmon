@@ -3455,7 +3455,7 @@ UNUSED(argc);
 
     umask(0);
 
-    printf("Daemon pid = %lu\n", (long unsigned)getpid());
+    printf("\nDaemon pid = %lu\n\n", (long unsigned)getpid());
 
     pid_t sid = setsid();
     if(sid < 0)

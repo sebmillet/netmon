@@ -1054,8 +1054,6 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
     return -1;
   }
 
-    // FIXME, used to be malloc'ed but the instruction free(tmp) (later)
-    // crashes the code...
   size_t l = (long int)(strlen(fmt) + 100);
   char *to_send = (char *)MYMALLOC(l + 1, to_send);
 
