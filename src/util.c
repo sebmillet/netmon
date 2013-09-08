@@ -92,14 +92,14 @@ char *os_last_err_desc_n(char *s, const size_t s_len, const long unsigned e) {
   LPVOID lpMsgBuf;
   FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
     NULL, e, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, NULL);
-  char tmp[ERR_STR_BUFSIZE];
-  strncpy(tmp, (char *)lpMsgBuf, sizeof(tmp));
-  int n = strlen(tmp);
+  char error[ERR_STR_BUFSIZE];
+  strncpy(error, (char *)lpMsgBuf, sizeof(error));
+  int n = strlen(error);
   if (n >= 2) {
-    if (tmp[n - 2] == '\r' && tmp[n - 1] == '\n')
-      tmp[n - 2] = '\0';
+    if (error[n - 2] == '\r' && error[n - 1] == '\n')
+      error[n - 2] = '\0';
   }
-  snprintf(s, s_len, "code=%lu (%s)", e, tmp);
+  snprintf(s, s_len, "code=%lu (%s)", e, error);
 /*  WSACleanup();*/
   return s;
 }
@@ -300,29 +300,6 @@ FILE *my_fopen(const char *filename, const char *mode, const int nb_retries, con
   return f;
 }
 
-/*void my_pthread_mutex_init(pthread_mutex_t *m) {*/
-/*  if ((errno = pthread_mutex_init(m, NULL)) != 0) {*/
-/*    char s_err[SMALLSTRSIZE];*/
-/*    fatal_error("pthread_mutex_init(): %s", errno_error(s_err, sizeof(s_err)));*/
-/*  }*/
-/*}*/
-
-/*void util_my_pthread_init() {*/
-/*  my_pthread_mutex_init(&util_mutex);*/
-/*}*/
-
-/*void my_pthread_mutex_lock(pthread_mutex_t *m) {*/
-/*  char s_err[SMALLSTRSIZE];*/
-/*  if ((errno = pthread_mutex_lock(m)) != 0)*/
-/*    fatal_error("pthread_mutex_lock(): %s", errno_error(s_err, sizeof(s_err)));*/
-/*}*/
-
-/*void my_pthread_mutex_unlock(pthread_mutex_t *m) {*/
-/*  char s_err[SMALLSTRSIZE];*/
-/*  if ((errno = pthread_mutex_unlock(m)) != 0)*/
-/*    fatal_error("pthread_mutex_unlock(): %s", errno_error(s_err, sizeof(s_err)));*/
-/*}*/
-
 //
 // Converts errno into a readable string
 //
@@ -449,16 +426,16 @@ void fatal_error(const char *format, ...) {
   va_list args;
   va_start(args, format);
 
-  char str[REGULAR_STR_STRBUFSIZE];
-  vsnprintf(str, sizeof(str), format, args);
+  char fatal[REGULAR_STR_STRBUFSIZE];
+  vsnprintf(fatal, sizeof(fatal), format, args);
 
   if (my_is_log_open()) {
-    my_logf(LL_ERROR, LP_DATETIME, "FATAL: %s", str);
+    my_logf(LL_ERROR, LP_DATETIME, "FATAL: %s", fatal);
     my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_NAME " aborted");
   }
 
-  strncat(str, "\n", sizeof(str));
-  fprintf(stderr, str, NULL);
+  strncat(fatal, "\n", sizeof(fatal));
+  fprintf(stderr, fatal, NULL);
   va_end(args);
   exit(EXIT_FAILURE);
 }
@@ -695,15 +672,15 @@ void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *f
     return;
 
   char dt[REGULAR_STR_STRBUFSIZE];
-  char str[REGULAR_STR_STRBUFSIZE];
+  char log_string[REGULAR_STR_STRBUFSIZE];
   my_log_core_get_dt_str(log_disp, dt, sizeof(dt));
   va_list args;
   va_start(args, format);
-  vsnprintf(str, sizeof(str), format, args);
+  vsnprintf(log_string, sizeof(log_string), format, args);
   va_end(args);
   strncat(dt, LOG_AFTER_TIMESTAMP, sizeof(dt));
   size_t dt_len = strlen(dt);
-  strncat(dt, str, sizeof(dt));
+  strncat(dt, log_string, sizeof(dt));
   my_log_core_output(dt, dt_len);
 }
 

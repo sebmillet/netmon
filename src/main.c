@@ -1884,7 +1884,7 @@ void manage_output(const struct tm *now_done, float elapsed) {
       strncpy(short_display_name, chk->display_name, (unsigned)g_display_name_width + 1);
       short_display_name[g_display_name_width] = '\0';
 
-      char f[50];
+      char f[SMALLSTRSIZE];
       if (g_nb_keep_last_status >= 1) {
         snprintf(f, sizeof(f), "%%-%lis %%s |%%s| %%s\n", g_display_name_width);
         printf(f, short_display_name, ST_TO_STR2[chk->status], chk->str_prev_status, lsc);
@@ -2659,13 +2659,13 @@ char *get_path(char *f) {
 //   directory.
 //
 void build_definitive_html_directory() {
-    char tmp[MAX_PATH];
+    char log_base[MAX_PATH];
     char target[MAX_PATH];
-    strncpy(tmp, g_log_file, sizeof(tmp));
-    tmp[sizeof(tmp) - 1] = '\0';
-    get_path(tmp);
+    strncpy(log_base, g_log_file, sizeof(log_base));
+    log_base[sizeof(log_base) - 1] = '\0';
+    get_path(log_base);
 
-    build_file_complete_name(tmp, g_html_directory, target, sizeof(target));
+    build_file_complete_name(log_base, g_html_directory, target, sizeof(target));
     strncpy(g_html_directory, target, sizeof(g_html_directory));
     g_html_directory[sizeof(g_html_directory) - 1] = '\0';
 }
@@ -3215,27 +3215,27 @@ void config_display() {
     if (!chk->is_valid)
       continue;
 
-    char t[BIGSTRSIZE];
-    strncpy(t, "", sizeof(t));
+    char list_alerts[BIGSTRSIZE];
+    strncpy(list_alerts, "", sizeof(list_alerts));
     int II;
     for (II = 0; II < chk->nb_alerts; ++II) {
-      if (strlen(t) >= 1)
-        strncat(t, ", ", sizeof(t));
-      strncat(t, alerts[chk->alert_ctrl[II].idx].name, sizeof(t));
+      if (strlen(list_alerts) >= 1)
+        strncat(list_alerts, ", ", sizeof(list_alerts));
+      strncat(list_alerts, alerts[chk->alert_ctrl[II].idx].name, sizeof(list_alerts));
     }
-    t[sizeof(t) - 1] = '\0';
+    list_alerts[sizeof(list_alerts) - 1] = '\0';
 
     if (chk->method == CM_TCP) {
       my_logf(LL_NORMAL, LP_DATETIME, "To check: TCP - '%s' [%s:%i], %s%s%s, %s%s", chk->display_name, chk->srv.server, chk->srv.port,
         chk->tcp_expect_set ? "expect \"" : "no expect", chk->tcp_expect_set ? chk->tcp_expect : "", chk->tcp_expect_set ? "\"" : "",
-        chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? t : "");
+        chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? list_alerts : "");
     } else if (chk->method == CM_PROGRAM) {
       my_logf(LL_NORMAL, LP_DATETIME, "To check: PROGRAM - '%s' [%s], %s%s", chk->display_name, chk->prg_command, 
-        chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? t : "");
+        chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? list_alerts : "");
     } else if (chk->method == CM_LOOP) {
       my_logf(LL_NORMAL, LP_DATETIME, "To check: LOOP - '%s', %s, %s(%s), %s%s", chk->display_name,
         chk->loop_smtp.srv.server, chk->loop_pop3.srv.server, chk->loop_pop3.user,
-        chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? t : "");
+        chk->alerts_set ? "alerts: " : "no alert", chk->alerts_set ? list_alerts : "");
     }
   }
 }
