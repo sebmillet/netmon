@@ -1,3 +1,10 @@
+2014-04-16 Sébastien Millet <sebastien.millet1@club-internet.fr>
+
+	* Release 1.1.1 built
+	* Updated README for compilation instructions with libssl under Linux
+	* Fixed a bug with email retrieval on certain POP3 servers ('loop' check)
+	* Added libcrypto to configure.ac checks to ensure proper linking (-lcrypto) during generation
+
 2013-09-08 Sébastien Millet <sebastien.millet1@club-internet.fr>
 
 	* Release 1.1 built

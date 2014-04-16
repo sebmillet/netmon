@@ -50,6 +50,12 @@ instructions to compile and install the program, using the usual
 sequence.
 This INSTALL file is the one provided by default by autotools.
 
+  Note about SSL
+  The SSL feature requires SSL development library to be available on the
+  system you compile on. The package name is libssl-dev for DEB packages and
+  openssl-devel (not tested) in RPM ones. For example under Ubuntu, execute:
+    sudo apt-get install libssl-dev
+
 - Windows
 
 1) You have to install Mingw and run
@@ -62,13 +68,18 @@ This INSTALL file is the one provided by default by autotools.
   Libs in c:\openssl\lib
   Includes in c:\openssl\include
 
-3) pthreads must be available for static linking in c:\pthreads, see below for
+3) OBSOLETE - pthreads must be available for static linking in c:\pthreads, see below for
   instructions as to how to build it. To be more precise:
   Libs in c:\pthreads
   Includes in c:\pthreads
 
-If openssl or pthreads is not available in the directories mentionned above,
-see below the paragraph "Mingw makefile generation" to rebuild makefile.
+  *IMPORTANT*
+  pthread library is no longer used in netmon, pthread mention is left for
+  history...
+
+If openssl (or pthreads for old netmon versions) is not available in the
+directories mentionned above, see below the paragraph "Mingw makefile
+generation" to rebuild makefile.
 
 Borland was not tested, neither Visual C++. If ever used, one showstopper to
 fix will be the getopt library, used to parse long options.
@@ -105,6 +116,10 @@ To build a static version of openssl with mingw, see the following URLs:
 
 To build a static version of pthreads with mingw, see the following URL:
     http://www.sourceware.org/pthreads-win32/
+
+  *IMPORTANT*
+  pthread library is no longer used in netmon, this note is left here for
+  history...
 
   Instructions:
 

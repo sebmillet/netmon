@@ -1,4 +1,4 @@
-netmon 1.1 start
+netmon 1.1.1 start
 Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 2: variable display_name not allowed in this section
 Configuration file 'netmon.ini', line 3: variable check_interval not allowed in this section
@@ -131,7 +131,7 @@ keep_last_status = 15
 display_name_width = 20
 html_directory = ../www
 html_file = status.html
-html_title = netmon 1.1
+html_title = netmon 1.1.1
 html_refresh_interval = 20
 Valid check(s) defined: 3
 Run web server: no

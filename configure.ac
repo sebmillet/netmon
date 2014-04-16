@@ -5,7 +5,7 @@
 
 AC_PREREQ([2.68])
 
-AC_INIT([netmon], [1.1], [sebastien.millet1@club-internet.fr])
+AC_INIT([netmon], [1.1.1], [sebastien.millet1@club-internet.fr])
 
 AC_CONFIG_SRCDIR([src/main.h])
 AC_CONFIG_AUX_DIR([admin])
@@ -64,6 +64,7 @@ AC_CHECK_FUNCS([atexit gethostbyname gettimeofday memset select socket strcasecm
 
 dnl AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(ssl, SSL_library_init)
+AC_CHECK_LIB(crypto, ERR_error_string_n)
 
 AC_OUTPUT(Makefile src/Makefile doc/Makefile)
 

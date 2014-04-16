@@ -1,6 +1,6 @@
 // main.c
 
-// Copyright Sébastien Millet, 2013
+// Copyright Sébastien Millet, 2013, 2014
 
 #include "main.h"
 
@@ -1235,11 +1235,11 @@ UNUSED(subst_len);
 
   int r;
 
-  int cr = conn_establish_connection(&conn, &pop3->srv, DEFAULT_POP3_PORT, "+OK ", prefix, g_trace_network_traffic);
+  int cr = conn_establish_connection(&conn, &pop3->srv, DEFAULT_POP3_PORT, "+OK", prefix, g_trace_network_traffic);
   if (cr != CONNRES_OK)
     return (cr == CONNRES_RESOLVE_ERROR ? ERR_POP3_RESOLVE_ERROR : ERR_POP3_NETIO);
 
-  if ((r = conn_round_trip(&conn, "+OK ", g_trace_network_traffic, "USER %s", pop3->user)) != CONNRES_OK) {
+  if ((r = conn_round_trip(&conn, "+OK", g_trace_network_traffic, "USER %s", pop3->user)) != CONNRES_OK) {
     if (r != CONNRES_NETIO) {
       conn_line_sendf(&conn, g_trace_network_traffic, "QUIT");
       my_logf(LL_ERROR, LP_DATETIME, "%s user not accepted, closing connection", prefix);
@@ -1250,7 +1250,7 @@ UNUSED(subst_len);
     }
   }
 
-  if ((r = conn_round_trip(&conn, "+OK ", g_trace_network_traffic, "PASS %s", pop3->password)) != CONNRES_OK) {
+  if ((r = conn_round_trip(&conn, "+OK", g_trace_network_traffic, "PASS %s", pop3->password)) != CONNRES_OK) {
     if (r != CONNRES_NETIO) {
       conn_line_sendf(&conn, g_trace_network_traffic, "QUIT");
       my_logf(LL_ERROR, LP_DATETIME, "%s user not accepted, closing connection", prefix);
@@ -1274,7 +1274,7 @@ UNUSED(subst_len);
   char *strN = response + 4;
   if (strlen(response) >= 5)
     space = strchr(strN, ' ');
-  if (!s_begins_with(response, "+OK ") || space == NULL) {
+  if (!s_begins_with(response, "+OK") || space == NULL) {
     my_logf(LL_ERROR, LP_DATETIME, "%s unexpected answer from server '%s'", prefix, response);
     MYFREE(response);
     conn_close(&conn);
@@ -1307,7 +1307,7 @@ UNUSED(subst_len);
 
 // 1. Retrieve email headers
 
-    if ((r = conn_round_trip(&conn, "+OK ", g_trace_network_traffic, "TOP %d 0", I)) == CONNRES_NETIO) {
+    if ((r = conn_round_trip(&conn, "+OK", g_trace_network_traffic, "TOP %d 0", I)) == CONNRES_NETIO) {
       MYFREE(response);
       return ERR_POP3_NETIO;
     } else if (r == CONNRES_UNEXPECTED_ANSWER) {
@@ -1339,7 +1339,7 @@ UNUSED(subst_len);
       my_logf(LL_DEBUG, LP_DATETIME, "%s email %d of reference '%s' is mine", prefix, I, header_value);
       loop_manage_retrieved_email(header_value, prefix);
 
-      if ((r = conn_round_trip(&conn, "+OK ", g_trace_network_traffic, "DELE %d", I)) == CONNRES_NETIO) {
+      if ((r = conn_round_trip(&conn, "+OK", g_trace_network_traffic, "DELE %d", I)) == CONNRES_NETIO) {
         MYFREE(header_value);
         MYFREE(response);
         return ERR_POP3_NETIO;
@@ -2317,7 +2317,7 @@ void printversion() {
 #else
   printf(PACKAGE_STRING "\n");
 #endif
-  printf("Copyright 2013 Sébastien Millet\n");
+  printf("Copyright 2013, 2014 Sébastien Millet\n");
 	printf("This program is free software; you may redistribute it under the terms of\n");
 	printf("the GNU General Public License version 3 or (at your option) any later version.\n");
 	printf("This program has absolutely no warranty.\n");

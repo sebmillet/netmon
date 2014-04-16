@@ -1,4 +1,4 @@
-netmon 1.1 start
+netmon 1.1.1 start
 Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 3: variable name not allowed in this section
 Configuration file 'netmon.ini', line 4: syntax error
@@ -243,7 +243,7 @@ keep_last_status = 15
 display_name_width = 20
 html_directory = ../www
 html_file = status.html
-html_title = netmon 1.1
+html_title = netmon 1.1.1
 html_refresh_interval = 20
 Valid check(s) defined: 5
 Run web server: no
@@ -259,8 +259,8 @@ TCP check(Local FTP): connecting to Localhost:21...
 Running gethosbyname() on Localhost
 TCP check(Local FTP): will connect to Localhost:21, connect timeout = 5, netio timeout = 10
 TCP check(Local FTP): connected to Localhost:21
-<<< 220 (vsFTPd 2.3.5)
-TCP check(Local FTP): received unexpected answer: '220 (vsFTPd 2.3.5)' (expected '221 ')
+<<< 220 (vsFTPd 3.0.2)
+TCP check(Local FTP): received unexpected answer: '220 (vsFTPd 3.0.2)' (expected '221 ')
 Local FTP -> ** KO **
 Performing check tcp(Local HTTP)
 TCP check(Local HTTP): connecting to 127.0.0.1:80...
