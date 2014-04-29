@@ -347,7 +347,7 @@ INITIALIZATION FILES
 		normal
 		verbose
 		debug
-		debugtrace (debug + network traffic)
+		trace (debug + network traffic)
 
 
        Variables of the [check] sections
