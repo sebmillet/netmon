@@ -186,7 +186,7 @@ Local HTTP -> ok
 Performing check tcp(Local SMTP)
 TCP check(Local SMTP): connecting to My SMTP:25...
 Running gethosbyname() on My SMTP
-Unknown host My SMTP, code=110 (Connection timed out)
+Unknown host My SMTP, code=0 (Success)
 Local SMTP -> ** ?? **
 Performing check tcp(My POP3)
 TCP check(My POP3): connecting to localhost:13529...
@@ -197,7 +197,7 @@ My POP3 -> ** KO **
 Performing check tcp(Test avec nom inconnu)
 TCP check(Test avec nom inconnu): connecting to a.b.c:25...
 Running gethosbyname() on a.b.c
-Unknown host a.b.c, code=110 (Connection timed out)
+Unknown host a.b.c, code=0 (Success)
 Test avec nom inconnu -> ** ?? **
 Check done in 0.123450s
 netmon end

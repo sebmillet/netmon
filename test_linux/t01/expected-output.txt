@@ -149,7 +149,7 @@ my Localhost -> ** KO **
 Performing check tcp(ab544abcbcbczc31415911)
 TCP check(ab544abcbcbczc31415911): connecting to ab544abcbcbczc31415911:18...
 Running gethosbyname() on ab544abcbcbczc31415911
-Unknown host ab544abcbcbczc31415911, code=110 (Connection timed out)
+Unknown host ab544abcbcbczc31415911, code=0 (Success)
 ab544abcbcbczc31415911 -> ** ?? **
 Performing check program(my program check)
 Program check(my program check): will execute the command:

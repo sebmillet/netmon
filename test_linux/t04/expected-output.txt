@@ -258,7 +258,7 @@ My POP3 -> ** KO **
 Performing check tcp(Test avec nom inconnu)
 TCP check(Test avec nom inconnu): connecting to a.b.c:25...
 Running gethosbyname() on a.b.c
-Unknown host a.b.c, code=110 (Connection timed out)
+Unknown host a.b.c, code=0 (Success)
 Test avec nom inconnu -> ** ?? **
 Check done in 0.123450s
 netmon end
