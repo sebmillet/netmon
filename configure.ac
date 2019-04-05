@@ -1,11 +1,11 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-# Sébastien Millet, December 2012
+# Sébastien Millet, December 2012, 2019
 
 AC_PREREQ([2.68])
 
-AC_INIT([netmon], [1.1.1], [sebastien.millet1@club-internet.fr])
+AC_INIT([netmon], [1.1.2], [sebastien.millet1@club-internet.fr])
 
 AC_CONFIG_SRCDIR([src/main.h])
 AC_CONFIG_AUX_DIR([admin])

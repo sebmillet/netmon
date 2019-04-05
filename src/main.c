@@ -3216,11 +3216,11 @@ void config_display() {
       continue;
 
     char list_alerts[BIGSTRSIZE];
-    strncpy(list_alerts, "", sizeof(list_alerts));
+    strncpy(list_alerts, "", sizeof(list_alerts) - 1);
     int II;
     for (II = 0; II < chk->nb_alerts; ++II) {
       if (strlen(list_alerts) >= 1)
-        strncat(list_alerts, ", ", sizeof(list_alerts));
+        strncat(list_alerts, ", ", sizeof(list_alerts) - 1);
       strncat(list_alerts, alerts[chk->alert_ctrl[II].idx].name, sizeof(list_alerts));
     }
     list_alerts[sizeof(list_alerts) - 1] = '\0';

@@ -305,7 +305,7 @@ int manage_web_transaction(connection_t *conn) {
 
   while (*p != '\0' && *p != ' ')
     ++p;
-  if (p != '\0') {
+  if (*p != '\0') {
     *p = '\0';
     ++p;
   }

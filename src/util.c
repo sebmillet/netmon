@@ -434,7 +434,7 @@ void fatal_error(const char *format, ...) {
     my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_NAME " aborted");
   }
 
-  strncat(fatal, "\n", sizeof(fatal));
+  strncat(fatal, "\n", sizeof(fatal) - 1);
   fprintf(stderr, fatal, NULL);
   va_end(args);
   exit(EXIT_FAILURE);
@@ -499,7 +499,7 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst, int n) {
         if (g_print_subst_error) {
           strncpy(var2, SUBST_ERROR_PREFIX, sizeof(var2));
           strncat(var2, var, sizeof(var2));
-          strncat(var2, SUBST_ERROR_POSTFIX, sizeof(var2));
+          strncat(var2, SUBST_ERROR_POSTFIX, sizeof(var2) - 1);
         } else {
           strncpy(var2, "", sizeof(var2));
         }
@@ -657,7 +657,7 @@ void my_logs(const loglevel_t log_level, const logdisp_t log_disp, const char *s
   char dt[REGULAR_STR_STRBUFSIZE];
 
   my_log_core_get_dt_str(log_disp, dt, sizeof(dt));
-  strncat(dt, LOG_AFTER_TIMESTAMP, sizeof(dt));
+  strncat(dt, LOG_AFTER_TIMESTAMP, sizeof(dt) - 1);
   size_t dt_len = strlen(dt);
   strncat(dt, s, sizeof(dt));
   my_log_core_output(dt, dt_len);
@@ -678,7 +678,7 @@ void my_logf(const loglevel_t log_level, const logdisp_t log_disp, const char *f
   va_start(args, format);
   vsnprintf(log_string, sizeof(log_string), format, args);
   va_end(args);
-  strncat(dt, LOG_AFTER_TIMESTAMP, sizeof(dt));
+  strncat(dt, LOG_AFTER_TIMESTAMP, sizeof(dt) - 1);
   size_t dt_len = strlen(dt);
   strncat(dt, log_string, sizeof(dt));
   my_log_core_output(dt, dt_len);
