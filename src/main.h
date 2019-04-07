@@ -20,8 +20,7 @@
 
 void os_set_sock_nonblocking_mode(int sock);
 
-enum
-{
+enum {
     ST_UNDEF = 0,
     ST_UNKNOWN = 1,
     ST_OK = 2,
@@ -29,8 +28,7 @@ enum
     _ST_LAST = 3,
     _ST_NBELEMS = 4
 };
-enum
-{
+enum {
     ERR_SMTP_OK = 0,
     ERR_SMTP_RESOLVE_ERROR,
     ERR_SMTP_NETIO,
@@ -41,8 +39,7 @@ enum
     ERR_SMTP_EMAIL_RECEPTION_NOT_CONFIRMED,
     ERR_SMTP_INVALID_PORT_NUMBER
 };
-enum
-{
+enum {
     ERR_POP3_OK = 0,
     ERR_POP3_INVALID_PORT_NUMBER,
     ERR_POP3_USER_REJECTED,
@@ -55,23 +52,20 @@ enum
 
 // Used for HTML page image files (small icons giving the status
 // of an entry)
-struct img_file_t
-{
+struct img_file_t {
     const char *file_name;
     const char *var;
     size_t var_len;
 };
 
-struct alert_ctrl_t
-{
+struct alert_ctrl_t {
     int idx;
     int alert_status;
     int trigger_sequence;
     int nb_failures;
 };
 
-struct rfc821_enveloppe_t
-{
+struct rfc821_enveloppe_t {
     conn_def_t srv;
     char *self;
     char *sender;
@@ -86,8 +80,7 @@ struct rfc821_enveloppe_t
     char *from;
 };
 
-struct pop3_account_t
-{
+struct pop3_account_t {
     conn_def_t srv;
     char *user;
     char *password;
@@ -96,16 +89,14 @@ struct pop3_account_t
 };
 
 enum {LE_NONE = 0, LE_SENT = 1, LE_RECEIVED = 2};
-struct loop_t
-{
+struct loop_t {
     int status;
     char loop_ref[LOOP_REF_SIZE];
     time_t sent_time;
     time_t received_time;
 };
 
-struct check_t
-{
+struct check_t {
 
 // 1. Defined at build time
 
@@ -170,8 +161,7 @@ struct check_t
     int trigger_sequence;
 };
 
-struct alert_t
-{
+struct alert_t {
     int is_valid;
 
     char *name;
@@ -208,8 +198,7 @@ struct alert_t
 
 // Used to read ini file
 enum {V_STR, V_INT, V_YESNO, V_STRKEY};
-struct readcfg_var_t
-{
+struct readcfg_var_t {
     const char *name;
     int var_type;
     int section;
@@ -224,16 +213,14 @@ struct readcfg_var_t
     int method;
 };
 // Used in confunction with readcfg_var_t to read ini file
-struct section_method_mgmt_t
-{
+struct section_method_mgmt_t {
     const char **names;
     int *guess_method;
     long int *method;
     int *method_set;
 };
 
-struct exec_alert_t
-{
+struct exec_alert_t {
     int status;
     int alert_status;
     struct alert_t *alrt;

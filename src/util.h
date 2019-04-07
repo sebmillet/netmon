@@ -115,8 +115,7 @@ void dbg_write(const char *fmt, ...);
 #define UNUSED(x) (void)(x)
 
 // Level of log
-typedef enum
-{
+typedef enum {
     LL_ERROR = 0,
     LL_WARNING = 1,
     LL_NORMAL = 2,
@@ -129,8 +128,7 @@ typedef enum
 // Type of prefix output in the log
 typedef enum {LP_DATETIME, LP_NOTHING, LP_INDENT} logdisp_t;
 // Return value of socket-based functions
-enum
-{
+enum {
     CONNRES_OK,
     CONNRES_NETIO,
     CONNRES_UNEXPECTED_ANSWER,
@@ -141,8 +139,7 @@ enum
     CONNRES_INVALID_PORT_NUMBER
 };
 
-struct subst_t
-{
+struct subst_t {
     const char *find;
     const char *replace;
 };
@@ -154,8 +151,7 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
 enum {CONNTYPE_PLAIN = 0, CONNTYPE_SSL = 1};
 
 // Definition of a connection
-typedef struct
-{
+typedef struct {
     char *server;
     long int port;
     long int crypt;
@@ -170,8 +166,7 @@ typedef struct
 
 // Live connection
 typedef struct connection connection_t;
-typedef struct connection
-{
+typedef struct connection {
     int type;
     int sock;
     SSL *ssl;
@@ -182,8 +177,7 @@ typedef struct connection
     const char *log_prefix_sent;
 } connection_t;
 
-struct connection_table_t
-{
+struct connection_table_t {
     ssize_t (*sock_read)(connection_t *, void *, const size_t);
     const char *log_prefix_received;
     ssize_t (*sock_write)(connection_t *, void *, const size_t);

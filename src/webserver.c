@@ -47,16 +47,14 @@
 #define DEFAULT_WEBSERVER_PORT 8080
 #endif
 
-struct img_file_t img_files[_ST_NBELEMS] =
-{
+struct img_file_t img_files[_ST_NBELEMS] = {
     {"st-undef.png", NULL, 0},      // ST_UNDEF
     {"st-unknown.png", NULL, 0},    // ST_UNKNOWN
     {"st-ok.png", NULL, 0},             // ST_OK
     {"st-fail.png", NULL, 0}            // ST_FAIL
 };
 
-const char *ST_TO_BGCOLOR_FORHTML[_ST_NBELEMS] =
-{
+const char *ST_TO_BGCOLOR_FORHTML[_ST_NBELEMS] = {
     "#FFFFFF", // ST_UNDEF
     "#B0B0B0", // ST_UNKNOWN
     "#00FF00", // ST_OK
@@ -121,8 +119,7 @@ const size_t buffer_size = 5000;
 //
 // Create files used for HTML display
 //
-void web_create_files_for_web()
-{
+void web_create_files_for_web() {
     char buf[BIGSTRSIZE];
 
     img_files[ST_UNDEF].var = st_undef;
@@ -138,28 +135,22 @@ void web_create_files_for_web()
             "Will create image files in html directory");
 
     int i;
-    for (i = 0; i <= _ST_LAST; ++i)
-    {
+    for (i = 0; i <= _ST_LAST; ++i) {
         strncpy(buf, g_html_directory, sizeof(buf));
         fs_concatene(buf, img_files[i].file_name, sizeof(buf));
         FILE *IMG = my_fopen(buf, "wb", 1, 0);
 
-        if (IMG == NULL)
-        {
+        if (IMG == NULL) {
             my_logf(LL_ERROR, LP_DATETIME, "Unable to create %s", buf);
-        }
-        else
-        {
+        } else {
             int j;
             const char const *v = img_files[i].var;
             size_t l = img_files[i].var_len;
 
             /*      dbg_write("Creating %s of size %lu\n", buf, l);*/
 
-            if (IMG != NULL)
-            {
-                for (j = 0; (unsigned int)j < l; ++j)
-                {
+            if (IMG != NULL) {
+                for (j = 0; (unsigned int)j < l; ++j) {
                     fputc(v[j], IMG);
                 }
                 fclose(IMG);
@@ -173,15 +164,11 @@ void web_create_files_for_web()
     fs_concatene(buf, FILE_MAN_EN, sizeof(buf));
     FILE *IMG = my_fopen(buf, "w", 1, 0);
 
-    if (IMG == NULL)
-    {
+    if (IMG == NULL) {
         my_logf(LL_ERROR, LP_DATETIME, "Unable to create %s", buf);
-    }
-    else
-    {
+    } else {
         int j;
-        for (j = 0; (unsigned)j < netmon_len; ++j)
-        {
+        for (j = 0; (unsigned)j < netmon_len; ++j) {
             fputs(netmon[j], IMG);
         }
         fclose(IMG);
@@ -194,15 +181,14 @@ void web_create_files_for_web()
 // Start server listening
 // Return 1 if OK, 0 if error
 //
-int server_listen(int listen_port, const char *prefix, connection_t *conn)
-{
+int server_listen(int listen_port, const char *prefix,
+                  connection_t *conn) {
     struct sockaddr_in listen_sa;
 
     char s_err[ERR_STR_BUFSIZE];
 
     conn->sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (conn->sock == -1)
-    {
+    if (conn->sock == -1) {
         my_logf(LL_ERROR, LP_DATETIME, "%s: error creating socket, error %s",
                 prefix, os_last_err_desc(s_err, sizeof(s_err)));
         return 0;
@@ -212,8 +198,7 @@ int server_listen(int listen_port, const char *prefix, connection_t *conn)
     socklen_t bOptLen = sizeof(int);
     if (setsockopt(conn->sock, SOL_SOCKET, SO_REUSEADDR,
                    (char *)&bOptVal, bOptLen)
-            == SOCKET_ERROR)
-    {
+            == SOCKET_ERROR) {
         my_logf(LL_ERROR, LP_DATETIME, "%s: cannot set socket option, error %s",
                 prefix, os_last_err_desc(s_err, sizeof(s_err)));
         conn_close(conn);
@@ -225,15 +210,13 @@ int server_listen(int listen_port, const char *prefix, connection_t *conn)
     listen_sa.sin_family = AF_INET;
 
     if (bind(conn->sock, (struct sockaddr*)&listen_sa, sizeof(listen_sa))
-            == SOCKET_ERROR)
-    {
+            == SOCKET_ERROR) {
         my_logf(LL_ERROR, LP_DATETIME, "%s: cannot bind, error %s", prefix,
                 os_last_err_desc(s_err, sizeof(s_err)));
         conn_close(conn);
         return 0;
     }
-    if (listen(conn->sock, SOMAXCONN) == SOCKET_ERROR)
-    {
+    if (listen(conn->sock, SOMAXCONN) == SOCKET_ERROR) {
         my_logf(LL_ERROR, LP_DATETIME, "%s: cannot listen, error %s", prefix,
                 os_last_err_desc(s_err, sizeof(s_err)));
         conn_close(conn);
@@ -249,8 +232,7 @@ int server_listen(int listen_port, const char *prefix, connection_t *conn)
 int server_accept(connection_t *listen_conn,
                   struct sockaddr_in* remote_sin,
                   int listen_port, const char* prefix,
-                  connection_t *connect_conn)
-{
+                  connection_t *connect_conn) {
     socklen_t remote_sin_len;
 
     char s_err[SMALLSTRSIZE];
@@ -264,8 +246,7 @@ int server_accept(connection_t *listen_conn,
 
     my_logf(LL_DEBUG, LP_DATETIME, "%s: accept() function returned");
 
-    if (connect_conn->sock == -1)
-    {
+    if (connect_conn->sock == -1) {
         my_logf(LL_ERROR, LP_DATETIME, "%s: cannot accept, error %s",
                 prefix, os_last_err_desc(s_err, sizeof(s_err)));
         conn_close(connect_conn);
@@ -280,8 +261,7 @@ int server_accept(connection_t *listen_conn,
 // Send error page over HTTP connection
 //
 void http_send_error_page(connection_t *conn, const char *e,
-                          const char *t)
-{
+                          const char *t) {
     my_logf(LL_DEBUG, LP_DATETIME, "Sending HTTP error %s / %s", e, t);
 
     conn_line_sendf(conn, g_trace_network_traffic, "HTTP/1.1 %s", e);
@@ -300,8 +280,7 @@ void http_send_error_page(connection_t *conn, const char *e,
 //
 // Date & time to str for network HTTP usage
 //
-char *my_ctime_r(const time_t *timep, char *buf, size_t buflen)
-{
+char *my_ctime_r(const time_t *timep, char *buf, size_t buflen) {
     char *c = ctime(timep);
     if (c == NULL)
         return c;
@@ -314,8 +293,7 @@ char *my_ctime_r(const time_t *timep, char *buf, size_t buflen)
 //
 // Answers web connections
 //
-int manage_web_transaction(connection_t *conn)
-{
+int manage_web_transaction(connection_t *conn) {
 
     my_logf(LL_DEBUG, LP_DATETIME, "Entering web transaction...");
 
@@ -323,8 +301,7 @@ int manage_web_transaction(connection_t *conn)
     size_t size;
     int read_res = 0;
     if ((read_res = conn_read_line_alloc(conn, &received,
-                                         g_trace_network_traffic, &size)) < 0)
-    {
+                                         g_trace_network_traffic, &size)) < 0) {
         MYFREE(received);
         return -1;
     }
@@ -332,8 +309,7 @@ int manage_web_transaction(connection_t *conn)
     my_logf(LL_DEBUG, LP_DATETIME, "Received request '%s'", received);
 
     char *p = received;
-    if (strncmp(p, "GET", 3))
-    {
+    if (strncmp(p, "GET", 3)) {
         MYFREE(received);
         http_send_error_page(conn, "400 Bad Request",
                              "Could not understand request");
@@ -351,16 +327,14 @@ int manage_web_transaction(connection_t *conn)
 
     while (*p != '\0' && *p != ' ')
         ++p;
-    if (*p != '\0')
-    {
+    if (*p != '\0') {
         *p = '\0';
         ++p;
     }
 
     while (*p == ' ')
         ++p;
-    if (strncmp(p, "HTTP/1.1", 8))
-    {
+    if (strncmp(p, "HTTP/1.1", 8)) {
         MYFREE(received);
         http_send_error_page(conn, "400 Bad Request",
                              "Could not understand request");
@@ -370,8 +344,7 @@ int manage_web_transaction(connection_t *conn)
     char *t = strrchr(tmpurl, '/');
     if (t != NULL)
         tmpurl = t + 1;
-    if (strstr(received, "..") != 0)
-    {
+    if (strstr(received, "..") != 0) {
         MYFREE(received);
         http_send_error_page(conn, "401 Unauthorized",
                              "Not allowed to go up in directory tree");
@@ -382,20 +355,17 @@ int manage_web_transaction(connection_t *conn)
     strncpy(url, tmpurl, sizeof(url));
 
     int keep_alive = TRUE;
-    while (strlen(received) != 0)
-    {
+    while (strlen(received) != 0) {
         if ((read_res = conn_read_line_alloc(conn, &received,
                                              g_trace_network_traffic,
                                              &size))
-                < 0)
-        {
+                < 0) {
             MYFREE(received);
             return -1;
         }
 
         if (strncasecmp(received, "connection:", 11) == 0
-                && strstr(received, "close") != NULL)
-        {
+                && strstr(received, "close") != NULL) {
             my_logf(LL_DEBUG, LP_DATETIME,
                     "Connection will be closed afterwards");
             keep_alive = FALSE;
@@ -417,27 +387,22 @@ int manage_web_transaction(connection_t *conn)
 
     if (strcasecmp(url, MAN_EN) == 0)
         fs_concatene(path, FILE_MAN_EN, sizeof(path));
-    else if (strcasecmp(url, POEM_URL) == 0)
-    {
+    else if (strcasecmp(url, POEM_URL) == 0) {
         internal_content = POEM;
         size_internal_content = strlen(internal_content);
         my_logf(LL_DEBUG, LP_DATETIME,
                 "Size of poem: %lu", size_internal_content);
         type_internal_content = POEM_TYPE;
-    }
-    else
-    {
+    } else {
         fs_concatene(path, strlen(url) == 0 ? g_html_file : url, sizeof(path));
     }
 
     struct stat s;
 
-    if (internal_content == NULL)
-    {
+    if (internal_content == NULL) {
         my_logf(LL_DEBUG, LP_DATETIME, "Will stat file '%s'", path);
 
-        if (stat(path, &s))
-        {
+        if (stat(path, &s)) {
             char s_err[SMALLSTRSIZE];
             errno_error(s_err, sizeof(s_err));
             my_logf(LL_ERROR, LP_DATETIME, "%s", s_err);
@@ -455,34 +420,28 @@ int manage_web_transaction(connection_t *conn)
 
     const char *content_type = "application/octet-stream";
 
-    if (internal_content == NULL)
-    {
+    if (internal_content == NULL) {
         if (my_ctime_r(&s.st_mtime, dt_fileupdate,
-                       sizeof(dt_fileupdate)) == 0)
-        {
+                       sizeof(dt_fileupdate)) == 0) {
             http_send_error_page(conn, "500 Server error",
                                  "Internal server error");
             return -1;
         }
     }
     if (gettimeofday(&tv, NULL) != 0 ||
-            my_ctime_r(&tv.tv_sec, dt_now, sizeof(dt_now)) == 0)
-    {
+            my_ctime_r(&tv.tv_sec, dt_now, sizeof(dt_now)) == 0) {
         http_send_error_page(conn, "500 Server error", "Internal server error");
         return -1;
     }
-    if (internal_content == NULL)
-    {
+    if (internal_content == NULL) {
         my_logf(LL_DEBUG, LP_DATETIME, "path opened: '%s'", path);
         F = my_fopen(path, "rb", 5, 800);
-        if (F == NULL)
-        {
+        if (F == NULL) {
             http_send_error_page(conn, "404 Not found", "File not found");
             return -1;
         }
         char *pos;
-        if ((pos = strrchr(path, '.')) != NULL)
-        {
+        if ((pos = strrchr(path, '.')) != NULL) {
             ++pos;
             if (strcasecmp(pos, "png") == 0)
                 content_type = "image/png";
@@ -492,9 +451,7 @@ int manage_web_transaction(connection_t *conn)
             else if (strcasecmp(pos, "ini") == 0 || strcasecmp(pos, "log") == 0)
                 content_type = "text/ascii";
         }
-    }
-    else
-    {
+    } else {
         strncpy(dt_fileupdate, dt_now, sizeof(dt_fileupdate));
         content_type = type_internal_content;
         content_length = size_internal_content;
@@ -519,15 +476,11 @@ int manage_web_transaction(connection_t *conn)
 
     size_t n;
     ssize_t e;
-    if (internal_content == NULL)
-    {
+    if (internal_content == NULL) {
         char *buffer = (char *)MYMALLOC(buffer_size, buffer);
-        while (feof(F) == 0)
-        {
-            if ((n = fread(buffer, 1, buffer_size, F)) == 0)
-            {
-                if (feof(F) == 0)
-                {
+        while (feof(F) == 0) {
+            if ((n = fread(buffer, 1, buffer_size, F)) == 0) {
+                if (feof(F) == 0) {
                     my_logf(LL_ERROR, LP_DATETIME, "Error reading file %s",
                             path);
                     keep_alive = FALSE;
@@ -537,8 +490,7 @@ int manage_web_transaction(connection_t *conn)
                 }
             }
             e = conn->sock_write(conn, buffer, n);
-            if (e == SOCKET_ERROR)
-            {
+            if (e == SOCKET_ERROR) {
                 my_logf(LL_ERROR, LP_DATETIME, "Socket error");
                 keep_alive = FALSE;
                 MYFREE(buffer);
@@ -549,18 +501,14 @@ int manage_web_transaction(connection_t *conn)
         MYFREE(buffer);
         fclose(F);
         conn_line_sendf(conn, g_trace_network_traffic, "");
-    }
-    else
-    {
+    } else {
         n = size_internal_content;
         char *walker = (char *)internal_content;
-        while (n >= 1)
-        {
+        while (n >= 1) {
             size_t to_send = (n >= buffer_size ? buffer_size : n);
             n -= to_send;
             e = conn->sock_write(conn, walker, to_send);
-            if (e == SOCKET_ERROR)
-            {
+            if (e == SOCKET_ERROR) {
                 my_logf(LL_ERROR, LP_DATETIME, "Socket error");
                 keep_alive = FALSE;
                 break;
@@ -578,16 +526,14 @@ int manage_web_transaction(connection_t *conn)
 //
 // Manages web server
 //
-void *webserver(void *p)
-{
+void *webserver(void *p) {
     UNUSED(p);
 
     connection_t listen_conn;
     conn_init(&listen_conn, CONNTYPE_PLAIN);
 
     if (!server_listen((int)g_webserver_port, WEBSERVER_LOG_PREFIX,
-                       &listen_conn))
-    {
+                       &listen_conn)) {
         my_logf(LL_NORMAL, LP_DATETIME, "%s: stop", WEBSERVER_LOG_PREFIX);
         return NULL;
     }
@@ -598,23 +544,20 @@ void *webserver(void *p)
     connection_t connect_conn;
     conn_init(&connect_conn, CONNTYPE_PLAIN);
 
-    while (1)
-    {
+    while (1) {
         while (server_accept(&listen_conn, &remote_sin, (int)g_webserver_port,
-                             WEBSERVER_LOG_PREFIX, &connect_conn) != -1)
-        {
-            if (manage_web_transaction(&connect_conn) != 0)
-            {
+                             WEBSERVER_LOG_PREFIX, &connect_conn) != -1) {
+            if (manage_web_transaction(&connect_conn) != 0) {
                 conn_close(&connect_conn);
                 my_logf(LL_VERBOSE, LP_DATETIME,
                         WEBSERVER_LOG_PREFIX ": terminated connection with client");
-            }
-            else
-            {
+            } else {
                 my_logf(LL_VERBOSE, LP_DATETIME,
                         WEBSERVER_LOG_PREFIX ": continuing connection with client");
             }
         }
+        my_logf(LL_VERBOSE, LP_DATETIME,
+                WEBSERVER_LOG_PREFIX ": OULALA");
     }
     return NULL;
 }

@@ -43,8 +43,7 @@ FILE *log_fd = NULL;
 
 /*static pthread_mutex_t util_mutex;*/
 
-const struct connection_table_t connection_table[] =
-{
+const struct connection_table_t connection_table[] = {
     {conn_plain_read, "<<< ", conn_plain_write, ">>> "},        // CONNTYPE_PLAIN
     {conn_ssl_read,     "SSL<<< ", conn_ssl_write,   "SSL>>> "} // CONNTYPE_SSL
 };
@@ -61,33 +60,28 @@ const char FS_SEPARATOR = '\\';
 
 // HAS_TM_GMTOFF is NOT defined under Windows
 // and thus the fnuction below is needed.
-long int os_gmtoff()
-{
+long int os_gmtoff() {
     TIME_ZONE_INFORMATION TimeZoneInfo;
     GetTimeZoneInformation(&TimeZoneInfo);
     return -(TimeZoneInfo.Bias + TimeZoneInfo.DaylightBias) * 60;
 }
 
-void os_usleep(unsigned long int usec)
-{
+void os_usleep(unsigned long int usec) {
     Sleep(usec);
 }
 
-void os_sleep(unsigned int seconds)
-{
+void os_sleep(unsigned int seconds) {
     os_usleep(seconds * 1000L);
 }
 
-static void os_set_sock_nonblocking_mode(int sock)
-{
+static void os_set_sock_nonblocking_mode(int sock) {
     u_long iMode = 1;
     int iResult = ioctlsocket(sock, FIONBIO, &iMode);
     if (iResult != NO_ERROR)
         fatal_error("ioctlsocket failed with error: %ld", iResult);
 }
 
-static void os_set_sock_blocking_mode(int sock)
-{
+static void os_set_sock_blocking_mode(int sock) {
     u_long iMode = 0;
     int iResult = ioctlsocket(sock, FIONBIO, &iMode);
     if (iResult != NO_ERROR)
@@ -95,8 +89,7 @@ static void os_set_sock_blocking_mode(int sock)
 }
 
 char *os_last_err_desc_n(char *s, const size_t s_len,
-                         const long unsigned e)
-{
+                         const long unsigned e) {
     LPVOID lpMsgBuf;
     FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
                   FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -105,8 +98,7 @@ char *os_last_err_desc_n(char *s, const size_t s_len,
     char error[ERR_STR_BUFSIZE];
     strncpy(error, (char *)lpMsgBuf, sizeof(error));
     int n = strlen(error);
-    if (n >= 2)
-    {
+    if (n >= 2) {
         if (error[n - 2] == '\r' && error[n - 1] == '\n')
             error[n - 2] = '\0';
     }
@@ -115,42 +107,35 @@ char *os_last_err_desc_n(char *s, const size_t s_len,
     return s;
 }
 
-char *os_last_err_desc(char *s, const size_t s_len)
-{
+char *os_last_err_desc(char *s, const size_t s_len) {
     return os_last_err_desc_n(s, s_len, WSAGetLastError());
 }
 
-void os_init_network()
-{
+void os_init_network() {
     WSADATA wsaData;
     int e;
     char s_err[ERR_STR_BUFSIZE];
-    if ((e = WSAStartup(MAKEWORD(2, 2), &wsaData)) != 0)
-    {
+    if ((e = WSAStartup(MAKEWORD(2, 2), &wsaData)) != 0) {
         fatal_error("WSAStartup() returned value %i, error: %s", e,
                     os_last_err_desc(s_err, sizeof(s_err)));
         WSACleanup();
     }
 }
 
-int os_last_network_op_is_in_progress()
-{
+int os_last_network_op_is_in_progress() {
     return (WSAGetLastError() == WSAEINPROGRESS
             || WSAGetLastError() == WSAEWOULDBLOCK);
 }
 
-static void os_closesocket(int sock)
-{
+static void os_closesocket(int sock) {
     closesocket(sock);
 }
 
-int os_wexitstatus(const int r)
-{
+int os_wexitstatus(const int r) {
     return r;
 }
 
-int add_reader_access_right(const char *f)
-{
+int add_reader_access_right(const char *f) {
     UNUSED(f);
 
     return 0;
@@ -159,10 +144,8 @@ int add_reader_access_right(const char *f)
 //
 // Puts in p the complete file name of the current executable
 //
-void win_get_exe_file(const char *argv0, char *p, size_t p_len)
-{
-    if (!GetModuleFileName(NULL, p, p_len))
-    {
+void win_get_exe_file(const char *argv0, char *p, size_t p_len) {
+    if (!GetModuleFileName(NULL, p, p_len)) {
         strncpy(p, argv0, p_len);
         p[p_len - 1] = '\0';
     }
@@ -188,67 +171,55 @@ void win_get_exe_file(const char *argv0, char *p, size_t p_len)
 
 const char FS_SEPARATOR = '/';
 
-void os_usleep(unsigned long int usec)
-{
+void os_usleep(unsigned long int usec) {
     usleep((useconds_t)usec);
 }
 
-void os_sleep(unsigned int seconds)
-{
+void os_sleep(unsigned int seconds) {
     sleep(seconds);
 }
 
-static void os_set_sock_nonblocking_mode(int sock)
-{
+static void os_set_sock_nonblocking_mode(int sock) {
     long arg = fcntl(sock, F_GETFL, NULL);
     arg |= O_NONBLOCK;
     fcntl(sock, F_SETFL, arg);
 }
 
-static void os_set_sock_blocking_mode(int sock)
-{
+static void os_set_sock_blocking_mode(int sock) {
     long arg = fcntl(sock, F_GETFL, NULL);
     arg &= ~O_NONBLOCK;
     fcntl(sock, F_SETFL, arg);
 }
 
-char *os_last_err_desc(char *s, size_t s_bufsize)
-{
+char *os_last_err_desc(char *s, size_t s_bufsize) {
     snprintf(s, s_bufsize, "code=%i (%s)", errno, strerror(errno));
     return s;
 }
 
-void os_init_network()
-{
+void os_init_network() {
     signal(SIGPIPE, SIG_IGN);
 }
 
-int os_last_network_op_is_in_progress()
-{
+int os_last_network_op_is_in_progress() {
     return (errno == EINPROGRESS);
 }
 
-static void os_closesocket(int sock)
-{
+static void os_closesocket(int sock) {
     close(sock);
 }
 
-int os_wexitstatus(const int r)
-{
+int os_wexitstatus(const int r) {
     return WEXITSTATUS(r);
 }
 
-int add_reader_access_right(const char *f)
-{
+int add_reader_access_right(const char *f) {
     struct stat s;
     int r = 0;
-    if (!stat(f, &s))
-    {
+    if (!stat(f, &s)) {
         s.st_mode |= S_IRUSR | S_IRGRP | S_IROTH;
         r = chmod(f, s.st_mode);
     }
-    if (r)
-    {
+    if (r) {
         char s_err[SMALLSTRSIZE];
         errno_error(s_err, sizeof(s_err));
         my_logf(LL_ERROR, LP_DATETIME, "Unable to change mode of file '%s': ", f,
@@ -257,8 +228,7 @@ int add_reader_access_right(const char *f)
     return -1;
 }
 
-void win_get_exe_file(const char *argv0, char *p, size_t p_len)
-{
+void win_get_exe_file(const char *argv0, char *p, size_t p_len) {
 }
 
 #endif
@@ -269,8 +239,7 @@ void win_get_exe_file(const char *argv0, char *p, size_t p_len)
 // * *** *
 
 #ifdef DEBUG
-void dbg_write(const char *fmt, ...)
-{
+void dbg_write(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     vprintf(fmt, args);
@@ -285,11 +254,9 @@ void dbg_write(const char *fmt, ...)
 // Linked to DEBUG_DYNMEM macro definition
 //
 void *debug_malloc(size_t size, const char *var, const char *source_file,
-                   const long int line)
-{
+                   const long int line) {
     FILE *F = fopen(DEBUG_MALLOC_LOGFILE, "a");
-    if (F != NULL)
-    {
+    if (F != NULL) {
         char dt[REGULAR_STR_STRBUFSIZE];
         my_log_core_get_dt_str(LP_DATETIME, dt, sizeof(dt));
         fprintf(F, "%s\tMALLOC.\t%s\t%lu\t%s:%li\n", dt, var,
@@ -304,11 +271,9 @@ void *debug_malloc(size_t size, const char *var, const char *source_file,
 // Linked to DEBUG_DYNMEM macro definition
 //
 void *debug_realloc(void *ptr, size_t size, const char *var,
-                    const char *source_file, const long int line)
-{
+                    const char *source_file, const long int line) {
     FILE *F = fopen(DEBUG_MALLOC_LOGFILE, "a");
-    if (F != NULL)
-    {
+    if (F != NULL) {
         char dt[REGULAR_STR_STRBUFSIZE];
         my_log_core_get_dt_str(LP_DATETIME, dt, sizeof(dt));
         fprintf(F, "%s\tREALLOC\t%s\t%lu\t%s:%li\n", dt, var,
@@ -323,11 +288,9 @@ void *debug_realloc(void *ptr, size_t size, const char *var,
 // Linked to DEBUG_DYNMEM macro definition
 //
 void debug_free(void *ptr, const char *var, const char *source_file,
-                const long int line)
-{
+                const long int line) {
     FILE *F = fopen(DEBUG_MALLOC_LOGFILE, "a");
-    if (F != NULL)
-    {
+    if (F != NULL) {
         char dt[REGULAR_STR_STRBUFSIZE];
         my_log_core_get_dt_str(LP_DATETIME, dt, sizeof(dt));
         fprintf(F, "%s\tFREE...\t%s\t\t%s:%li\n", dt, var, source_file, line);
@@ -339,12 +302,10 @@ void debug_free(void *ptr, const char *var, const char *source_file,
 #endif  // DEBUG_DYNMEM
 
 FILE *my_fopen(const char *filename, const char *mode,
-               const int nb_retries, const unsigned long int usec_delay)
-{
+               const int nb_retries, const unsigned long int usec_delay) {
     int retry;
     FILE *f = NULL;
-    for (retry = 1; retry <= nb_retries; ++retry, os_usleep(usec_delay))
-    {
+    for (retry = 1; retry <= nb_retries; ++retry, os_usleep(usec_delay)) {
         if ((f = fopen(filename, mode)) != NULL)
             break;
     }
@@ -354,8 +315,7 @@ FILE *my_fopen(const char *filename, const char *mode,
 //
 // Converts errno into a readable string
 //
-char *errno_error(char *s, size_t s_len)
-{
+char *errno_error(char *s, size_t s_len) {
     snprintf(s, s_len, "Error %i, %s", errno, strerror(errno));
     return s;
 }
@@ -363,14 +323,11 @@ char *errno_error(char *s, size_t s_len)
 //
 // My implementation of getline()
 //
-ssize_t my_getline(char **lineptr, size_t *n, FILE *stream)
-{
-    if (*lineptr == NULL || *n == 0)
-    {
+ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
+    if (*lineptr == NULL || *n == 0) {
         *n = MY_GETLINE_INITIAL_ALLOCATE;
         *lineptr = (char *)MYMALLOC(*n, lineptr);
-        if (*lineptr == NULL)
-        {
+        if (*lineptr == NULL) {
             errno = ENOMEM;
             return -1;
         }
@@ -378,12 +335,10 @@ ssize_t my_getline(char **lineptr, size_t *n, FILE *stream)
     char *write_head = *lineptr;
     ssize_t char_read = 0;
     int c;
-    while (1)
-    {
+    while (1) {
 
         // Check there's enough memory to store read characters
-        if ((ssize_t)*n - char_read <= 2)
-        {
+        if ((ssize_t)*n - char_read <= 2) {
             size_t increase = *n * MY_GETLINE_COEF_INCREASE;
             if (increase < MY_GETLINE_MIN_INCREASE)
                 increase = MY_GETLINE_MIN_INCREASE;
@@ -393,8 +348,7 @@ ssize_t my_getline(char **lineptr, size_t *n, FILE *stream)
             *lineptr = (char *)MYREALLOC(*lineptr, *n);
             write_head += (*lineptr - old_lineptr);
 
-            if (*lineptr == NULL)
-            {
+            if (*lineptr == NULL) {
                 errno = ENOMEM;
                 return -1;
             }
@@ -410,8 +364,7 @@ ssize_t my_getline(char **lineptr, size_t *n, FILE *stream)
             return -1;
 
         // Deal with end of file
-        if (c == EOF)
-        {
+        if (c == EOF) {
             if (char_read == 0)
                 return -1;
             else
@@ -433,8 +386,7 @@ ssize_t my_getline(char **lineptr, size_t *n, FILE *stream)
 //
 // concatene a path and a file name
 //
-void fs_concatene(char *dst, const char *src, size_t dst_len)
-{
+void fs_concatene(char *dst, const char *src, size_t dst_len) {
     char t[2] = "\0";
     t[0] = FS_SEPARATOR;
     if (dst[strlen(dst) - 1] != FS_SEPARATOR)
@@ -447,11 +399,9 @@ void fs_concatene(char *dst, const char *src, size_t dst_len)
 // Finds a word in a table, return index found or -1 if not found.
 // Case insensitive search
 //
-int find_string(const char **table, int n, const char *elem)
-{
+int find_string(const char **table, int n, const char *elem) {
     int i;
-    for (i = 0; i < n; ++i)
-    {
+    for (i = 0; i < n; ++i) {
         if (strcasecmp(table[i], elem) == 0)
             return i;
     }
@@ -463,14 +413,12 @@ int find_string(const char **table, int n, const char *elem)
 // To remove trailing spaces, it just writes '\0' after the last non-space
 // found from right to left.
 //
-char *trim(char *str)
-{
+char *trim(char *str) {
     char *end;
 
     while(isspace(*str)) str++;
 
-    if(*str == 0)
-    {
+    if(*str == 0) {
         return str;
     }
 
@@ -486,16 +434,14 @@ char *trim(char *str)
 // Print an error in standard error and exit program
 // if exit_program is true.
 //
-void fatal_error(const char *format, ...)
-{
+void fatal_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
 
     char fatal[REGULAR_STR_STRBUFSIZE];
     vsnprintf(fatal, sizeof(fatal), format, args);
 
-    if (my_is_log_open())
-    {
+    if (my_is_log_open()) {
         my_logf(LL_ERROR, LP_DATETIME, "FATAL: %s", fatal);
         my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_NAME " aborted");
     }
@@ -509,8 +455,7 @@ void fatal_error(const char *format, ...)
 //
 // Initializes the program log
 //
-void my_log_open()
-{
+void my_log_open() {
     if (strlen(g_log_file) >= 1)
         log_fd = my_fopen(g_log_file, "a", 1, 0);
     else
@@ -520,8 +465,7 @@ void my_log_open()
 //
 // Closes the program log
 //
-void my_log_close()
-{
+void my_log_close() {
     if (log_fd != NULL)
         fclose(log_fd);
 }
@@ -529,8 +473,7 @@ void my_log_close()
 //
 // Is log open?
 //
-int my_is_log_open()
-{
+int my_is_log_open() {
     return (log_fd != NULL);
 }
 
@@ -543,8 +486,7 @@ int my_is_log_open()
 /*extern pthread_mutex_t mutex;*/
 
 char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
-                         int n)
-{
+                         int n) {
     size_t sc_len = strlen(s) + 1;
     char *sc = (char *)MYMALLOC(sc_len, sc);
     strncpy(sc, s, sc_len);
@@ -553,16 +495,13 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
     char var2[SMALLSTRSIZE];
 
     char *p = sc;
-    for (; *p != '\0'; ++p)
-    {
-        if (*p == '$' && *(p + 1) == '{')
-        {
+    for (; *p != '\0'; ++p) {
+        if (*p == '$' && *(p + 1) == '{') {
             char *c = p + 2;
             for (; *c != '}' && *c != '\0'; ++c)
                 ;
             int l = (int)(c - p - 2);
-            if (*c == '}' && l >= 1)
-            {
+            if (*c == '}' && l >= 1) {
                 *c = '\0';
                 strncpy(var, p + 2, sizeof(var));
                 var[sizeof(var) - 1] = '\0';
@@ -571,22 +510,17 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
 
                 int i;
 
-                if (g_print_subst_error)
-                {
+                if (g_print_subst_error) {
                     strncpy(var2, SUBST_ERROR_PREFIX, sizeof(var2));
                     strncat(var2, var, sizeof(var2));
                     strncat(var2, SUBST_ERROR_POSTFIX, sizeof(var2) - 1);
-                }
-                else
-                {
+                } else {
                     strncpy(var2, "", sizeof(var2));
                 }
 
                 char *rep = var2;
-                for (i = 0; i < n; ++i)
-                {
-                    if (strcasecmp(subst[i].find, var) == 0)
-                    {
+                for (i = 0; i < n; ++i) {
+                    if (strcasecmp(subst[i].find, var) == 0) {
                         rep = (char *)subst[i].replace;
                         break;
                     }
@@ -599,11 +533,10 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
                 strncpy(buf, c + 1, buf_len);
                 *p = '\0';
                 size_t need_len = strlen(sc) + strlen(rep) + strlen(buf) + 1;
-                if (need_len > sc_len)
-                {
+                if (need_len > sc_len) {
                     char *new_sc = (char *)MYREALLOC(sc, need_len);
 
-/*                    dbg_write("Reallocated from %lu to %lu\n", sc_len, need_len);*/
+                    /*                    dbg_write("Reallocated from %lu to %lu\n", sc_len, need_len);*/
 
                     sc_len = need_len;
                     p += (new_sc - sc);
@@ -626,16 +559,14 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
 //
 void get_datetime_of_day(int *wday, int *year, int *month, int *day,
                          int *hour, int *minute, int *second,
-                         long int *usec, long int *gmtoff)
-{
+                         long int *usec, long int *gmtoff) {
     time_t ltime = time(NULL);
     struct tm ts;
     ts = *localtime(&ltime);
 
     struct timeval tv;
     struct timezone tz;
-    if (gettimeofday(&tv, &tz) == GETTIMEOFDAY_ERROR)
-    {
+    if (gettimeofday(&tv, &tz) == GETTIMEOFDAY_ERROR) {
         char s_err[ERR_STR_BUFSIZE];
         fatal_error("gettimeofday() error, %s", os_last_err_desc(s_err,
                     sizeof(s_err)));
@@ -659,8 +590,7 @@ void get_datetime_of_day(int *wday, int *year, int *month, int *day,
 
 //
 // Remplit la structure avec les date/heure actuelles
-void set_current_tm(struct tm *ts)
-{
+void set_current_tm(struct tm *ts) {
     time_t ltime = time(NULL);
     *ts = *localtime(&ltime);
 }
@@ -670,16 +600,12 @@ void set_current_tm(struct tm *ts)
 //
 void set_log_timestamp(char *s, size_t s_len,
                        int year, int month, int day, int hour, int minute, int second,
-                       long int usec)
-{
-    if (g_log_usec && usec >= 0)
-    {
+                       long int usec) {
+    if (g_log_usec && usec >= 0) {
         snprintf(s, s_len, "%02i/%02i/%02i %02i:%02i:%02i.%06lu",
                  g_date_df ? day : month, g_date_df ? month : day,
                  year % 100, hour, minute, second, usec);
-    }
-    else
-    {
+    } else {
         snprintf(s, s_len, "%02i/%02i/%02i %02i:%02i:%02i",
                  g_date_df ? day : month, g_date_df ? month : day,
                  year % 100, hour, minute, second);
@@ -691,8 +617,7 @@ void set_log_timestamp(char *s, size_t s_len,
 // Prepare prefix string, used by my_log only
 //
 void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt,
-                            size_t dt_len)
-{
+                            size_t dt_len) {
     int wday;
     int year;
     int month;
@@ -709,12 +634,9 @@ void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt,
                       usec);
     size_t l = strlen(dt);
 
-    if (log_disp == LP_NOTHING)
-    {
+    if (log_disp == LP_NOTHING) {
         strncpy(dt, "", l);
-    }
-    else if (log_disp == LP_INDENT)
-    {
+    } else if (log_disp == LP_INDENT) {
         memset(dt, ' ', l);
     }
 }
@@ -722,12 +644,10 @@ void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt,
 //
 // Output log string, used by my_log only
 //
-void my_log_core_output(const char *s, size_t dt_len)
-{
+void my_log_core_output(const char *s, size_t dt_len) {
     /*  my_pthread_mutex_lock(&util_mutex);*/
 
-    if (log_fd)
-    {
+    if (log_fd) {
         fputs(s, log_fd);
         fputs("\n", log_fd);
 
@@ -736,12 +656,10 @@ void my_log_core_output(const char *s, size_t dt_len)
 #endif
 
     }
-    if (g_print_log)
-    {
+    if (g_print_log) {
         const char *t = s;
         size_t i = 0;
-        for (i = 0; i < dt_len; ++i)
-        {
+        for (i = 0; i < dt_len; ++i) {
             if (*t == '\0')
                 break;
             ++t;
@@ -761,8 +679,7 @@ void my_log_core_output(const char *s, size_t dt_len)
 // Output a string in the program log
 //
 void my_logs(const loglevel_t log_level, const logdisp_t log_disp,
-             const char *s)
-{
+             const char *s) {
     if (log_level > g_current_log_level)
         return;
 
@@ -779,8 +696,7 @@ void my_logs(const loglevel_t log_level, const logdisp_t log_disp,
 // Output a formatted string in the program log
 //
 void my_logf(const loglevel_t log_level, const logdisp_t log_disp,
-             const char *format, ...)
-{
+             const char *format, ...) {
 
     if (log_level > g_current_log_level)
         return;
@@ -802,16 +718,14 @@ void my_logf(const loglevel_t log_level, const logdisp_t log_disp,
 // Return true if s begins with prefix, false otherwise
 // String comparison is case insensitive
 //
-int s_begins_with(const char *s, const char *begins_with)
-{
+int s_begins_with(const char *s, const char *begins_with) {
     return (strncasecmp(s, begins_with, strlen(begins_with)) == 0);
 }
 
 //
 // Sets the string passed as argument to the last SSL error
 //
-char *ssl_get_error(const unsigned long e, char *s, const size_t s_len)
-{
+char *ssl_get_error(const unsigned long e, char *s, const size_t s_len) {
     ERR_error_string_n(e, s, s_len);
     return s;
 }
@@ -819,8 +733,7 @@ char *ssl_get_error(const unsigned long e, char *s, const size_t s_len)
 //
 // Initializes the connection_t object
 //
-void conn_init(connection_t *conn, int type)
-{
+void conn_init(connection_t *conn, int type) {
     conn->type = type;
     conn->sock = -1;
     conn->ssl = NULL;
@@ -836,17 +749,14 @@ void conn_init(connection_t *conn, int type)
 //
 // Closes the connection
 //
-void conn_close(connection_t *conn)
-{
+void conn_close(connection_t *conn) {
     os_closesocket(conn->sock);
-    if (conn->ssl != NULL)
-    {
+    if (conn->ssl != NULL) {
         SSL_shutdown(conn->ssl);
         SSL_free(conn->ssl);
         conn->ssl = NULL;
     }
-    if (conn->ssl_context != NULL)
-    {
+    if (conn->ssl_context != NULL) {
         SSL_CTX_free(conn->ssl_context);
         conn->ssl_context = NULL;
     }
@@ -856,8 +766,7 @@ void conn_close(connection_t *conn)
 //
 // Check whether a given connection_t object is closed
 //
-int conn_is_closed(connection_t *conn)
-{
+int conn_is_closed(connection_t *conn) {
     if (conn->sock != -1 || conn->ssl_context != NULL || conn->ssl != NULL)
         return FALSE;
     return TRUE;
@@ -869,8 +778,7 @@ int conn_is_closed(connection_t *conn)
 //
 int conn_connect(connection_t *conn, const struct sockaddr_in *server,
                  const int conn_to, const int netio_to, const char *desc,
-                 const char *prefix)
-{
+                 const char *prefix) {
     fd_set fdset;
     FD_ZERO(&fdset);
     FD_SET((unsigned int)(conn->sock), &fdset);
@@ -885,46 +793,35 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
 
     int cr = CONNRES_OK;
     if (connect(conn->sock, (struct sockaddr *)server,
-                sizeof(*server)) == CONNECT_ERROR)
-    {
-        if (os_last_network_op_is_in_progress())
-        {
-            if (select((conn->sock) + 1, NULL, &fdset, NULL, &conn_tv) <= 0)
-            {
+                sizeof(*server)) == CONNECT_ERROR) {
+        if (os_last_network_op_is_in_progress()) {
+            if (select((conn->sock) + 1, NULL, &fdset, NULL, &conn_tv) <= 0) {
                 my_logf(LL_ERROR, LP_DATETIME, "%s timeout connecting to %s, %s",
                         prefix, desc, os_last_err_desc(s_err, sizeof(s_err)));
                 cr = CONNRES_CONNECTION_TIMEOUT;
-            }
-            else
-            {
+            } else {
                 char so_error;
                 socklen_t len = sizeof(so_error);
                 getsockopt(conn->sock, SOL_SOCKET, SO_ERROR, &so_error, &len);
-                if (so_error != 0)
-                {
+                if (so_error != 0) {
                     my_logf(LL_ERROR, LP_DATETIME,
                             "%s network error connecting to %s, code=%i (%s)",
                             prefix, desc, so_error, strerror(so_error));
                 }
                 cr = so_error != 0 ? CONNRES_NETIO : CONNRES_OK;
             }
-        }
-        else
-        {
+        } else {
             my_logf(LL_ERROR, LP_DATETIME, "%s error connecting to %s, %s",
                     prefix, desc, os_last_err_desc(s_err, sizeof(s_err)));
             cr = CONNRES_CONNECTION_ERROR;
         }
-    }
-    else
-    {
+    } else {
         my_logf(LL_ERROR, LP_DATETIME, "%s unknown error connecting to %s",
                 prefix, desc);
         cr = CONNRES_CONNECTION_ERROR;
     }
 
-    if (cr != CONNRES_OK)
-    {
+    if (cr != CONNRES_OK) {
         conn_close(conn);
         return cr;
     }
@@ -935,8 +832,7 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
     netio_tv.tv_sec = netio_to;
     netio_tv.tv_usec = 0;
     if (setsockopt(conn->sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&netio_tv,
-                   sizeof(netio_tv)))
-    {
+                   sizeof(netio_tv))) {
         my_logf(LL_ERROR, LP_DATETIME, "%s unable to set timeout to network I/O",
                 prefix);
     }
@@ -945,8 +841,7 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
         return CONNRES_OK;
 
     // Assume we are a v2 or v3 client
-    if ((conn->ssl_context = SSL_CTX_new(SSLv23_client_method())) == NULL)
-    {
+    if ((conn->ssl_context = SSL_CTX_new(SSLv23_client_method())) == NULL) {
         my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
                 prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err,
                         sizeof(s_err)));
@@ -954,8 +849,7 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
     }
 
     /* Create SSL connection */
-    else if ((conn->ssl = SSL_new(conn->ssl_context)) == NULL)
-    {
+    else if ((conn->ssl = SSL_new(conn->ssl_context)) == NULL) {
         my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
                 prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err,
                         sizeof(s_err)));
@@ -963,8 +857,7 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
     }
 
     /* Connect the SSL struct to our connection */
-    else if (!SSL_set_fd(conn->ssl, conn->sock))
-    {
+    else if (!SSL_set_fd(conn->ssl, conn->sock)) {
         my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
                 prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err,
                         sizeof(s_err)));
@@ -972,22 +865,18 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
     }
 
     /* Initiate SSL handshake */
-    else if (SSL_connect(conn->ssl) != 1)
-    {
+    else if (SSL_connect(conn->ssl) != 1) {
         my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
                 prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err,
                         sizeof(s_err)));
         cr = CONNRES_SSL_CONNECTION_ERROR;
     }
 
-    if (cr == CONNRES_OK)
-    {
+    if (cr == CONNRES_OK) {
         my_logf(LL_DEBUG, LP_DATETIME, "%s SSL: handshake [%s] successful", prefix,
                 desc);
         os_set_sock_blocking_mode(conn->sock);
-    }
-    else
-    {
+    } else {
         conn_close(conn);
     }
 
@@ -1003,24 +892,19 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
 static int split_hostname(const char *hostname, const int port_set,
                           const int port, const int default_port,
                           const char *prefix, char *h, const size_t h_len,
-                          int *p)
-{
+                          int *p) {
     strncpy(h, hostname, h_len);
     h[h_len - 1] = '\0';
     char *col = strchr(h, PORT_SEPARATOR);
-    if (col != NULL)
-    {
+    if (col != NULL) {
         *col = '\0';
         char *strport = col + 1;
         strport = trim(strport);
         *p = atoi(strport);
-    }
-    else
-    {
+    } else {
         *p = port_set ? port : default_port;
     }
-    if (*p < 1)
-    {
+    if (*p < 1) {
         my_logf(LL_ERROR, LP_DATETIME, "%s invalid port number (%s:%i)",
                 prefix, h, *p);
         return -1;
@@ -1031,21 +915,17 @@ static int split_hostname(const char *hostname, const int port_set,
 //
 // Guess if SSL is to be used given the port number
 //
-int guess_conntype(const long int p, const int crypt_set, const int crypt)
-{
-    if (!crypt_set || crypt == FIND_STRING_NOT_FOUND)
-    {
+int guess_conntype(const long int p, const int crypt_set,
+                   const int crypt) {
+    if (!crypt_set || crypt == FIND_STRING_NOT_FOUND) {
         int i;
         for (i = 0; i < (signed int)(sizeof(crypt_ports) / sizeof(*crypt_ports));
-                ++i)
-        {
+                ++i) {
             if (p == crypt_ports[i])
                 return CONNTYPE_SSL;
         }
         return CONNTYPE_PLAIN;
-    }
-    else
-    {
+    } else {
         return crypt;
     }
 }
@@ -1058,15 +938,13 @@ int guess_conntype(const long int p, const int crypt_set, const int crypt)
 //
 int conn_establish_connection(connection_t *conn, const conn_def_t *srv,
                               const int default_port, const char *expect,
-                              const char *prefix, const int trace)
-{
+                              const char *prefix, const int trace) {
 
     char h[SMALLSTRSIZE];
     int p;
 
     if (split_hostname(srv->server, srv->port_set, (int)srv->port,
-                       default_port, prefix, h, sizeof(h), &p))
-    {
+                       default_port, prefix, h, sizeof(h), &p)) {
         return CONNRES_INVALID_PORT_NUMBER;
     }
 
@@ -1084,8 +962,7 @@ int conn_establish_connection(connection_t *conn, const conn_def_t *srv,
     struct hostent *hostinfo = NULL;
     my_logf(LL_DEBUG, LP_DATETIME, "Running gethosbyname() on %s", h);
     hostinfo = gethostbyname(h);
-    if (hostinfo == NULL)
-    {
+    if (hostinfo == NULL) {
         my_logf(LL_ERROR, LP_DATETIME, "Unknown host %s, %s", h,
                 os_last_err_desc(s_err, sizeof(s_err)));
         return CONNRES_RESOLVE_ERROR;
@@ -1094,8 +971,7 @@ int conn_establish_connection(connection_t *conn, const conn_def_t *srv,
     int ret = CONNRES_CONNECTION_ERROR;
 
     if ((conn->sock = socket(AF_INET, SOCK_STREAM,
-                             IPPROTO_TCP)) == SOCKET_ERROR)
-    {
+                             IPPROTO_TCP)) == SOCKET_ERROR) {
         fatal_error("%s socket() error to create connection socket, %s", prefix,
                     os_last_err_desc(s_err, sizeof(s_err)));
     }
@@ -1114,36 +990,27 @@ int conn_establish_connection(connection_t *conn, const conn_def_t *srv,
             prefix, h, p, conn_to, netio_to);
 
     if ((ret = conn_connect(conn, &server, conn_to, netio_to, server_desc,
-                            prefix)) == CONNRES_OK)
-    {
+                            prefix)) == CONNRES_OK) {
         my_logf(LL_DEBUG, LP_DATETIME, "%s connected to %s", prefix, server_desc);
 
-        if (expect != NULL && strlen(expect) >= 1)
-        {
+        if (expect != NULL && strlen(expect) >= 1) {
             char *response = NULL;
             size_t response_size;
-            if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0)
-            {
+            if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0) {
                 ;
-            }
-            else if (s_begins_with(response, expect))
-            {
+            } else if (s_begins_with(response, expect)) {
                 my_logf(LL_VERBOSE, LP_DATETIME,
                         "%s received expected answer: '%s' (expected '%s')",
                         prefix, response, expect);
                 ret = CONNRES_OK;
-            }
-            else
-            {
+            } else {
                 my_logf(LL_ERROR, LP_DATETIME,
                         "%s received unexpected answer: '%s' (expected '%s')",
                         prefix, response, expect);
                 ret = CONNRES_UNEXPECTED_ANSWER;
             }
             MYFREE(response);
-        }
-        else
-        {
+        } else {
             ret = CONNRES_OK;
         }
 
@@ -1158,8 +1025,7 @@ int conn_establish_connection(connection_t *conn, const conn_def_t *srv,
 // 0 if transmission is closed.
 //
 int conn_read_line_alloc(connection_t *conn, char **out, int trace,
-                         size_t *size)
-{
+                         size_t *size) {
     const int INITIAL_READLINE_BUFFER_SIZE = 100;
 
     int i = 0;
@@ -1167,16 +1033,13 @@ int conn_read_line_alloc(connection_t *conn, char **out, int trace,
     char ch;
     ssize_t nb;
 
-    if (*out == NULL)
-    {
+    if (*out == NULL) {
         *size = (size_t)INITIAL_READLINE_BUFFER_SIZE;
         *out = (char *)MYMALLOC(*size, out);
     }
 
-    for (;;)
-    {
-        if ((nb = conn->sock_read(conn, &ch, 1)) == SOCKET_ERROR)
-        {
+    for (;;) {
+        if ((nb = conn->sock_read(conn, &ch, 1)) == SOCKET_ERROR) {
             char s_err[ERR_STR_BUFSIZE];
             my_logf(LL_ERROR, LP_DATETIME, "Error reading socket, error %s",
                     os_last_err_desc(s_err, sizeof(s_err)));
@@ -1184,51 +1047,38 @@ int conn_read_line_alloc(connection_t *conn, char **out, int trace,
             return -1;
         }
 
-        if ((unsigned)i >= *size)
-        {
-            if (*size * 2 <= MAX_READLINE_SIZE)
-            {
+        if ((unsigned)i >= *size) {
+            if (*size * 2 <= MAX_READLINE_SIZE) {
                 *size *= 2;
                 *out = (char *)MYREALLOC(*out, *size);
-            }
-            else
-            {
+            } else {
                 (*out)[*size - 1] = '\0';
                 break;
             }
         }
 
-        if (nb == 0)
-        {
+        if (nb == 0) {
             (*out)[i] = '\0';
             break;
         }
 
-        if (ch == '\n')
-        {
-            if (cr && i > 0)
-            {
+        if (ch == '\n') {
+            if (cr && i > 0) {
                 i--;
             }
             (*out)[i] = '\0';
             break;
-        }
-        else
-        {
+        } else {
             cr = (ch == '\r' ? TRUE : FALSE);
             (*out)[i] = ch;
         }
         i++;
     }
 
-    if (nb == 0)
-    {
+    if (nb == 0) {
         return 0;
-    }
-    else
-    {
-        if (trace)
-        {
+    } else {
+        if (trace) {
             my_logf(LL_DEBUGTRACE, LP_DATETIME, "%s%s", conn->log_prefix_received,
                     *out);
         }
@@ -1241,11 +1091,9 @@ int conn_read_line_alloc(connection_t *conn, char **out, int trace,
 // Return 0 if OK, -1 if error.
 // Manage logging an error code and closing socket.
 //
-int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...)
-{
+int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
 
-    if (conn->sock == -1)
-    {
+    if (conn->sock == -1) {
         return -1;
     }
 
@@ -1268,8 +1116,7 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...)
 
     MYFREE(to_send);
 
-    if (e == SOCKET_ERROR)
-    {
+    if (e == SOCKET_ERROR) {
         char s_err[ERR_STR_BUFSIZE];
         my_logf(LL_ERROR, LP_DATETIME, "Network I/O error: %s",
                 os_last_err_desc(s_err, sizeof(s_err)));
@@ -1284,8 +1131,7 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...)
 // Send a string to a socket and chck answer (telnet-style communication)
 //
 int conn_round_trip(connection_t *conn, const char *expect, int trace,
-                    const char *fmt, ...)
-{
+                    const char *fmt, ...) {
     size_t l = strlen(fmt) + 100;
     char *formatted_str = (char *)MYMALLOC(l + 1, formatted_str);
 
@@ -1301,14 +1147,12 @@ int conn_round_trip(connection_t *conn, const char *expect, int trace,
 
     char *response = NULL;
     size_t response_size;
-    if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0)
-    {
+    if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0) {
         MYFREE(response);
         return CONNRES_NETIO;
     }
 
-    if (s_begins_with(response, expect))
-    {
+    if (s_begins_with(response, expect)) {
         MYFREE(response);
         return CONNRES_OK;
     }
@@ -1321,8 +1165,7 @@ int conn_round_trip(connection_t *conn, const char *expect, int trace,
 // CONNTYPE_PLAIN -> read sock
 //
 ssize_t conn_plain_read(connection_t *conn, void *buf,
-                        const size_t buf_len)
-{
+                        const size_t buf_len) {
     return recv(conn->sock, buf, buf_len, 0);
 }
 
@@ -1330,16 +1173,15 @@ ssize_t conn_plain_read(connection_t *conn, void *buf,
 // CONNTYPE_PLAIN -> write sock
 //
 ssize_t conn_plain_write(connection_t *conn, void *buf,
-                         const size_t buf_len)
-{
+                         const size_t buf_len) {
     return send(conn->sock, buf, buf_len, 0);
 }
 
 //
 // CONNTYPE_SSL -> read sock
 //
-ssize_t conn_ssl_read(connection_t *conn, void *buf, const size_t buf_len)
-{
+ssize_t conn_ssl_read(connection_t *conn, void *buf,
+                      const size_t buf_len) {
     return SSL_read(conn->ssl, buf, (int)buf_len);
 }
 
@@ -1347,8 +1189,7 @@ ssize_t conn_ssl_read(connection_t *conn, void *buf, const size_t buf_len)
 // CONNTYPE_SSL -> write sock
 //
 ssize_t conn_ssl_write(connection_t *conn, void *buf,
-                       const size_t buf_len)
-{
+                       const size_t buf_len) {
     return SSL_write(conn->ssl, buf, (int)buf_len);
 }
 
