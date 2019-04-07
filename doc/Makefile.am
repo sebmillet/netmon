@@ -17,7 +17,7 @@ ${MANPAGEEN}: ${srcdir}/netmonen-prefix.1 ${srcdir}/netmon-sample.ini ${srcdir}/
 	${srcdir}/build-man-en.sh
 
 ${HTMLPAGEEN}: ${MANPAGEEN}
-	man2html ${MANPAGEEN} > $@
+	mandoc -T html ${MANPAGEEN} > $@
 ${TEXTPAGEEN}: ${MANPAGEEN}
 	nroff -man ${MANPAGEEN} | col -b > $@
 	unix2dos $@

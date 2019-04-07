@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/usr/bin/bash
+
+#set -euo pipefail
 
 SRCE0=netmon-sample.ini
 SRCEN=netmonen-m0.txt
@@ -26,21 +28,29 @@ sed -n '/^;--$/,$p' $SRCEN | while read l; do
     if [ -z "$all_comments" ]; then
       all_comments="  $c"
     else
-      all_comments="$all_comments\n  $c"
+      all_comments="$all_comments
+  $c"
     fi
   elif [ -n "$s" ]; then
     if [ "$s" != "$lasts" ]; then
       if [ "$s" = "general" ]; then
-        echo ".TP\n.B Variables of the [$s] section\n.br"
+        echo ".TP
+.B Variables of the [$s] section
+.br"
       else
-        echo ".TP\n.B Variables of the [$s] sections\n.br"
+        echo ".TP
+.B Variables of the [$s] sections
+.br"
       fi
       lasts=$s
     fi
   elif [ -n "$v" ]; then
     if [ -n "$all_comments" ]; then
-      echo ".TP\n\\\\fI$v\\\\fP"
-      echo "$all_comments\n.br\n"
+      echo ".TP
+\\fI$v\\fP"
+      echo "$all_comments
+.br
+"
       all_comments=""
     fi
   fi

@@ -1,6 +1,6 @@
 // webserver.c
 
-// Copyright Sébastien Millet, 2013
+// Copyright Sébastien Millet, 2013, 2019
 
 #include "main.h"
 

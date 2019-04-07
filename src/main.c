@@ -2317,7 +2317,7 @@ void printversion() {
 #else
   printf(PACKAGE_STRING "\n");
 #endif
-  printf("Copyright 2013, 2014 Sébastien Millet\n");
+  printf("Copyright 2013, 2014, 2019 Sébastien Millet\n");
 	printf("This program is free software; you may redistribute it under the terms of\n");
 	printf("the GNU General Public License version 3 or (at your option) any later version.\n");
 	printf("This program has absolutely no warranty.\n");

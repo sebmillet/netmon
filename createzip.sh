@@ -1,6 +1,6 @@
 #!/bin/sh
 
-ZIPNAME=netmon-1.1.1.zip
+ZIPNAME=netmon-1.1.2.zip
 
 mkdir ztmp
 cd ztmp

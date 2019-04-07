@@ -1,4 +1,4 @@
-netmon 1.1.1 start
+netmon 1.1.2 start
 Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 12: empty value not allowed
 Configuration file 'netmon.ini', line 12: variable program_command not compatible with guessed method 'tcp'
@@ -225,7 +225,7 @@ keep_last_status = 15
 display_name_width = 20
 html_directory = ../www
 html_file = status.html
-html_title = netmon 1.1.1
+html_title = netmon 1.1.2
 html_refresh_interval = 20
 Valid check(s) defined: 4
 Run web server: no
@@ -246,9 +246,8 @@ Performing check tcp(Local HTTP)
 TCP check(Local HTTP): connecting to 127.0.0.1:80...
 Running gethosbyname() on 127.0.0.1
 TCP check(Local HTTP): will connect to 127.0.0.1:80, connect timeout = 5, netio timeout = 10
-TCP check(Local HTTP): connected to 127.0.0.1:80
-TCP check(Local HTTP): disconnected from 127.0.0.1:80
-Local HTTP -> ok
+TCP check(Local HTTP): network error connecting to 127.0.0.1:80, code=111 (Connection refused)
+Local HTTP -> ** KO **
 Performing check tcp(My POP3)
 TCP check(My POP3): connecting to localhost:13529...
 Running gethosbyname() on localhost
