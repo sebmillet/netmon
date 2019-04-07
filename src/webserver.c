@@ -293,7 +293,7 @@ char *my_ctime_r(const time_t *timep, char *buf, size_t buflen) {
 //
 // Answers web connections
 //
-int manage_web_transaction(connection_t *conn) {
+void manage_web_transaction(connection_t *conn) {
 
     my_logf(LL_DEBUG, LP_DATETIME, "Entering web transaction...");
 
@@ -303,7 +303,7 @@ int manage_web_transaction(connection_t *conn) {
     if ((read_res = conn_read_line_alloc(conn, &received,
                                          g_trace_network_traffic, &size)) < 0) {
         MYFREE(received);
-        return -1;
+        return;
     }
 
     my_logf(LL_DEBUG, LP_DATETIME, "Received request '%s'", received);
@@ -313,7 +313,7 @@ int manage_web_transaction(connection_t *conn) {
         MYFREE(received);
         http_send_error_page(conn, "400 Bad Request",
                              "Could not understand request");
-        return -1;
+        return;
     }
     p += 3;
     while (*p == ' ')
@@ -338,7 +338,7 @@ int manage_web_transaction(connection_t *conn) {
         MYFREE(received);
         http_send_error_page(conn, "400 Bad Request",
                              "Could not understand request");
-        return -1;
+        return;
     }
 
     char *t = strrchr(tmpurl, '/');
@@ -348,7 +348,7 @@ int manage_web_transaction(connection_t *conn) {
         MYFREE(received);
         http_send_error_page(conn, "401 Unauthorized",
                              "Not allowed to go up in directory tree");
-        return -1;
+        return;
     }
 
     char url[BIGSTRSIZE];
@@ -361,7 +361,7 @@ int manage_web_transaction(connection_t *conn) {
                                              &size))
                 < 0) {
             MYFREE(received);
-            return -1;
+            return;
         }
 
         if (strncasecmp(received, "connection:", 11) == 0
@@ -407,7 +407,7 @@ int manage_web_transaction(connection_t *conn) {
             errno_error(s_err, sizeof(s_err));
             my_logf(LL_ERROR, LP_DATETIME, "%s", s_err);
             http_send_error_page(conn, "404 Not found", s_err);
-            return -1;
+            return;
         }
         content_length = (size_t)s.st_size;
     }
@@ -425,20 +425,20 @@ int manage_web_transaction(connection_t *conn) {
                        sizeof(dt_fileupdate)) == 0) {
             http_send_error_page(conn, "500 Server error",
                                  "Internal server error");
-            return -1;
+            return;
         }
     }
     if (gettimeofday(&tv, NULL) != 0 ||
             my_ctime_r(&tv.tv_sec, dt_now, sizeof(dt_now)) == 0) {
         http_send_error_page(conn, "500 Server error", "Internal server error");
-        return -1;
+        return;
     }
     if (internal_content == NULL) {
         my_logf(LL_DEBUG, LP_DATETIME, "path opened: '%s'", path);
         F = my_fopen(path, "rb", 5, 800);
         if (F == NULL) {
             http_send_error_page(conn, "404 Not found", "File not found");
-            return -1;
+            return;
         }
         char *pos;
         if ((pos = strrchr(path, '.')) != NULL) {
@@ -474,17 +474,18 @@ int manage_web_transaction(connection_t *conn) {
 
     my_logf(LL_DEBUG, LP_DATETIME, "Will send content over the network");
 
+    int close_conn = TRUE;
+
     size_t n;
     ssize_t e;
     if (internal_content == NULL) {
         char *buffer = (char *)MYMALLOC(buffer_size, buffer);
-        while (feof(F) == 0) {
+        while (!feof(F)) {
             if ((n = fread(buffer, 1, buffer_size, F)) == 0) {
                 if (feof(F) == 0) {
                     my_logf(LL_ERROR, LP_DATETIME, "Error reading file %s",
                             path);
                     keep_alive = FALSE;
-                    MYFREE(buffer);
                     fclose(F);
                     break;
                 }
@@ -492,14 +493,13 @@ int manage_web_transaction(connection_t *conn) {
             e = conn->sock_write(conn, buffer, n);
             if (e == SOCKET_ERROR) {
                 my_logf(LL_ERROR, LP_DATETIME, "Socket error");
+                close_conn = FALSE;
                 keep_alive = FALSE;
-                MYFREE(buffer);
                 fclose(F);
                 break;
             }
         }
         MYFREE(buffer);
-        fclose(F);
         conn_line_sendf(conn, g_trace_network_traffic, "");
     } else {
         n = size_internal_content;
@@ -510,6 +510,7 @@ int manage_web_transaction(connection_t *conn) {
             e = conn->sock_write(conn, walker, to_send);
             if (e == SOCKET_ERROR) {
                 my_logf(LL_ERROR, LP_DATETIME, "Socket error");
+                close_conn = FALSE;
                 keep_alive = FALSE;
                 break;
             }
@@ -520,15 +521,25 @@ int manage_web_transaction(connection_t *conn) {
     my_logf(LL_DEBUG, LP_DATETIME,
             "Finished sending content over the network");
 
-    return keep_alive ? 0 : -1;
+    if (keep_alive) {
+        my_logf(LL_VERBOSE, LP_DATETIME,
+                WEBSERVER_LOG_PREFIX ": continuing connection with client");
+    } else {
+
+        if (close_conn)
+            conn_close(conn);
+
+        my_logf(LL_VERBOSE, LP_DATETIME,
+                WEBSERVER_LOG_PREFIX ": terminated connection with client");
+    }
+
+    return;
 }
 
 //
 // Manages web server
 //
-void *webserver(void *p) {
-    UNUSED(p);
-
+void *webserver() {
     connection_t listen_conn;
     conn_init(&listen_conn, CONNTYPE_PLAIN);
 
@@ -547,17 +558,8 @@ void *webserver(void *p) {
     while (1) {
         while (server_accept(&listen_conn, &remote_sin, (int)g_webserver_port,
                              WEBSERVER_LOG_PREFIX, &connect_conn) != -1) {
-            if (manage_web_transaction(&connect_conn) != 0) {
-                conn_close(&connect_conn);
-                my_logf(LL_VERBOSE, LP_DATETIME,
-                        WEBSERVER_LOG_PREFIX ": terminated connection with client");
-            } else {
-                my_logf(LL_VERBOSE, LP_DATETIME,
-                        WEBSERVER_LOG_PREFIX ": continuing connection with client");
-            }
+            manage_web_transaction(&connect_conn);
         }
-        my_logf(LL_VERBOSE, LP_DATETIME,
-                WEBSERVER_LOG_PREFIX ": OULALA");
     }
     return NULL;
 }

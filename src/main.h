@@ -256,5 +256,5 @@ int perform_check_loop(struct check_t *chk, const struct subst_t *subst,
 int main_post(int argc, char *argv[]);
 
 // From webserver.c
-void *webserver(void *p);
+void *webserver();
 

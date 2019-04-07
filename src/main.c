@@ -4099,7 +4099,7 @@ int main_post(int argc, char *argv[]) {
 #ifdef MY_WINDOWS
         if (g_webserver) {
             my_log_open();
-            webserver(NULL);
+            webserver();
             my_log_close();
             exit(EXIT_SUCCESS);
         } else {
@@ -4125,7 +4125,7 @@ int main_post(int argc, char *argv[]) {
 
 #ifdef MY_LINUX
         if ((g_web_server_pid = fork()) == 0) {
-            webserver(NULL);
+            webserver();
             exit(EXIT_SUCCESS);
         } else if (g_web_server_pid < 0) {
             my_logf(LL_ERROR, LP_DATETIME, "Unable to launch web server");
