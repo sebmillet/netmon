@@ -244,7 +244,7 @@ int server_accept(connection_t *listen_conn,
                                 (struct sockaddr *)remote_sin,
                                 &remote_sin_len);
 
-    my_logf(LL_DEBUG, LP_DATETIME, "%s: accept() function returned");
+    my_logf(LL_DEBUG, LP_DATETIME, "%s: accept() function returned", WEBSERVER_LOG_PREFIX);
 
     if (connect_conn->sock == -1) {
         my_logf(LL_ERROR, LP_DATETIME, "%s: cannot accept, error %s",
