@@ -49,7 +49,8 @@
 
 #ifdef MY_WINDOWS
 // WINDOWS
-#include <winsock2.h>
+//#include <winsock2.h>
+#include <stdint.h>
 #else
 // NOT WINDOWS
 #include <netinet/in.h>

@@ -68,8 +68,8 @@ This INSTALL file is the one provided by default by autotools.
   Libs in c:\openssl\lib
   Includes in c:\openssl\include
 
-3) OBSOLETE - pthreads must be available for static linking in c:\pthreads, see below for
-  instructions as to how to build it. To be more precise:
+3) OBSOLETE - pthreads must be available for static linking in c:\pthreads, see
+  below for instructions as to how to build it. To be more precise:
   Libs in c:\pthreads
   Includes in c:\pthreads
 
@@ -102,7 +102,10 @@ To build a static version of openssl with mingw, see the following URLs:
 
   1. Download the source from there and extract it:
     http://www.openssl.org/source/openssl-1.0.1e.tar.gz
-  2. Open a MSYS window (from MinGW\msys\1.0\msys.bat)
+    Below we assume you extracted it into
+    C:\openssl
+  2. Open a MSYS window (execute MinGW\msys\1.0\msys.bat)
+    and cd to /c/openssl
   3. Run the command (32 bits)
     perl Configure mingw no-shared no-asm --prefix=/c/openssl
   Or (64 bits)
@@ -110,7 +113,8 @@ To build a static version of openssl with mingw, see the following URLs:
   4. Run
     make
     make install
-  5. Under the directory you built openssl in, you will find the libraries, example:
+  5. Under the directory you built openssl in, you will find the libraries,
+    example:
     C:\openssl\lib\libcrypto.a
     C:\openssl\lib\libssl.a
 
@@ -128,8 +132,8 @@ To build a static version of pthreads with mingw, see the following URL:
   2. Open a MSYS window (from MinGW\msys\1.0\msys.bat)
   3. Run the command
     make GC-static
-  The compiled code linked against static libpthreads MUST be compiled with the defined macro
-  -DPTW32_STATIC_LIB
+  The compiled code linked against static libpthreads MUST be compiled with the
+  defined macro -DPTW32_STATIC_LIB
 
 You're done!
 
