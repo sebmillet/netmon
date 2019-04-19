@@ -91,14 +91,6 @@ enum {
 
 void web_create_files_for_web();
 
-#ifdef MY_WINDOWS
-
-// WINDOWS
-
-/*#include <winsock2.h>*/
-
-#endif
-
 
 //
 // Status
@@ -736,8 +728,6 @@ VOID WINAPI ntsvc_main(DWORD dwArgc, LPTSTR *lpszArgv) {
 // Incremented at each interval as defined in the ini variable
 // check_interval.
 long int loop_count = 0;
-
-/*pthread_mutex_t mutex;*/
 
 
 //
@@ -1830,9 +1820,7 @@ int perform_check_loop(struct check_t *chk, const struct subst_t *subst,
 // Get loop_count in a thread-safe manner
 //
 long int get_loop_count() {
-    /*  my_pthread_mutex_lock(&mutex);*/
     long int lc = loop_count;
-    /*  my_pthread_mutex_unlock(&mutex);*/
     return lc;
 }
 
@@ -2224,8 +2212,6 @@ void manage_output(const struct tm *now_done, float elapsed) {
         printf("    . = ok, X = fail, ? = unknown, <space> = undefined\n");
     }
 
-    /*  my_pthread_mutex_lock(&mutex);*/
-
     FILE *H = NULL;
     if (g_test_mode == 0) {
         H = my_fopen(g_html_complete_file_name, "w", 3, 1000);
@@ -2349,8 +2335,6 @@ void manage_output(const struct tm *now_done, float elapsed) {
         add_reader_access_right(g_html_complete_file_name);
     }
 
-    /*  my_pthread_mutex_unlock(&mutex);*/
-
 }
 
 //
@@ -2405,10 +2389,8 @@ void almost_neverending_loop() {
         }
         this_sleep = 0;
 
-        /*      my_pthread_mutex_lock(&mutex);*/
         ++loop_count;
         int lc = (int)loop_count;
-        /*      my_pthread_mutex_unlock(&mutex);*/
 
         int II;
 
@@ -3959,9 +3941,6 @@ int main(int argc, char *argv[]) {
 
     // rand() function used by get_unique_mime_boundary()
     srand((unsigned int)time(NULL));
-
-    /*  my_pthread_mutex_init(&mutex);*/
-    /*  util_my_pthread_init();*/
 
     SSL_load_error_strings(); /* readable error messages */
     SSL_library_init();             /* initialize library */

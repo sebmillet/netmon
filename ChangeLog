@@ -1,6 +1,9 @@
-2019-04-10 Sébastien Millet <milletseb@laposte.net>
+2019-04-19 Sébastien Millet <milletseb@laposte.net>
 
 	* Release 1.1.2 built
+	* Fixes a critical bug where under Windows, the netio_timout (socket
+	  timeout) was in milliseconds instead of seconds, resulting in erratic
+	  timeouts depending on OS/network environment.
 	* Fixes a bug in webserver, that would make it become unavailable forever,
 	    if a client connection got inadvertently closed
 	* Fixes a bug in webserver debug mode log output

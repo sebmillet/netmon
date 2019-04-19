@@ -41,8 +41,6 @@ int g_print_log = DEFAULT_PRINT_LOG;
 long int g_log_usec = DEFAULT_LOG_USEC;
 FILE *log_fd = NULL;
 
-/*static pthread_mutex_t util_mutex;*/
-
 const struct connection_table_t connection_table[] = {
     {conn_plain_read, "<<< ", conn_plain_write, ">>> "},        // CONNTYPE_PLAIN
     {conn_ssl_read,     "SSL<<< ", conn_ssl_write,   "SSL>>> "} // CONNTYPE_SSL
@@ -53,8 +51,6 @@ const struct connection_table_t connection_table[] = {
 // * ******* *
 // * WINDOWS *
 // * ******* *
-
-#include <windows.h>
 
 const char FS_SEPARATOR = '\\';
 
@@ -88,6 +84,12 @@ static void os_set_sock_blocking_mode(int sock) {
         fatal_error("ioctlsocket failed with error: %ld", iResult);
 }
 
+static int os_setsock_timeout(int sock, int timeout_in_seconds) {
+    DWORD dwTimeout_in_milliseconds = 1000 * timeout_in_seconds;
+    return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,
+                      (char *)&dwTimeout_in_milliseconds,
+                      (int)sizeof(dwTimeout_in_milliseconds));
+}
 char *os_last_err_desc_n(char *s, const size_t s_len,
                          const long unsigned e) {
     LPVOID lpMsgBuf;
@@ -189,6 +191,14 @@ static void os_set_sock_blocking_mode(int sock) {
     long arg = fcntl(sock, F_GETFL, NULL);
     arg &= ~O_NONBLOCK;
     fcntl(sock, F_SETFL, arg);
+}
+
+static int os_setsock_timeout(int sock, int timeout_in_seconds) {
+    struct timeval netio_tv;
+    netio_tv.tv_sec = timeout_in_seconds;
+    netio_tv.tv_usec = 0;
+    return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&netio_tv,
+                      sizeof(netio_tv));
 }
 
 char *os_last_err_desc(char *s, size_t s_bufsize) {
@@ -483,8 +493,6 @@ int my_is_log_open() {
 // n MUST be set to 0.
 //
 
-/*extern pthread_mutex_t mutex;*/
-
 char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
                          int n) {
     size_t sc_len = strlen(s) + 1;
@@ -645,8 +653,6 @@ void my_log_core_get_dt_str(const logdisp_t log_disp, char *dt,
 // Output log string, used by my_log only
 //
 void my_log_core_output(const char *s, size_t dt_len) {
-    /*  my_pthread_mutex_lock(&util_mutex);*/
-
     if (log_fd) {
         fputs(s, log_fd);
         fputs("\n", log_fd);
@@ -672,7 +678,6 @@ void my_log_core_output(const char *s, size_t dt_len) {
 
     }
 
-    /*  my_pthread_mutex_unlock(&util_mutex);*/
 }
 
 //
@@ -828,11 +833,7 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
 
     os_set_sock_blocking_mode(conn->sock);
 
-    struct timeval netio_tv;
-    netio_tv.tv_sec = netio_to;
-    netio_tv.tv_usec = 0;
-    if (setsockopt(conn->sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&netio_tv,
-                   sizeof(netio_tv))) {
+    if (os_setsock_timeout(conn->sock, netio_to)) {
         my_logf(LL_ERROR, LP_DATETIME, "%s unable to set timeout to network I/O",
                 prefix);
     }

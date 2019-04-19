@@ -62,7 +62,6 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([atexit gethostbyname gettimeofday memset select socket strcasecmp strerror strncasecmp strstr])
 
-dnl AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(ssl, SSL_library_init)
 AC_CHECK_LIB(crypto, ERR_error_string_n)
 

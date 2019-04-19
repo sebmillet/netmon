@@ -19,8 +19,6 @@
 #define DEFAULT_HTML_DIRECTORY (".")
 #define DEFAULT_HTML_FILE "status.html"
 
-/*#include <winsock2.h>*/
-
 #else
 
 // NOT WINDOWS

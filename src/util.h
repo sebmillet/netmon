@@ -6,12 +6,12 @@
 
 #if defined(_WIN32) || defined(_WIN64)
 #define MY_WINDOWS
+#include <winsock2.h>
 #else
 #define MY_LINUX
 #endif
 
 #include <sys/types.h>
-//#include <pthread.h>
 #include <stdio.h>
 #include <openssl/ssl.h>
 
@@ -49,7 +49,6 @@
 
 #ifdef MY_WINDOWS
 // WINDOWS
-//#include <winsock2.h>
 #include <stdint.h>
 #else
 // NOT WINDOWS
@@ -221,11 +220,6 @@ int os_last_network_op_is_in_progress();
 
 FILE *my_fopen(const char *filename, const char *mode,
                const int nb_retries, const unsigned long int usec_delay);
-
-//void my_pthread_mutex_lock(pthread_mutex_t *m);
-//void my_pthread_mutex_unlock(pthread_mutex_t *m);
-//void my_pthread_mutex_init(pthread_mutex_t *m);
-//void util_my_pthread_init();
 
 void os_init_network();
 int s_begins_with(const char *s, const char *begins_with);
