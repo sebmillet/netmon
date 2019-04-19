@@ -144,7 +144,7 @@ void web_create_files_for_web() {
             my_logf(LL_ERROR, LP_DATETIME, "Unable to create %s", buf);
         } else {
             int j;
-            const char const *v = img_files[i].var;
+            char const *v = img_files[i].var;
             size_t l = img_files[i].var_len;
 
             /*      dbg_write("Creating %s of size %lu\n", buf, l);*/

@@ -15,7 +15,7 @@ echo "// (c) 2013 Sébastien Millet" >> $DST
 echo >> $DST
 echo "#include <stdlib.h>" >> $DST
 echo >> $DST
-echo "const char const $VAR[] = {" >> $DST
+echo "char const $VAR[] = {" >> $DST
 hexdump -v -e '16/1 "0x%02X, " "\n"' "$1" | sed 's/,\s*0x\s*,.*//;$s/,\s*$//' >> $DST
 echo "};" >> $DST
 echo >> $DST

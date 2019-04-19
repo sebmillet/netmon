@@ -1855,13 +1855,13 @@ int perform_check(struct check_t *chk) {
 
     // NOW substitutions
     char now_ts[STR_LOG_TIMESTAMP];
-    char now_date[9];
-    char now_y[5];
-    char now_m[3];
-    char now_d[3];
-    char now_h[3];
-    char now_mi[3];
-    char now_s[3];
+    char now_date[30];
+    char now_y[12];
+    char now_m[12];
+    char now_d[12];
+    char now_h[12];
+    char now_mi[12];
+    char now_s[12];
     set_log_timestamp(now_ts, sizeof(now_ts), my_now.tm_year + 1900,
                       my_now.tm_mon + 1, my_now.tm_mday,
                       my_now.tm_hour, my_now.tm_min, my_now.tm_sec, -1);
@@ -2101,13 +2101,13 @@ int execute_alert(struct exec_alert_t *exec_alert) {
     // NOW substitutions
     struct tm *mn = exec_alert->my_now;
     char now_ts[STR_LOG_TIMESTAMP];
-    char now_date[9];
-    char now_y[5];
-    char now_m[3];
-    char now_d[3];
-    char now_h[3];
-    char now_mi[3];
-    char now_s[3];
+    char now_date[30];
+    char now_y[12];
+    char now_m[12];
+    char now_d[12];
+    char now_h[12];
+    char now_mi[12];
+    char now_s[12];
     set_log_timestamp(now_ts, sizeof(now_ts), mn->tm_year + 1900,
                       mn->tm_mon + 1,
                       mn->tm_mday,
@@ -2123,13 +2123,13 @@ int execute_alert(struct exec_alert_t *exec_alert) {
     // ALERT_INFO substitutions
     struct tm *ai = exec_alert->alert_info;
     char ai_ts[STR_LOG_TIMESTAMP];
-    char ai_date[9];
-    char ai_y[5];
-    char ai_m[3];
-    char ai_d[3];
-    char ai_h[3];
-    char ai_mi[3];
-    char ai_s[3];
+    char ai_date[30];
+    char ai_y[12];
+    char ai_m[12];
+    char ai_d[12];
+    char ai_h[12];
+    char ai_mi[12];
+    char ai_s[12];
     set_log_timestamp(ai_ts, sizeof(ai_ts), ai->tm_year + 1900, ai->tm_mon + 1,
                       ai->tm_mday,
                       ai->tm_hour, ai->tm_min, ai->tm_sec, -1);
@@ -3310,7 +3310,7 @@ void read_configuration_file(const char *cf, int *nb_errors) {
                         if (strcasecmp(key, readcfg_vars[i].name) == 0
                                 && read_status == readcfg_vars[i].section) {
                             match = TRUE;
-                            const struct readcfg_var_t const *cfg = &readcfg_vars[i];
+                            struct readcfg_var_t const *cfg = &readcfg_vars[i];
 
                             long int n = 0;
                             if (cfg->plint_target != NULL && cfg->var_type == V_INT)
@@ -3796,7 +3796,7 @@ void config_display() {
             if (strlen(list_alerts) >= 1)
                 strncat(list_alerts, ", ", sizeof(list_alerts) - 1);
             strncat(list_alerts, alerts[chk->alert_ctrl[II].idx].name,
-                    sizeof(list_alerts));
+                    sizeof(list_alerts) - 1);
         }
         list_alerts[sizeof(list_alerts) - 1] = '\0';
 
@@ -3924,7 +3924,7 @@ void ntsvc_install_and_quit(const char *argv0) {
     build_file_complete_name(tmp, g_cfg_file, cfg, sizeof(cfg));
     build_file_complete_name(tmp, g_log_file, log, sizeof(log));
 
-    char command[2 * MAX_PATH];
+    char command[3 * MAX_PATH + 500];
     snprintf(command, sizeof(command), "\"%s\" -d -c \"%s\" -l \"%s\"", e, cfg,
              log);
 
@@ -4105,7 +4105,7 @@ int main_post(int argc, char *argv[]) {
         } else {
             char exe[MAX_PATH];
             win_get_exe_file(argv[0], exe, sizeof(exe));
-            char cmd[MAX_PATH * 2];
+            char cmd[4 * MAX_PATH + 2000];
             snprintf(cmd, sizeof(cmd), "\"%s\" --webserver -c \"%s\" -l \"%s\"", exe,
                      g_cfg_file, g_log_file);
 

@@ -511,11 +511,11 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
                 int i;
 
                 if (g_print_subst_error) {
-                    strncpy(var2, SUBST_ERROR_PREFIX, sizeof(var2));
-                    strncat(var2, var, sizeof(var2));
+                    strncpy(var2, SUBST_ERROR_PREFIX, sizeof(var2) - 1);
+                    strncat(var2, var, sizeof(var2) - 1);
                     strncat(var2, SUBST_ERROR_POSTFIX, sizeof(var2) - 1);
                 } else {
-                    strncpy(var2, "", sizeof(var2));
+                    strncpy(var2, "", sizeof(var2) - 1);
                 }
 
                 char *rep = var2;
@@ -688,7 +688,7 @@ void my_logs(const loglevel_t log_level, const logdisp_t log_disp,
     my_log_core_get_dt_str(log_disp, dt, sizeof(dt));
     strncat(dt, LOG_AFTER_TIMESTAMP, sizeof(dt) - 1);
     size_t dt_len = strlen(dt);
-    strncat(dt, s, sizeof(dt));
+    strncat(dt, s, sizeof(dt) - 1);
     my_log_core_output(dt, dt_len);
 }
 
@@ -710,7 +710,7 @@ void my_logf(const loglevel_t log_level, const logdisp_t log_disp,
     va_end(args);
     strncat(dt, LOG_AFTER_TIMESTAMP, sizeof(dt) - 1);
     size_t dt_len = strlen(dt);
-    strncat(dt, log_string, sizeof(dt));
+    strncat(dt, log_string, sizeof(dt) - 1);
     my_log_core_output(dt, dt_len);
 }
 
@@ -952,7 +952,7 @@ int conn_establish_connection(connection_t *conn, const conn_def_t *srv,
 
     my_logf(LL_DEBUG, LP_DATETIME, "%s connecting to %s:%i...", prefix, h, p);
 
-    char server_desc[SMALLSTRSIZE];
+    char server_desc[SMALLSTRSIZE + 100];
     char s_err[ERR_STR_BUFSIZE];
 
     snprintf(server_desc, sizeof(server_desc), "%s:%i", h, p);
