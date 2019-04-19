@@ -1,11 +1,13 @@
-#!/bin/sh
+#!/bin/bash
+
+set -euo pipefail
 
 ZIPNAME=netmon-1.1.2.zip
 
 mkdir ztmp
 cd ztmp
 
-cp -vi ~/netmon.exe .
+cp -vi ../build/netmon.exe .
 cp -vi ../doc/netmon.html .
 cp -vi ../doc/netmon-sample.ini .
 cp -vi ../README README.TXT
