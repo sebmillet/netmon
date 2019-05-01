@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-ZIPNAME=netmon-1.1.2.zip
+ZIPNAME=netmon-1.1.3.zip
 
 mkdir ztmp
 cd ztmp

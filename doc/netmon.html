@@ -81,6 +81,9 @@
   <dt><b>-l,&#x00A0;--log-file&#x00A0;<i>log-file</i></b></dt>
   <dd>Log information into <i>log-file</i>. By default it is
     <i>netmon.log</i></dd>
+  <dt><b>-w,&#x00A0;--web-log-file&#x00A0;<i>web-log-file</i></b></dt>
+  <dd>Web server log information into <i>web-log-file</i>. By default it is
+      <i>netmon-web.log</i></dd>
   <dt><b>-c,&#x00A0;--config-file&#x00A0;<i>config-file</i></b></dt>
   <dd>Use <i>config-file</i> to read configuration. By default it is
       <i>netmon.ini</i></dd>
@@ -114,87 +117,138 @@ The file <b>netmon-sample.ini</b>, provided with netmon, contains all ini
   variables with a short help.
 <br/>
 <b>netmon.ini help</b>
-<p class="Pp">A string value can be written as is, as in
-   host_name=localhost or with surrounding double-quotes, as in
-   host_name=&quot;localhost&quot; The equal sign can be preceeded or followed
-    by spaces, as in
+<p class="Pp">A string value can be written as is, as in</p>
+<p class="Pp">
+   host_name=localhost</p>
+<p class="Pp">or with surrounding double-quotes, as in</p>
+<p class="Pp">
+   host_name=&quot;localhost&quot;</p>
+<p class="Pp">The equal sign can be preceeded or followed by spaces, as in</p>
+<p class="Pp">
    host_name = Localhost</p>
 <p class="Pp">When multiple values are possible, they are separated by a ','
-    character, as in
+    character, as in</p>
+<p class="Pp">
    alerts = mylog, myprg, mysmtp</p>
-<p class="Pp">Sections can appear in any order. Inside sections, variables can
-    appear in any order.</p>
+<p class="Pp">Sections can appear in any order.</p>
+<p class="Pp">Inside sections, variables can appear in any order.</p>
 <p class="Pp">For settings referring to a TCP connection, the '..._crypt'
     variable (tcp_crypt, smtp_crypt, etc.) is optional. If no crypt
     specification is set, netmon will guess whether SSL is to be used by
     examining the port. If the port is one of 443, 465, 585, 993 or 995, netmon
     will use SSL over the TCP connection, otherwise it won't.</p>
-<p class="Pp"><b>About host names</b>
+<p class="Pp"><b>About host names</b></p>
+<p class="Pp">
    A host name can be followed by :port_number if appropriate,
-   taking precedence on the corresponding port number variable.
-   Thus for a TCP check definition, the line
-   host_name=smtp.myprovider.com:8080
-   produces the same result as the two lines
+   taking precedence on the corresponding port number variable.</p>
+<p class="Pp">
+   Thus for a TCP check definition, the line</p>
+<p class="Pp">
+   host_name=smtp.myprovider.com:8080</p>
+<p class="Pp">
+   produces the same result as the two lines</p>
+<p class="Pp">
    host_name=smtp.myprovider.com
    tcp_port=8080</p>
-<p class="Pp"><b>About substitutions</b>
-   The following parameters
-   program_command, log_file, log_string
-   are subject to substitutions.
+<p class="Pp"><b>About substitutions</b></p>
+<p class="Pp">
+   The following parameters</p>
+<p class="Pp">
+   program_command, log_file, log_string</p>
+<p class="Pp">
+   are subject to substitutions.</p>
+<p class="Pp">
    Any occurence of ${something} will be replaced by the value
-   of the 'something' variable.
-   For example
-   log_string=&quot;${NOW_TIMESTAMP} ${DESCRIPTION}&quot;
-   will cause printouts in the log like
-   21/01/93 10:22:00
+   of the 'something' variable.</p>
+<p class="Pp">
+   For example</p>
+<p class="Pp">
+   log_string=&quot;${NOW_TIMESTAMP} ${DESCRIPTION}&quot;</p>
+<p class="Pp">
+   will cause printouts in the log like</p>
+<p class="Pp">
+   21/01/93 10:22:00</p>
+<p class="Pp">
    What to do in case the variable does not exist is tuned by
    the print_subst_error variable.</p>
-<p class="Pp"><b>List of substitutions inside alerts and checks</b>
-   DISPLAY_NAME Check display_name
-   HOST_NAME Check host_name
-   NOW_TIMESTAMP dd/mm/yy hh:mm:ss of current date/time
-   NOW_YMD yyyymmdd of current date (8 digits)
-   NOW_YEAR Year of current date, 4 digits
-   NOW_MONTH Month of current date, 2 digits
-   NOW_DAY Day of current date, 2 digits
-   NOW_HOUR Hour of current time, 2 digits
-   NOW_MINUTE Minute of current time, 2 digits
-   NOW_SECOND Second of current time, 2 digits
-   LOOP_COUNT Number of ticks since program started
+<p class="Pp"><b>List of substitutions inside alerts and checks</b></p>
+<p class="Pp">
+   DISPLAY_NAME Check display_name</p>
+<p class="Pp">
+   HOST_NAME Check host_name</p>
+<p class="Pp">
+   NOW_TIMESTAMP dd/mm/yy hh:mm:ss of current date/time</p>
+<p class="Pp">
+   NOW_YMD yyyymmdd of current date (8 digits)</p>
+<p class="Pp">
+   NOW_YEAR Year of current date, 4 digits</p>
+<p class="Pp">
+   NOW_MONTH Month of current date, 2 digits</p>
+<p class="Pp">
+   NOW_DAY Day of current date, 2 digits</p>
+<p class="Pp">
+   NOW_HOUR Hour of current time, 2 digits</p>
+<p class="Pp">
+   NOW_MINUTE Minute of current time, 2 digits</p>
+<p class="Pp">
+   NOW_SECOND Second of current time, 2 digits</p>
+<p class="Pp">
+   LOOP_COUNT Number of ticks since program started</p>
+<p class="Pp">
    TAB A tab (ascii code 9)</p>
-<p class="Pp"><b>List of substitutions inside alerts only</b>
-   DESCRIPTION Description of alert, example
-   'My prog probe [none] in status Fail since 21/01 10:22'
-   STATUS Check status string, can be
-   &quot;Undefined&quot;, &quot;Unknown&quot;, &quot;Ok&quot;, &quot;Fail&quot;
-   STATUS_NUM Check status code, can be 0 for
-   Undefined, 1 for Unknown, 2 for Ok, 3 for Fail
-   CONSECUTIVE_NOTOK Number of consecutive ticks being not
-   &quot;Ok&quot; for the check
-   ALERT_NAME Name of alert
-   ALERT_METHOD Method of alert, can be &quot;smtp&quot;,
-   &quot;program&quot;, &quot;log&quot;
+<p class="Pp"><b>List of substitutions inside alerts only</b></p>
+<p class="Pp">
+   DESCRIPTION Description of alert, example</p>
+<p class="Pp">
+   'My prog probe [none] in status Fail since 21/01 10:22'</p>
+<p class="Pp">
+   STATUS Check status string, can be &quot;Undefined&quot;,
+    &quot;Unknown&quot;, &quot;Ok&quot;, &quot;Fail&quot;</p>
+<p class="Pp">
+   STATUS_NUM Check status code, can be 0 for Undefined, 1 for Unknown, 2 for
+    Ok, 3 for Fail</p>
+<p class="Pp">
+   CONSECUTIVE_NOTOK Number of consecutive ticks being not &quot;Ok&quot; for
+    the check</p>
+<p class="Pp">
+   ALERT_NAME Name of alert</p>
+<p class="Pp">
+   ALERT_METHOD Method of alert, can be &quot;smtp&quot;, &quot;program&quot;,
+    &quot;log&quot;.</p>
+<p class="Pp">
    ALERT_STATUS Alert status string, can be &quot;Nothing&quot;,
-   &quot;Fail&quot;, &quot;Recovery&quot;.
-   ALERT_STATUS_NUM Alert status code, can be 0 for Nothing,
-   1 for Fail, 2 for Recovery.
-   ALERT_SEQ Number of times the alert was already
-   triggered (for the same check failure)
-   ALERT_NB_FAILURES Number of failures executing the alert
-   itself
-   ALERT_TIMESTAMP Timestamp of the date/time at which the
-   check turned to &quot;Fail&quot; or &quot;Unknown&quot;
-   ALERT_YMD yyyymmdd of alert timestamp (8 digits)
-   ALERT_YEAR Year of alert timestamp (4 digits)
-   ALERT_MONTH Month of alert timestamp (2 digits)
-   ALERT_DAY Day of alert timestamp (2 digits)
-   ALERT_HOUR Hour of alert timestamp (2 digits)
-   ALERT_MINUTE Minute of alert timestamp (2 digits)
+    &quot;Fail&quot;, &quot;Recovery&quot;.</p>
+<p class="Pp">
+   ALERT_STATUS_NUM Alert status code, can be 0 for Nothing, 1 for Fail, 2 for
+    Recovery.</p>
+<p class="Pp">
+   ALERT_SEQ Number of times the alert was already triggered (for the same check
+    failure)</p>
+<p class="Pp">
+   ALERT_NB_FAILURES Number of failures executing the alert itself</p>
+<p class="Pp">
+   ALERT_TIMESTAMP Timestamp of the date/time at which the check turned to
+    &quot;Fail&quot; or &quot;Unknown&quot;</p>
+<p class="Pp">
+   ALERT_YMD yyyymmdd of alert timestamp (8 digits)</p>
+<p class="Pp">
+   ALERT_YEAR Year of alert timestamp (4 digits)</p>
+<p class="Pp">
+   ALERT_MONTH Month of alert timestamp (2 digits)</p>
+<p class="Pp">
+   ALERT_DAY Day of alert timestamp (2 digits)</p>
+<p class="Pp">
+   ALERT_HOUR Hour of alert timestamp (2 digits)</p>
+<p class="Pp">
+   ALERT_MINUTE Minute of alert timestamp (2 digits)</p>
+<p class="Pp">
    ALERT_SECOND Second of alert timestamp (2 digits)</p>
 <p class="Pp"><b>[general] section</b></p>
 <p class="Pp">The [general] section sets global options to netmon, the most
-    important one being
-   check_interval This option is the number of seconds between checks. It is the
+    important one being</p>
+<p class="Pp">
+   check_interval</p>
+<p class="Pp">This option is the number of seconds between checks. It is the
     reference duration for the &quot;tick&quot; of the running program. Many
     other options, like alert_threshold, alert_repeat_every, ..., correspond to
     a number of elapsed ticks.</p>
@@ -202,32 +256,44 @@ The file <b>netmon-sample.ini</b>, provided with netmon, contains all ini
 <p class="Pp">The [check] section appears once per probe to do. So, you have as
     many [check] sections as you have probes. It is not a very ini-proof
     approach but that is how it is. Probes can be of three kinds set by the
-    method variable. It is tcp, program and loop.
-   tcp
+    method variable. It is tcp, program and loop.</p>
+<p class="Pp"><b>tcp</b></p>
+<p class="Pp">
    Connect to a given address through TCP. You can specify an
    expected answer (as per telnet standard), useful to check
-   SMTP or similar (POP3, FTP etc.) protocols availability.
-   program
+   SMTP or similar (POP3, FTP etc.) protocols availability.</p>
+<p class="Pp"><b>program</b></p>
+<p class="Pp">
    Runs an arbitrary external program, and use its return
-   value for the service status, as per Nagios standard =&gt;
-   0 = Nagios Ok =&gt; netmon &quot;ok&quot;
-   1 = Nagios Warning =&gt; netmon &quot;fail&quot;
-   2 = Nagios Critical =&gt; netmon &quot;fail&quot;
-   3 = Nagios Unknown =&gt; netmon &quot;unknown&quot;
-   (netmon does not have a warning status)
-   loop
+   value for the service status, as per Nagios standard =&gt;</p>
+<p class="Pp">
+   0 = Nagios Ok =&gt; netmon &quot;ok&quot;</p>
+<p class="Pp">
+   1 = Nagios Warning =&gt; netmon &quot;fail&quot;</p>
+<p class="Pp">
+   2 = Nagios Critical =&gt; netmon &quot;fail&quot;</p>
+<p class="Pp">
+   3 = Nagios Unknown =&gt; netmon &quot;unknown&quot;</p>
+<p class="Pp">
+   (netmon does not have a warning status)</p>
+<p class="Pp"><b>loop</b></p>
+<p class="Pp">
    Perform an email loop. Sends an email through SMTP and
    collect received emails on a POP3 mail box to which sent
    emails are addressed.</p>
 <p class="Pp"><b>[alert] sections</b></p>
 <p class="Pp">Define alerts, referred to inside checks using the 'alerts'
-    variable (matched against the 'name' variable of each alert.) Alerts can be
-    of three kinds set by the method variable, smtp, program and log.
-   smtp
-   Sends an email via SMTP
-   program
-   Execute an arbitrary external program
-   log
+    variable (matched against the 'name' variable of each alert.)</p>
+<p class="Pp">Alerts can be of three kinds set by the method variable, smtp,
+    program and log.</p>
+<p class="Pp"><b>smtp</b></p>
+<p class="Pp">
+   Sends an email via SMTP</p>
+<p class="Pp"><b>program</b></p>
+<p class="Pp">
+   Execute an arbitrary external program</p>
+<p class="Pp"><b>log</b></p>
+<p class="Pp">
    Write information into a log file</p>
 <dl class="Bl-tag">
   <dt><b>Variables of the [general] section</b></dt>
@@ -871,8 +937,8 @@ The file <b>netmon-sample.ini</b>, provided with netmon, contains all ini
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">version 1.1.2</td>
-    <td class="foot-os">April 2019</td>
+    <td class="foot-date">version 1.1.3</td>
+    <td class="foot-os">May 2019</td>
   </tr>
 </table>
 </body>

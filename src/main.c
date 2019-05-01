@@ -69,6 +69,7 @@
 #define WIN_SERVICE_DISPLAY_NAME    (PACKAGE_NAME " Service")
 
 const char *DEFAULT_LOGFILE = PACKAGE_TARNAME ".log";
+const char *DEFAULT_WEB_LOGFILE = PACKAGE_TARNAME "-web.log";
 const char *DEFAULT_CFGFILE = PACKAGE_TARNAME ".ini";
 
 const char *TERM_CLEAR_SCREEN = "\033[2J\033[1;1H";
@@ -177,6 +178,7 @@ extern loglevel_t g_current_log_level;
 int g_log_level_updated_by_option = FALSE;
 
 extern char g_log_file[SMALLSTRSIZE];
+extern char g_web_log_file[SMALLSTRSIZE];
 
 struct check_t checks[2000];
 int g_nb_checks = 0;
@@ -1048,7 +1050,7 @@ int perform_check_tcp(struct check_t *chk, const struct subst_t *subst,
     int backup_cr = cr;
 
     if (cr == CONNRES_OK && chk->tcp_close_set) {
-        if (conn_line_sendf(&conn, g_trace_network_traffic, "%s",
+        if (conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "%s",
                             chk->tcp_close)) {
             cr = CONNRES_NETIO;
         }
@@ -1167,7 +1169,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env,
         return (cr == CONNRES_RESOLVE_ERROR ? ERR_SMTP_RESOLVE_ERROR :
                 ERR_SMTP_NETIO);
 
-    if (conn_line_sendf(conn, g_trace_network_traffic, "EHLO %s",
+    if (conn_line_sendf(my_logf, conn, g_trace_network_traffic, "EHLO %s",
                         env->self_set ? env->self : DEFAULT_SMTP_SELF)) {
         return ERR_SMTP_NETIO;
     }
@@ -1175,7 +1177,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env,
     char *response = NULL;
     size_t response_size;
     do {
-        if (conn_read_line_alloc(conn, &response, g_trace_network_traffic,
+        if (conn_read_line_alloc(my_logf, conn, &response, g_trace_network_traffic,
                                  &response_size) < 0) {
             return ERR_SMTP_NETIO;
         }
@@ -1192,10 +1194,10 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env,
     from_buf[from_buf_len - 1] = '\0';
     env->from = from_buf;
     env->from = smtp_address(env->from);
-    if (conn_round_trip(conn, "250 ",
+    if (conn_round_trip(my_logf, conn, "250 ",
                         g_trace_network_traffic, "MAIL FROM: <%s>", env->from
                        ) != CONNRES_OK) {
-        conn_line_sendf(conn, g_trace_network_traffic, "QUIT");
+        conn_line_sendf(my_logf, conn, g_trace_network_traffic, "QUIT");
         my_logf(LL_ERROR, LP_DATETIME,
                 "%s sender not accepted, closing connection", prefix);
         return ERR_SMTP_SENDER_REJECTED;
@@ -1216,7 +1218,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env,
         r = smtp_address(r);
         if (strlen(r) >= 1) {
             env->nb_recipients_wanted++;
-            int res = conn_round_trip(conn, "250 ", g_trace_network_traffic,
+            int res = conn_round_trip(my_logf, conn, "250 ", g_trace_network_traffic,
                                       "RCPT TO: <%s>", r);
             if (res == CONNRES_OK)
                 env->nb_recipients_ok++;
@@ -1233,12 +1235,12 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env,
     if (env->nb_recipients_ok == 0) {
         my_logf(LL_ERROR, LP_DATETIME,
                 "%s no recipient accepted, closing connection", prefix);
-        conn_line_sendf(conn, g_trace_network_traffic, "QUIT");
+        conn_line_sendf(my_logf, conn, g_trace_network_traffic, "QUIT");
         return ERR_SMTP_NO_RECIPIENT_ACCEPTED;
     }
 
     int res;
-    if ((res = conn_round_trip(conn, "354 ", g_trace_network_traffic,
+    if ((res = conn_round_trip(my_logf, conn, "354 ", g_trace_network_traffic,
                                "DATA")) != CONNRES_OK) {
         my_logf(LL_ERROR, LP_DATETIME,
                 "%s DATA command not accepted, closing connection", prefix);
@@ -1254,14 +1256,14 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env,
 //
 int smtp_mail_sending_post(connection_t *conn, const char *prefix,
                            char *email_ref, const size_t email_ref_len) {
-    if (conn_line_sendf(conn, g_trace_network_traffic, "")
-            || conn_line_sendf(conn, g_trace_network_traffic, ".")) {
+    if (conn_line_sendf(my_logf, conn, g_trace_network_traffic, "")
+            || conn_line_sendf(my_logf, conn, g_trace_network_traffic, ".")) {
         return ERR_SMTP_NETIO;
     }
 
     char *response = NULL;
     size_t response_size;
-    if (conn_read_line_alloc(conn, &response, g_trace_network_traffic,
+    if (conn_read_line_alloc(my_logf, conn, &response, g_trace_network_traffic,
                              &response_size) < 0) {
         MYFREE(response);
         conn_close(conn);
@@ -1298,7 +1300,7 @@ int smtp_mail_sending_post(connection_t *conn, const char *prefix,
     MYFREE(queued_ref);
     MYFREE(response);
 
-    conn_line_sendf(conn, g_trace_network_traffic, "QUIT");
+    conn_line_sendf(my_logf, conn, g_trace_network_traffic, "QUIT");
     conn_close(conn);
 
     my_logf(LL_DEBUG, LP_DATETIME, "Disconnected");
@@ -1342,18 +1344,20 @@ void get_rfc822_header_format_current_date(char *date,
 int smtp_mail_sending_stdheaders(connection_t *conn,
                                  const struct rfc821_enveloppe_t *smtp) {
     if (strlen(smtp->from_orig) >= 1) {
-        conn_line_sendf(conn, g_trace_network_traffic, "return-path: %s",
+        conn_line_sendf(my_logf, conn, g_trace_network_traffic, "return-path: %s",
                         smtp->from);
-        conn_line_sendf(conn, g_trace_network_traffic, "sender: %s", smtp->from);
-        conn_line_sendf(conn, g_trace_network_traffic, "from: %s",
+        conn_line_sendf(my_logf, conn, g_trace_network_traffic, "sender: %s",
+                        smtp->from);
+        conn_line_sendf(my_logf, conn, g_trace_network_traffic, "from: %s",
                         smtp->from_orig);
     }
-    conn_line_sendf(conn, g_trace_network_traffic, "to: %s", smtp->recipients);
-    conn_line_sendf(conn, g_trace_network_traffic, "x-mailer: %s",
+    conn_line_sendf(my_logf, conn, g_trace_network_traffic, "to: %s",
+                    smtp->recipients);
+    conn_line_sendf(my_logf, conn, g_trace_network_traffic, "x-mailer: %s",
                     PACKAGE_STRING);
     char date[SMALLSTRSIZE];
     get_rfc822_header_format_current_date(date, sizeof(date));
-    return conn_line_sendf(conn, g_trace_network_traffic, "date: %s",
+    return conn_line_sendf(my_logf, conn, g_trace_network_traffic, "date: %s",
                            date) ? ERR_SMTP_NETIO : ERR_SMTP_OK;
 }
 
@@ -1408,27 +1412,29 @@ int loop_send_email(const struct check_t *chk,
 
     if (g_test_mode == 0) {
         // Corresponds to LOOP_HEADER_REF
-        conn_line_sendf(&conn, g_trace_network_traffic, "subject: %s",
+        conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "subject: %s",
                         loop->loop_ref);
 
-        conn_line_sendf(&conn, g_trace_network_traffic, "MIME-Version: 1.0");
-        conn_line_sendf(&conn, g_trace_network_traffic,
+        conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
+                        "MIME-Version: 1.0");
+        conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                         "Content-Type: text/plain");
-        conn_line_sendf(&conn, g_trace_network_traffic,
+        conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                         "Content-Transfer-Encoding: 7bit");
 
 // Email body
 
-        conn_line_sendf(&conn, g_trace_network_traffic, "");
+        conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
 
-        conn_line_sendf(&conn, g_trace_network_traffic,
+        conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                         "This is a loop email sent by " PACKAGE_STRING);
         char strnow[STR_NOW];
         get_str_now(strnow, sizeof(strnow), &now);
-        conn_line_sendf(&conn, g_trace_network_traffic, "Sent: %s", strnow);
-        conn_line_sendf(&conn, g_trace_network_traffic, "Refrence: '%s'",
+        conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "Sent: %s",
+                        strnow);
+        conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "Refrence: '%s'",
                         loop->loop_ref);
-        conn_line_sendf(&conn, g_trace_network_traffic, "");
+        conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
 
         // Email end
 
@@ -1530,10 +1536,11 @@ int loop_receive_emails(const struct check_t *chk,
         return (cr == CONNRES_RESOLVE_ERROR ? ERR_POP3_RESOLVE_ERROR :
                 ERR_POP3_NETIO);
 
-    if ((r = conn_round_trip(&conn, "+OK", g_trace_network_traffic, "USER %s",
+    if ((r = conn_round_trip(my_logf, &conn, "+OK", g_trace_network_traffic,
+                             "USER %s",
                              pop3->user)) != CONNRES_OK) {
         if (r != CONNRES_NETIO) {
-            conn_line_sendf(&conn, g_trace_network_traffic, "QUIT");
+            conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "QUIT");
             my_logf(LL_ERROR, LP_DATETIME, "%s user not accepted, closing connection",
                     prefix);
             conn_close(&conn);
@@ -1543,10 +1550,11 @@ int loop_receive_emails(const struct check_t *chk,
         }
     }
 
-    if ((r = conn_round_trip(&conn, "+OK", g_trace_network_traffic, "PASS %s",
+    if ((r = conn_round_trip(my_logf, &conn, "+OK", g_trace_network_traffic,
+                             "PASS %s",
                              pop3->password)) != CONNRES_OK) {
         if (r != CONNRES_NETIO) {
-            conn_line_sendf(&conn, g_trace_network_traffic, "QUIT");
+            conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "QUIT");
             my_logf(LL_ERROR, LP_DATETIME, "%s user not accepted, closing connection",
                     prefix);
             conn_close(&conn);
@@ -1556,12 +1564,13 @@ int loop_receive_emails(const struct check_t *chk,
         }
     }
 
-    if (conn_line_sendf(&conn, g_trace_network_traffic, "STAT")) {
+    if (conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "STAT")) {
         return ERR_POP3_NETIO;
     }
     char *response = NULL;
     size_t response_size;
-    if (conn_read_line_alloc(&conn, &response, g_trace_network_traffic,
+    if (conn_read_line_alloc(my_logf, &conn, &response,
+                             g_trace_network_traffic,
                              &response_size) < 0) {
         MYFREE(response);
         return ERR_POP3_NETIO;
@@ -1607,7 +1616,8 @@ int loop_receive_emails(const struct check_t *chk,
 
 // 1. Retrieve email headers
 
-        if ((r = conn_round_trip(&conn, "+OK", g_trace_network_traffic, "TOP %d 0",
+        if ((r = conn_round_trip(my_logf, &conn, "+OK", g_trace_network_traffic,
+                                 "TOP %d 0",
                                  I)) == CONNRES_NETIO) {
             MYFREE(response);
             return ERR_POP3_NETIO;
@@ -1619,7 +1629,8 @@ int loop_receive_emails(const struct check_t *chk,
 
         char *header_value = NULL;
         do {
-            if (conn_read_line_alloc(&conn, &response, g_trace_network_traffic,
+            if (conn_read_line_alloc(my_logf, &conn, &response,
+                                     g_trace_network_traffic,
                                      &response_size) < 0) {
                 MYFREE(response);
                 return ERR_POP3_NETIO;
@@ -1645,7 +1656,8 @@ int loop_receive_emails(const struct check_t *chk,
                     I, header_value);
             loop_manage_retrieved_email(header_value, prefix);
 
-            if ((r = conn_round_trip(&conn, "+OK", g_trace_network_traffic, "DELE %d",
+            if ((r = conn_round_trip(my_logf, &conn, "+OK", g_trace_network_traffic,
+                                     "DELE %d",
                                      I)) == CONNRES_NETIO) {
                 MYFREE(header_value);
                 MYFREE(response);
@@ -1671,7 +1683,7 @@ int loop_receive_emails(const struct check_t *chk,
 
     MYFREE(response);
 
-    conn_line_sendf(&conn, g_trace_network_traffic, "QUIT");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "QUIT");
     my_logf(LL_DEBUG, LP_DATETIME, "%s closing POP3 connection", prefix);
     conn_close(&conn);
 
@@ -1911,52 +1923,58 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert,
         conn_close(&conn);
         return r;
     }
-    conn_line_sendf(&conn, g_trace_network_traffic, "subject: %s",
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "subject: %s",
                     exec_alert->desc);
-    conn_line_sendf(&conn, g_trace_network_traffic, "MIME-Version: 1.0");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
+                    "MIME-Version: 1.0");
     char boundary[SMALLSTRSIZE];
     get_unique_mime_boundary(boundary, sizeof(boundary));
-    conn_line_sendf(&conn, g_trace_network_traffic,
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                     "Content-Type: multipart/alternative; boundary=%s", boundary);
 
 // Email body
 
-    conn_line_sendf(&conn, g_trace_network_traffic, "");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
 
     // Alternative 1: plain text
-    conn_line_sendf(&conn, g_trace_network_traffic, "--%s", boundary);
-    conn_line_sendf(&conn, g_trace_network_traffic,
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "--%s", boundary);
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                     "Content-Type: text/plain; charset=\"us-ascii\"");
-    conn_line_sendf(&conn, g_trace_network_traffic,
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                     "Content-Transfer-Encoding: 7bit");
-    conn_line_sendf(&conn, g_trace_network_traffic, "");
-    conn_line_sendf(&conn, g_trace_network_traffic, "%s", exec_alert->desc);
-    conn_line_sendf(&conn, g_trace_network_traffic, "");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "%s",
+                    exec_alert->desc);
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
 
     // Alternative 2: html
-    conn_line_sendf(&conn, g_trace_network_traffic, "--%s", boundary);
-    conn_line_sendf(&conn, g_trace_network_traffic,
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "--%s", boundary);
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                     "Content-Type: text/html; charset=\"UTF-8\"");
-    conn_line_sendf(&conn, g_trace_network_traffic,
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                     "Content-Transfer-Encoding: 7bit");
-    conn_line_sendf(&conn, g_trace_network_traffic, "");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
     /*  conn_line_sendf(&sock, g_trace_network_traffic, "<!--");*/
     /*  conn_line_sendf(&sock, g_trace_network_traffic, "-->");*/
-    conn_line_sendf(&conn, g_trace_network_traffic, "<html>");
-    conn_line_sendf(&conn, g_trace_network_traffic, "<body>");
-    conn_line_sendf(&conn, g_trace_network_traffic,
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "<html>");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "<body>");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                     "<table cellpadding=\"2\" cellspacing=\"1\" border=\"1\">");
 
-    conn_line_sendf(&conn, g_trace_network_traffic, "<tr><td bgcolor=\"%s\">",
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
+                    "<tr><td bgcolor=\"%s\">",
                     ST_TO_BGCOLOR_FORHTML[exec_alert->status]);
-    conn_line_sendf(&conn, g_trace_network_traffic, "%s", exec_alert->desc);
-    conn_line_sendf(&conn, g_trace_network_traffic, "</td></tr></table>");
-    conn_line_sendf(&conn, g_trace_network_traffic, "</body>");
-    conn_line_sendf(&conn, g_trace_network_traffic, "</html>");
-    conn_line_sendf(&conn, g_trace_network_traffic, "");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "%s",
+                    exec_alert->desc);
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
+                    "</td></tr></table>");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "</body>");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "</html>");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
 
     // End of alternatives
-    conn_line_sendf(&conn, g_trace_network_traffic, "--%s--", boundary);
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "--%s--",
+                    boundary);
 
 // Email end
 
@@ -2229,8 +2247,8 @@ void manage_output(const struct tm *now_done, float elapsed) {
               H);
         fputs("<html>\n", H);
         fputs("<head>\n", H);
-        fprintf(H, "<META HTTP-EQUIV=\"Refresh\" CONTENT=\"%li\">\n",
-                g_html_refresh_interval);
+                fprintf(H, "<META HTTP-EQUIV=\"Refresh\" CONTENT=\"%li\">\n",
+                        g_html_refresh_interval);
         fputs("</head>\n", H);
         fputs("<body>\n", H);
         fprintf(H, "<h1>%s</h1><br>\n", g_html_title);
@@ -2718,23 +2736,25 @@ void printhelp() {
     printf("See " PACKAGE "-sample.ini for help about " PACKAGE
            " configuration.\n");
     printf("\n");
-    printf("    -h --help                    Display this help text\n");
+    printf("    -h --help                Display this help text\n");
     printf("    -V --version             Display version information and exit\n");
     printf("    -v --verbose             Be more talkative\n");
     printf("    -q --quiet               Be less talkative\n");
     printf("    -l --log-file            Log file (default: %s)\n",
            DEFAULT_LOGFILE);
-    printf("    -c --config-file     Configuration file (default: %s)\n",
+    printf("    -w --web-log-file        Web log file (default: %s)\n",
+           DEFAULT_WEB_LOGFILE);
+    printf("    -c --config-file         Configuration file (default: %s)\n",
            DEFAULT_CFGFILE);
-    printf("    -p --print-log       Print the log on the screen\n");
+    printf("    -p --print-log           Print the log on the screen\n");
     printf("    -C --stdout              Print status on stdout\n");
     printf("    -t --test N              Set test mode to N, 0 (default) = no test mode\n");
     printf("    -a --alert               Test the alert name written after the option and quit\n");
-    printf("         --laxist                Continue if errors are found in the ini file\n");
-    printf("                                         (default: stop)\n");
+    printf("         --laxist            Continue if errors are found in the ini file\n");
+    printf("                             (default: stop)\n");
     printf("    -d --daemon              Run as a daemon (Linux) / service (Windows)\n");
-    printf("                                         Linux: in the ini file, you must set the html_directory\n");
-    printf("                                         variable (in the [General] section) to an absolute path.\n");
+    printf("                             Linux: in the ini file, you must set the html_directory\n");
+    printf("                             variable (in the [General] section) to an absolute path.\n");
     printf("         --install           Install NT service (Windows only)\n");
     printf("         --uninstall         Uninstall NT service (Windows only)\n");
 }
@@ -2771,6 +2791,7 @@ void parse_options(int argc, char *argv[]) {
         {"verbose", no_argument, NULL, 'v'},
         {"quiet", no_argument, NULL, 'q'},
         {"log-file", required_argument, NULL, 'l'},
+        {"web-log-file", required_argument, NULL, 'w'},
         {"config-file", required_argument, NULL, 'c'},
         {"print-log", no_argument, NULL, 'p'},
         {"stdout", no_argument, NULL, 'C'},
@@ -2792,12 +2813,13 @@ void parse_options(int argc, char *argv[]) {
     int n;
 
     strncpy(g_log_file, DEFAULT_LOGFILE, sizeof(g_log_file));
+    strncpy(g_web_log_file, DEFAULT_WEB_LOGFILE, sizeof(g_web_log_file));
     strncpy(g_cfg_file, DEFAULT_CFGFILE, sizeof(g_cfg_file));
     strncpy(g_test_alert, "", sizeof(g_test_alert));
 
     while (1) {
 
-        c = getopt_long(argc, argv, "hvCt:l:c:a:pVqd", long_options,
+        c = getopt_long(argc, argv, "hvCt:l:c:a:pVqdw:", long_options,
                         &option_index);
 
         if (c == -1) {
@@ -2834,6 +2856,10 @@ void parse_options(int argc, char *argv[]) {
 
         case 'l':
             strncpy(g_log_file, optarg, sizeof(g_log_file));
+            break;
+
+        case 'w':
+            strncpy(g_web_log_file, optarg, sizeof(g_web_log_file));
             break;
 
         case '2':
@@ -2877,12 +2903,16 @@ void parse_options(int argc, char *argv[]) {
             abort();
         }
     }
+
     if (optind < argc)
         option_error("Trailing options");
+
     if ((int)g_current_log_level < LL_ERROR)
         g_current_log_level = LL_ERROR;
+
     if ((int)g_current_log_level > LL_DEBUGTRACE)
         g_current_log_level = LL_DEBUGTRACE;
+
 }
 
 //
@@ -3898,6 +3928,7 @@ void ntsvc_install_and_quit(const char *argv0) {
     char e[MAX_PATH];
     char cfg[MAX_PATH];
     char log[MAX_PATH];
+    char wlog[MAX_PATH];
     win_get_exe_file(argv0, tmp, sizeof(e));
     strncpy(e, tmp, sizeof(e));
 
@@ -3905,10 +3936,12 @@ void ntsvc_install_and_quit(const char *argv0) {
 
     build_file_complete_name(tmp, g_cfg_file, cfg, sizeof(cfg));
     build_file_complete_name(tmp, g_log_file, log, sizeof(log));
+    build_file_complete_name(tmp, g_web_log_file, wlog, sizeof(wlog));
 
     char command[3 * MAX_PATH + 500];
-    snprintf(command, sizeof(command), "\"%s\" -d -c \"%s\" -l \"%s\"", e, cfg,
-             log);
+    snprintf(command, sizeof(command),
+             "\"%s\" -d -c \"%s\" -l \"%s\" -w \"%s\"",
+             e, cfg, log, wlog);
 
     SC_HANDLE scnew = CreateService(scm, WIN_SERVICE_NAME,
                                     WIN_SERVICE_DISPLAY_NAME,
@@ -4084,9 +4117,10 @@ int main_post(int argc, char *argv[]) {
         } else {
             char exe[MAX_PATH];
             win_get_exe_file(argv[0], exe, sizeof(exe));
-            char cmd[4 * MAX_PATH + 2000];
-            snprintf(cmd, sizeof(cmd), "\"%s\" --webserver -c \"%s\" -l \"%s\"", exe,
-                     g_cfg_file, g_log_file);
+            char cmd[3 * MAX_PATH + 3000];
+            snprintf(cmd, sizeof(cmd),
+                     "\"%s\" --webserver -c \"%s\" -l \"%s\" -w \"%s\"", exe,
+                     g_cfg_file, g_log_file, g_web_log_file);
 
             STARTUPINFO si;
             ZeroMemory(&si, sizeof(si));

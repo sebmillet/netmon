@@ -23,10 +23,6 @@
 
 #include <openssl/err.h>
 
-// Call fflush each time a string is written in the log.
-// Useful to debug...
-#define FLUSH_LOG
-
 const int crypt_ports[] = {443, 465, 585, 993, 995};
 
 long int g_connect_timeout = DEFAULT_CONNECT_TIMEOUT;
@@ -45,6 +41,8 @@ const struct connection_table_t connection_table[] = {
     {conn_plain_read, "<<< ", conn_plain_write, ">>> "},        // CONNTYPE_PLAIN
     {conn_ssl_read,     "SSL<<< ", conn_ssl_write,   "SSL>>> "} // CONNTYPE_SSL
 };
+
+extern int g_test_mode;
 
 #ifdef MY_WINDOWS
 
@@ -84,7 +82,7 @@ static void os_set_sock_blocking_mode(int sock) {
         fatal_error("ioctlsocket failed with error: %ld", iResult);
 }
 
-static int os_setsock_timeout(int sock, int timeout_in_seconds) {
+int os_setsock_timeout(int sock, int timeout_in_seconds) {
     DWORD dwTimeout_in_milliseconds = 1000 * timeout_in_seconds;
     return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,
                       (char *)&dwTimeout_in_milliseconds,
@@ -193,7 +191,7 @@ static void os_set_sock_blocking_mode(int sock) {
     fcntl(sock, F_SETFL, arg);
 }
 
-static int os_setsock_timeout(int sock, int timeout_in_seconds) {
+int os_setsock_timeout(int sock, int timeout_in_seconds) {
     struct timeval netio_tv;
     netio_tv.tv_sec = timeout_in_seconds;
     netio_tv.tv_usec = 0;
@@ -657,11 +655,10 @@ void my_log_core_output(const char *s, size_t dt_len) {
         fputs(s, log_fd);
         fputs("\n", log_fd);
 
-#ifdef FLUSH_LOG
-        fflush(log_fd);
-#endif
-
+        if (g_test_mode)
+            fflush(log_fd);
     }
+
     if (g_print_log) {
         const char *t = s;
         size_t i = 0;
@@ -672,12 +669,9 @@ void my_log_core_output(const char *s, size_t dt_len) {
         }
         puts(t);
 
-#ifdef FLUSH_LOG
-        fflush(stdout);
-#endif
-
+        if (g_test_mode)
+            fflush(stdout);
     }
-
 }
 
 //
@@ -997,7 +991,8 @@ int conn_establish_connection(connection_t *conn, const conn_def_t *srv,
         if (expect != NULL && strlen(expect) >= 1) {
             char *response = NULL;
             size_t response_size;
-            if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0) {
+            if (conn_read_line_alloc(my_logf, conn, &response, trace,
+                                     &response_size) < 0) {
                 ;
             } else if (s_begins_with(response, expect)) {
                 my_logf(LL_VERBOSE, LP_DATETIME,
@@ -1025,7 +1020,8 @@ int conn_establish_connection(connection_t *conn, const conn_def_t *srv,
 // Return -1 if an error occured, 1 if reading is successful,
 // 0 if transmission is closed.
 //
-int conn_read_line_alloc(connection_t *conn, char **out, int trace,
+int conn_read_line_alloc(void (*lp)(const loglevel_t, const logdisp_t,
+                                    const char *, ...), connection_t *conn, char **out, int trace,
                          size_t *size) {
     const int INITIAL_READLINE_BUFFER_SIZE = 100;
 
@@ -1042,8 +1038,8 @@ int conn_read_line_alloc(connection_t *conn, char **out, int trace,
     for (;;) {
         if ((nb = conn->sock_read(conn, &ch, 1)) == SOCKET_ERROR) {
             char s_err[ERR_STR_BUFSIZE];
-            my_logf(LL_ERROR, LP_DATETIME, "Error reading socket, error %s",
-                    os_last_err_desc(s_err, sizeof(s_err)));
+            lp(LL_ERROR, LP_DATETIME, "Error reading socket, error %s",
+               os_last_err_desc(s_err, sizeof(s_err)));
             conn_close(conn);
             return -1;
         }
@@ -1080,8 +1076,8 @@ int conn_read_line_alloc(connection_t *conn, char **out, int trace,
         return 0;
     } else {
         if (trace) {
-            my_logf(LL_DEBUGTRACE, LP_DATETIME, "%s%s", conn->log_prefix_received,
-                    *out);
+            lp(LL_DEBUGTRACE, LP_DATETIME, "%s%s", conn->log_prefix_received,
+               *out);
         }
         return 1;
     }
@@ -1092,7 +1088,8 @@ int conn_read_line_alloc(connection_t *conn, char **out, int trace,
 // Return 0 if OK, -1 if error.
 // Manage logging an error code and closing socket.
 //
-int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
+int conn_line_sendf(void (*lp)(const loglevel_t, const logdisp_t,
+                               const char *, ...), connection_t *conn, int trace, const char *fmt, ...) {
 
     if (conn->sock == -1) {
         return -1;
@@ -1107,8 +1104,8 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
     va_end(args);
 
     if (trace)
-        my_logf(LL_DEBUGTRACE, LP_DATETIME, "%s%s", conn->log_prefix_sent,
-                to_send);
+        lp(LL_DEBUGTRACE, LP_DATETIME, "%s%s", conn->log_prefix_sent,
+           to_send);
 
     strncat(to_send, "\015\012", l);
     to_send[l] = '\0';
@@ -1119,8 +1116,8 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
 
     if (e == SOCKET_ERROR) {
         char s_err[ERR_STR_BUFSIZE];
-        my_logf(LL_ERROR, LP_DATETIME, "Network I/O error: %s",
-                os_last_err_desc(s_err, sizeof(s_err)));
+        lp(LL_ERROR, LP_DATETIME, "Network I/O error: %s",
+           os_last_err_desc(s_err, sizeof(s_err)));
         conn_close(conn);
         return -1;
     }
@@ -1131,7 +1128,8 @@ int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...) {
 //
 // Send a string to a socket and chck answer (telnet-style communication)
 //
-int conn_round_trip(connection_t *conn, const char *expect, int trace,
+int conn_round_trip(void (*lp)(const loglevel_t, const logdisp_t,
+                               const char *, ...), connection_t *conn, const char *expect, int trace,
                     const char *fmt, ...) {
     size_t l = strlen(fmt) + 100;
     char *formatted_str = (char *)MYMALLOC(l + 1, formatted_str);
@@ -1141,14 +1139,15 @@ int conn_round_trip(connection_t *conn, const char *expect, int trace,
     vsnprintf(formatted_str, l, fmt, args);
     va_end(args);
 
-    int e = conn_line_sendf(conn, trace, formatted_str);
+    int e = conn_line_sendf(lp, conn, trace, formatted_str);
     MYFREE(formatted_str);
     if (e)
         return CONNRES_NETIO;
 
     char *response = NULL;
     size_t response_size;
-    if (conn_read_line_alloc(conn, &response, trace, &response_size) < 0) {
+    if (conn_read_line_alloc(lp, conn, &response, trace,
+                             &response_size) < 0) {
         MYFREE(response);
         return CONNRES_NETIO;
     }

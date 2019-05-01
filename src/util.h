@@ -223,19 +223,23 @@ FILE *my_fopen(const char *filename, const char *mode,
 
 void os_init_network();
 int s_begins_with(const char *s, const char *begins_with);
+int os_setsock_timeout(int sock, int timeout_in_seconds);
 
 void win_get_exe_file(const char *argv0, char *p, size_t p_len);
 
 void conn_init(connection_t *conn, int type);
 void conn_close(connection_t *conn);
 int conn_is_closed(connection_t *conn);
-int conn_line_sendf(connection_t *conn, int trace, const char *fmt, ...);
-int conn_read_line_alloc(connection_t *conn, char **out, int trace,
+int conn_line_sendf(void (*l)(const loglevel_t, const logdisp_t,
+                              const char *, ...), connection_t *conn, int trace, const char *fmt, ...);
+int conn_read_line_alloc(void (*lp)(const loglevel_t, const logdisp_t,
+                                    const char *, ...), connection_t *conn, char **out, int trace,
                          size_t *size);
 int conn_connect(connection_t *conn, const struct sockaddr_in *server,
                  const int conn_to, const int netio_to, const char *desc,
                  const char *prefix);
-int conn_round_trip(connection_t *conn, const char *expect, int trace,
+int conn_round_trip(void (*l)(const loglevel_t, const logdisp_t,
+                              const char *, ...), connection_t *conn, const char *expect, int trace,
                     const char *fmt, ...);
 int conn_establish_connection(connection_t *conn, const conn_def_t *srv,
                               const int default_port,

@@ -1,3 +1,12 @@
+2019-05-01 Sébastien Millet <milletseb@laposte.net>
+
+	* Release 1.1.3 built
+	* Improves netmon.html formatting
+	* Separates web server log from main program log
+	* Fixes a critical bug where file descriptors were never closed, resulting
+	  in uggly behavior + errors "too many files open" after a few hours of
+	  running.
+
 2019-04-19 Sébastien Millet <milletseb@laposte.net>
 
 	* Release 1.1.2 built
