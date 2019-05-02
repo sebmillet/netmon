@@ -219,6 +219,7 @@ int g_html_directory_set = FALSE;
 extern char g_html_file[SMALLSTRSIZE];
 int g_html_file_set = FALSE;
 char g_html_complete_file_name[BIGSTRSIZE];
+extern char g_css_file[BIGSTRSIZE];
 
 #define CFGK_LIST_SEPARATOR ','
 #define CFGK_COMMENT_CHAR ';'
@@ -2247,13 +2248,53 @@ void manage_output(const struct tm *now_done, float elapsed) {
               H);
         fputs("<html>\n", H);
         fputs("<head>\n", H);
-                fprintf(H, "<META HTTP-EQUIV=\"Refresh\" CONTENT=\"%li\">\n",
-                        g_html_refresh_interval);
+        fprintf(H, "<META HTTP-EQUIV=\"Refresh\" CONTENT=\"%li\">\n",
+                g_html_refresh_interval);
+
+        fputs("<style>\n", H);
+        fputs("/* From http://cssmenumaker.com/blog/stylish-css-tables-tutorial/ */\n", H);
+        fputs("table {  \n", H);
+        fputs("    color: #116;\n", H);
+        fputs("    font-family: Helvetica, Arial, sans-serif;\n", H);
+        fputs("    border-collapse: collapse;\n", H);
+        fputs("    border-spacing: 0; \n", H);
+        fputs("}\n", H);
+        fputs("\n", H);
+        fputs("td, th {  \n", H);
+        fputs("    border: 2px solid white; /* No more visible border */\n", H);
+        fputs("    height: 24px; \n", H);
+        fputs("    transition: all 0.2s;  /* Simple transition for hover effect */\n", H);
+        fputs("}\n", H);
+        fputs("\n", H);
+        fputs("th {  \n", H);
+        fputs("    background: #D0D0D0;  /* Darken header a bit */\n", H);
+        fputs("    font-weight: bold;\n", H);
+        fputs("}\n", H);
+        fputs("\n", H);
+        fputs("td {  \n", H);
+        fputs("    background: #FAFAFA;\n", H);
+        fputs("}\n", H);
+        fputs("p {\n", H);
+        fputs("    color: #666666;\n", H);
+        fputs("}\n", H);
+        fputs("\n", H);
+        fputs("/* Cells in even rows (2,4,6...) are one color */        \n", H);
+        fputs("tr:nth-child(even) td { background: #F1F1F1; }   \n", H);
+        fputs("\n", H);
+        fputs("/* Cells in odd rows (1,3,5...) are another (excludes header cells)  */        \n", H);
+        fputs("tr:nth-child(odd) td { background: #FEFEFE; }  \n", H);
+        fputs("\n", H);
+        fputs("tr td:hover { background: #116; color: #FFF; }\n", H);
+        fputs("tr th:hover { background: #116; color: #FFF; }\n", H);
+        fputs("a:link { background: #FFF; color: #116; }\n", H);
+        fputs("a:visited { background: #FFF; color: #666; }\n", H);
+        fputs("</style>\n", H);
+
         fputs("</head>\n", H);
         fputs("<body>\n", H);
-        fprintf(H, "<h1>%s</h1><br>\n", g_html_title);
+        fprintf(H, "<h1 style=\"background: #116; color:#FFF; text-align:center\">%s</h1><br>\n", g_html_title);
         fputs("<hr>\n", H);
-        fprintf(H, "<h3>Last check: %s</h3>\n", now);
+        fprintf(H, "<h3 style=\"color:#666\">Last check: %s</h3>\n", now);
         fprintf(H, "<p>Last check done in %6.3fs<br>\n", elapsed);
         if (g_nb_keep_last_status >= 1) {
             fprintf(H, "Check interval = %li second%s, range = %li min<br>\n",
@@ -2265,9 +2306,9 @@ void manage_output(const struct tm *now_done, float elapsed) {
         fputs("<tr>\n", H);
         int i;
         for (i = 0; i < g_html_nb_columns; ++i) {
-            fputs("<td>Name</td><td>Status</td><td>Last *</td>", H);
+            fputs("<th>Name</th><th>Status</th><th>Last *</th>", H);
             if (g_nb_keep_last_status >= 1)
-                fputs("<td>History</td>", H);
+                fputs("<th>History</th>", H);
             fputs("\n", H);
         }
         fputs("</tr>\n", H);
@@ -2307,10 +2348,10 @@ void manage_output(const struct tm *now_done, float elapsed) {
         if (H != NULL) {
             if (counter % g_html_nb_columns == 0)
                 fputs("<tr>\n", H);
-            fprintf(H, "<td>%s</td><td bgcolor=\"%s\">%s</td>\n",
+            fprintf(H, "<td>%s</td><td style=\"background-color:%s\";text-align:center>%s</td>\n",
                     chk->display_name, ST_TO_BGCOLOR_FORHTML[chk->status],
                     ST_TO_LONGSTR_SIMPLE[chk->status]);
-            fprintf(H, "<td>%s</td>", lsc);
+            fprintf(H, "<td style=\"text-align:center\">%s</td>", lsc);
             if (g_nb_keep_last_status >= 1) {
                 fputs("<td>", H);
                 int i;
@@ -2346,7 +2387,9 @@ void manage_output(const struct tm *now_done, float elapsed) {
     if (H != NULL) {
         fputs("</table>\n", H);
         fputs("<p>* Time at which the status last changed\n</p>", H);
-        fprintf(H, "<p><a href=\"" MAN_EN "\">manual (english)</a></p>\n");
+        fprintf(H, "<table style=\"color:#666\"><tr><td>"
+                   "<a href=\"" MAN_EN "\">"
+                   "manual (english)</a></td></tr></table>\n");
         fputs("</body>\n", H);
         fputs("</html>\n", H);
         fclose(H);

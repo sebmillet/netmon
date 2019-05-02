@@ -1,4 +1,4 @@
-netmon 1.1.3 start
+netmon 1.1.4 start
 Reading configuration from 'netmon.ini'
 keep_last_status not defined, taking default = 15
 == CHECK #0
@@ -55,7 +55,7 @@ keep_last_status = 15
 display_name_width = 20
 html_directory = ../www
 html_file = status.html
-html_title = netmon 1.1.3
+html_title = netmon
 html_refresh_interval = 20
 Valid check(s) defined: 2
 Run web server: no
@@ -310,7 +310,7 @@ Executed alert, result = 0
 Performing check loop(My loop)
 Loop check(My loop): skipping email sending, countdown = 2
 Loop check(My loop): retrieving probe email(s)
-Loop check(My loop): removing loop email 4 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 8 > timeout = 8
+Loop check(My loop): removing loop email 4 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 9 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
 netmon end

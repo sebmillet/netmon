@@ -12,19 +12,17 @@
 #include <wchar.h>
 #include <sys/stat.h>
 
+#define DEFAULT_HTML_DIRECTORY (".")
+#define DEFAULT_HTML_FILE      "status.html"
+#define CSS_FILE               (PACKAGE_NAME ".css")
+
 #ifdef MY_WINDOWS
 
 // WINDOWS
 
-#define DEFAULT_HTML_DIRECTORY (".")
-#define DEFAULT_HTML_FILE "status.html"
-
 #else
 
 // NOT WINDOWS
-
-#define DEFAULT_HTML_DIRECTORY (".")
-#define DEFAULT_HTML_FILE "status.html"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -88,7 +86,8 @@ const char *POEM_TYPE = "text/html";
 
 char g_html_directory[BIGSTRSIZE] = DEFAULT_HTML_DIRECTORY;
 char g_html_file[SMALLSTRSIZE] = DEFAULT_HTML_FILE;
-char g_html_title[SMALLSTRSIZE] = PACKAGE_STRING;
+char g_html_title[SMALLSTRSIZE] = PACKAGE_NAME;
+char g_css_file[BIGSTRSIZE] = CSS_FILE;
 extern char g_html_directory[BIGSTRSIZE];
 
 long int g_html_refresh_interval = DEFAULT_HTML_REFRESH_PERIOD;
