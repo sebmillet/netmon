@@ -340,7 +340,7 @@ SUBDIRS = src doc
 ACLOCAL_AMFLAGS = -I admin
 dist_doc_DATA = README
 dist_pkgdata_SCRIPTS = src/printargs.sh
-EXTRA_DIST = netmon.bkl gen-win-makefile.cmd test_linux makefile.gcc extracfg.h createzip.sh
+EXTRA_DIST = netmon.bkl gen-win-makefile.cmd test_linux makefile.gcc extracfg.h createzip.sh bootstrap
 appsdir = $(datadir)/applications
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
@@ -882,7 +882,7 @@ uninstall-am: uninstall-dist_docDATA uninstall-dist_pkgdataSCRIPTS
 
 
 dist-hook:
-	rm -rf `find $(distdir) -name .svn`
+	rm -rf `find $(distdir) -name .git`
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -1,4 +1,4 @@
-netmon 1.1.4 start
+netmon 1.1.5 start
 Reading configuration from 'netmon.ini'
 keep_last_status not defined, taking default = 15
 == CHECK #0
@@ -313,4 +313,5 @@ Loop check(My loop): retrieving probe email(s)
 Loop check(My loop): removing loop email 4 of reference 'netmon:MYLOOP:1371397278-137861-187807:netmon' (run to timeout), age = 9 > timeout = 8
 My loop -> ** KO **
 Check done in 0.123450s
-netmon end
+netmon
+end

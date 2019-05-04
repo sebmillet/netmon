@@ -15,7 +15,8 @@
 
 #define LOOP_REF_SIZE 70
 
-#define MAN_EN      "man-en"
+#define URL_MAN_EN  "man-en"
+#define URL_LOG     "netmon.log"
 #define FILE_MAN_EN "netmon.html"
 
 void os_set_sock_nonblocking_mode(int sock);

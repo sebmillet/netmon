@@ -15,9 +15,6 @@
 #include <stdio.h>
 #include <openssl/ssl.h>
 
-//
-// FIXME
-//
 // !!!!!     WARNING      !!!!!
 // !!!!! USE WITH CAUTION !!!!!
 //
@@ -107,7 +104,8 @@ enum {DF_FRENCH = 0, DF_ENGLISH = 1};
 #define FIND_STRING_NOT_FOUND -1
 
 #ifdef DEBUG
-void dbg_write(const char *fmt, ...);
+void dbg_write(const char *fmt, ...)
+     __attribute__((format(printf, 1, 2)));
 #else
 #define dbg_write(...)
 #endif
@@ -194,10 +192,12 @@ void my_log_close();
 int my_is_log_open();
 char *trim(char *str);
 
-void fatal_error(const char *format, ...);
+void fatal_error(const char *format, ...)
+     __attribute__((format(printf, 1, 2)));
 char *errno_error(char *s, size_t s_len);
 void my_logf(const loglevel_t log_level, const logdisp_t log_disp,
-             const char *format, ...);
+             const char *format, ...)
+     __attribute__((format(printf, 3, 4)));
 void my_logs(const loglevel_t log_level, const logdisp_t log_disp,
              const char *s);
 
@@ -231,7 +231,8 @@ void conn_init(connection_t *conn, int type);
 void conn_close(connection_t *conn);
 int conn_is_closed(connection_t *conn);
 int conn_line_sendf(void (*l)(const loglevel_t, const logdisp_t,
-                              const char *, ...), connection_t *conn, int trace, const char *fmt, ...);
+                              const char *, ...), connection_t *conn, int trace, const char *fmt, ...)
+    __attribute__((format(printf, 4, 5)));
 int conn_read_line_alloc(void (*lp)(const loglevel_t, const logdisp_t,
                                     const char *, ...), connection_t *conn, char **out, int trace,
                          size_t *size);
@@ -240,7 +241,8 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
                  const char *prefix);
 int conn_round_trip(void (*l)(const loglevel_t, const logdisp_t,
                               const char *, ...), connection_t *conn, const char *expect, int trace,
-                    const char *fmt, ...);
+                    const char *fmt, ...)
+    __attribute__((format(printf, 5, 6)));
 int conn_establish_connection(connection_t *conn, const conn_def_t *srv,
                               const int default_port,
                               const char *expect, const char *prefix,

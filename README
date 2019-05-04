@@ -75,7 +75,7 @@ This INSTALL file is the one provided by default by autotools.
 
   *IMPORTANT*
   pthread library is no longer used in netmon, pthread mention is left for
-  history...
+  history.
 
 If openssl (or pthreads for old netmon versions) is not available in the
 directories mentionned above, see below the paragraph "Mingw makefile
@@ -123,7 +123,7 @@ To build a static version of pthreads with mingw, see the following URL:
 
   *IMPORTANT*
   pthread library is no longer used in netmon, this note is left here for
-  history...
+  history.
 
   Instructions:
 

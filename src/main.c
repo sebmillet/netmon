@@ -59,7 +59,7 @@
 #define LOOP_ARRAY_REALLOC_STEP     60
 // "subject" is the simplest! It could be
 //      "x-" PACKAGE_NAME
-// but x- headers are not guaranteed to be kept along the way...
+// but x- headers are not guaranteed to be kept along the way.
 // Also message-ID could be used but you then would need to
 // determine the domain name.
 #define LOOP_HEADER_REF             "subject:"
@@ -213,6 +213,7 @@ int telnet_log = FALSE;
 extern int g_print_log;
 int g_print_status = FALSE;
 int g_test_mode = 0;
+extern int g_flush_log;
 
 extern char g_html_directory[BIGSTRSIZE];
 int g_html_directory_set = FALSE;
@@ -658,7 +659,7 @@ int last_loop = -1;
 int loops_nb_alloc = 0;
 
 // Shall we print network traffic to the log?
-// For very high level debugging only...
+// For very high level debugging only.
 int g_trace_network_traffic;
 
 // Used to catch interruption
@@ -827,7 +828,7 @@ void pop3_account_t_create(struct pop3_account_t *p) {
 // Create a check struct
 //
 void check_t_create(struct check_t *chk) {
-    /*  dbg_write("Creating check...\n");*/
+    dbg_write("Creating check...\n");
 
     chk->is_valid = FALSE;
 
@@ -932,7 +933,7 @@ void alert_t_destroy(struct alert_t *alrt) {
 // Create an alert struct
 //
 void alert_t_create(struct alert_t *alrt) {
-    /*  dbg_write("Creating alert...\n");*/
+    dbg_write("Creating alert...\n");
 
     alrt->is_valid = FALSE;
 
@@ -1061,7 +1062,7 @@ int perform_check_tcp(struct check_t *chk, const struct subst_t *subst,
     assert(conn_is_closed(&conn));
 
     if (backup_cr == CONNRES_OK)
-        my_logf(LL_VERBOSE, LP_DATETIME, "%s disconnected from %s:%i", prefix,
+        my_logf(LL_VERBOSE, LP_DATETIME, "%s disconnected from %s:%li", prefix,
                 chk->srv.server, chk->srv.port);
 
     if (cr == CONNRES_OK)
@@ -1257,7 +1258,7 @@ int smtp_email_sending_pre(struct rfc821_enveloppe_t *env,
 //
 int smtp_mail_sending_post(connection_t *conn, const char *prefix,
                            char *email_ref, const size_t email_ref_len) {
-    if (conn_line_sendf(my_logf, conn, g_trace_network_traffic, "")
+    if (conn_line_sendf(my_logf, conn, g_trace_network_traffic, "%s", "")
             || conn_line_sendf(my_logf, conn, g_trace_network_traffic, ".")) {
         return ERR_SMTP_NETIO;
     }
@@ -1425,7 +1426,7 @@ int loop_send_email(const struct check_t *chk,
 
 // Email body
 
-        conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
+        conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "%s", "");
 
         conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                         "This is a loop email sent by " PACKAGE_STRING);
@@ -1435,7 +1436,7 @@ int loop_send_email(const struct check_t *chk,
                         strnow);
         conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "Refrence: '%s'",
                         loop->loop_ref);
-        conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
+        conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "%s", "");
 
         // Email end
 
@@ -1935,7 +1936,7 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert,
 
 // Email body
 
-    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "%s", "");
 
     // Alternative 1: plain text
     conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "--%s", boundary);
@@ -1943,10 +1944,10 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert,
                     "Content-Type: text/plain; charset=\"us-ascii\"");
     conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                     "Content-Transfer-Encoding: 7bit");
-    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "%s", "");
     conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "%s",
                     exec_alert->desc);
-    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "%s", "");
 
     // Alternative 2: html
     conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "--%s", boundary);
@@ -1954,7 +1955,7 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert,
                     "Content-Type: text/html; charset=\"UTF-8\"");
     conn_line_sendf(my_logf, &conn, g_trace_network_traffic,
                     "Content-Transfer-Encoding: 7bit");
-    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "%s", "");
     /*  conn_line_sendf(&sock, g_trace_network_traffic, "<!--");*/
     /*  conn_line_sendf(&sock, g_trace_network_traffic, "-->");*/
     conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "<html>");
@@ -1971,7 +1972,7 @@ int core_execute_alert_smtp_one_host(const struct exec_alert_t *exec_alert,
                     "</td></tr></table>");
     conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "</body>");
     conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "</html>");
-    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "");
+    conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "%s", "");
 
     // End of alternatives
     conn_line_sendf(my_logf, &conn, g_trace_network_traffic, "--%s--",
@@ -2067,7 +2068,7 @@ int execute_alert_log(const struct exec_alert_t *exec_alert) {
     int ret = 0;
 
     if (H == NULL) {
-        my_logf(LL_ERROR, LP_DATETIME, "%s unable to open log file '%s'", prefix);
+        my_logf(LL_ERROR, LP_DATETIME, "%s unable to open log file '%s'", prefix, f_substitued);
         ret = -1;
     } else {
         char *s_substitued = dollar_subst_alloc(alrt->log_string,
@@ -2278,10 +2279,10 @@ void manage_output(const struct tm *now_done, float elapsed) {
         fputs("    color: #666666;\n", H);
         fputs("}\n", H);
         fputs("\n", H);
-        fputs("/* Cells in even rows (2,4,6...) are one color */        \n", H);
+        fputs("/* Cells in even rows are one color */        \n", H);
         fputs("tr:nth-child(even) td { background: #F1F1F1; }   \n", H);
         fputs("\n", H);
-        fputs("/* Cells in odd rows (1,3,5...) are another (excludes header cells)  */        \n", H);
+        fputs("/* Cells in odd rows are another (excludes header cells)  */        \n", H);
         fputs("tr:nth-child(odd) td { background: #FEFEFE; }  \n", H);
         fputs("\n", H);
         fputs("tr td:hover { background: #116; color: #FFF; }\n", H);
@@ -2387,9 +2388,16 @@ void manage_output(const struct tm *now_done, float elapsed) {
     if (H != NULL) {
         fputs("</table>\n", H);
         fputs("<p>* Time at which the status last changed\n</p>", H);
-        fprintf(H, "<table style=\"color:#666\"><tr><td>"
-                   "<a href=\"" MAN_EN "\">"
-                   "manual (english)</a></td></tr></table>\n");
+        fprintf(H, "<table style=\"color:#666\"><tr>\n");
+        fprintf(H, "<td>"
+                   "<a href=\"" URL_LOG "\">"
+                   "log</a></td>\n");
+        fprintf(H, "</tr></table>\n");
+        fprintf(H, "<table style=\"color:#666\"><tr>\n");
+        fprintf(H, "<td>"
+                   "<a href=\"" URL_MAN_EN "\" target=\"_blank\">"
+                   "manual (english)</a></td>\n");
+        fprintf(H, "</tr></table>\n");
         fputs("</body>\n", H);
         fputs("</html>\n", H);
         fclose(H);
@@ -2436,7 +2444,7 @@ void almost_neverending_loop() {
         if (delay > 0) {
             if (this_sleep == 0) {
                 my_logf(LL_NORMAL, LP_DATETIME,
-                        "Now sleeping for %li second(s) (interval = %li)",
+                        "Now sleeping for %i second(s) (interval = %li)",
                         delay, g_check_interval);
             }
             this_sleep = delay < SLEEP_STEPS ? delay : SLEEP_STEPS;
@@ -2444,6 +2452,8 @@ void almost_neverending_loop() {
             my_logf(LL_DEBUG, LP_DATETIME, "Will sleep %i second(s)", this_sleep);
             my_logf(LL_DEBUG, LP_DATETIME,
                     "Sleeping duration remaining after this one: %is second(s)", delay);
+
+            dbg_write("Now sleeping for %d second(s)\n", this_sleep);
 
             os_sleep((unsigned int)this_sleep);
             continue;
@@ -2731,28 +2741,29 @@ void terminate(const char *how) {
     if (loops != NULL)
         MYFREE(loops);
 
-    my_logf(LL_NORMAL, LP_DATETIME, "%s %s", PACKAGE_NAME, how);
+    my_logs(LL_NORMAL, LP_DATETIME, PACKAGE_NAME);
+    my_logs(LL_NORMAL, LP_DATETIME, how);
     my_log_close();
 }
 
 //
 // Manage signals
 //
-void sigterm_handler(int sig) {
+static void sigterm_handler(int sig) {
     UNUSED(sig);
 
     terminate("terminated");
     exit(EXIT_SUCCESS);
 }
 
-void sigabrt_handler(int sig) {
+static void sigabrt_handler(int sig) {
     UNUSED(sig);
 
     terminate("aborted");
     exit(EXIT_FAILURE);
 }
 
-void sigint_handler(int sig) {
+static void sigint_handler(int sig) {
     UNUSED(sig);
 
     terminate("interrupted");
@@ -2956,6 +2967,8 @@ void parse_options(int argc, char *argv[]) {
     if ((int)g_current_log_level > LL_DEBUGTRACE)
         g_current_log_level = LL_DEBUGTRACE;
 
+    if (g_test_mode)
+        g_flush_log = 1;
 }
 
 //
@@ -3121,7 +3134,7 @@ void alert_t_check(struct alert_t *alrt, const char *cf, int line_number,
 // Return TRUE if path is absolute (Windows or Linux)
 //
 // FIXME
-//   Should rather rely on cleaner OS abstraction libs...
+//   Should rather rely on cleaner OS abstraction libs.
 //   The code below is a hack.
 //   Yes.
 //
@@ -3228,7 +3241,7 @@ void read_configuration_file(const char *cf, int *nb_errors) {
         line[nb_bytes - 1] = '\0';
         ++line_number;
 
-        /*      dbg_write("Line %i: '%s'\n", line_number, line);*/
+        dbg_write("Line %i: '%s'\n", line_number, line);
 
         char *b = line;
         while (isspace(*b)) b++;
@@ -3283,8 +3296,8 @@ void read_configuration_file(const char *cf, int *nb_errors) {
                             --cur_check;
                             (*nb_errors)++;
                             my_logf(LL_ERROR, LP_DATETIME,
-                                    "Configuration file '%s', line %i: reached max number of checks (%i)",
-                                    cf, line_number, sizeof(checks) / sizeof(*checks));
+                                    "Configuration file '%s', line %i: reached max number of checks (%lu)",
+                                    cf, line_number, (long unsigned int)(sizeof(checks) / sizeof(*checks)));
                         } else {
                             read_status = CS_CHECK;
                             check_t_create(&chk00);
@@ -3295,8 +3308,8 @@ void read_configuration_file(const char *cf, int *nb_errors) {
                             --cur_alert;
                             (*nb_errors)++;
                             my_logf(LL_ERROR, LP_DATETIME,
-                                    "Configuration file '%s', line %i: reached max number of alerts (%i)",
-                                    cf, line_number, sizeof(alerts) / sizeof(*alerts));
+                                    "Configuration file '%s', line %i: reached max number of alerts (%lu)",
+                                    cf, line_number, (long unsigned int)(sizeof(alerts) / sizeof(*alerts)));
                         } else {
                             read_status = CS_ALERT;
                             alert_t_create(&alrt00);
@@ -3530,7 +3543,7 @@ void read_configuration_file(const char *cf, int *nb_errors) {
     fs_concatene(g_html_complete_file_name, g_html_file,
                  sizeof(g_html_complete_file_name));
 
-    /*  dbg_write("Output HTML file = %s\n", g_html_complete_file_name);*/
+    dbg_write("Output HTML file = %s\n", g_html_complete_file_name);
 
     g_print_log = save_g_print_log;
 
@@ -3554,6 +3567,13 @@ void read_configuration_file(const char *cf, int *nb_errors) {
             fprintf(stderr, "        [General]\n");
             fprintf(stderr, "        html_directory=\"/var/www\"\n");
             fprintf(stderr, "        ...\n");
+            fatal_error("Cannot start daemon, stopping");
+        } else if (!is_path_absolute(g_log_file)) {
+            fprintf(stderr, "To launch " PACKAGE
+                    " daemon, the log file must be specified as an absolute path, as in "
+                    "\"/var/log/netmon.log\"\n");
+            fprintf(stderr,
+                    "To do it, use the -l option.\n");
             fatal_error("Cannot start daemon, stopping");
         }
     }
@@ -3644,7 +3664,7 @@ void identify_alerts(int *nb_errors) {
 //
 void d_i(const char *desc, const int is_set, const long int val) {
     if (is_set)
-        my_logf(LL_DEBUG, LP_INDENT, "%s%i", desc, val);
+        my_logf(LL_DEBUG, LP_INDENT, "%s%li", desc, val);
     else
         my_logf(LL_DEBUG, LP_INDENT, "%s<unset>", desc);
 }
@@ -3857,7 +3877,7 @@ void config_display() {
 
         if (chk->method == CM_TCP) {
             my_logf(LL_NORMAL, LP_DATETIME,
-                    "To check: TCP - '%s' [%s:%i], %s%s%s, %s%s",
+                    "To check: TCP - '%s' [%s:%li], %s%s%s, %s%s",
                     chk->display_name, chk->srv.server, chk->srv.port,
                     chk->tcp_expect_set ? "expect \"" : "no expect",
                     chk->tcp_expect_set ? chk->tcp_expect : "",
@@ -4058,6 +4078,10 @@ int main(int argc, char *argv[]) {
 
 int main_post(int argc, char *argv[]) {
     UNUSED(argc);
+
+/*    char tmp[MAX_PATH];*/
+/*    get_path(tmp);*/
+/*    build_file_complete_name(tmp, g_log_file, log, sizeof(log));*/
 
     if (!g_webserver)
         my_log_open();

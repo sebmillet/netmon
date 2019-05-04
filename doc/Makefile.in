@@ -257,6 +257,7 @@ TEXTPAGEEN = ${srcdir}/netmon.txt
 dist_doc_DATA = ${HTMLPAGEEN} ${TEXTPAGEEN} ${srcdir}/netmon-sample.ini
 EXTRA_DIST = ${HTMLPAGEEN} ${TEXTPAGEEN} ${srcdir}/build-man-en.sh ${srcdir}/netmonen-prefix.1 ${srcdir}/netmonen-postfix.1
 dist_man_MANS = ${MANPAGEEN}
+@BUILD_DOCS_TRUE@CLEANFILES = ${srcdir}/netmonen-m0.txt ${srcdir}/netmonen-m1.1 ${srcdir}/netmonen-m2.1
 all: all-am
 
 .SUFFIXES:
@@ -422,6 +423,7 @@ install-strip:
 mostlyclean-generic:
 
 clean-generic:
+	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
@@ -430,7 +432,6 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-@BUILD_DOCS_FALSE@maintainer-clean-local:
 clean: clean-am
 
 clean-am: clean-generic mostlyclean-am
@@ -481,8 +482,7 @@ installcheck-am:
 
 maintainer-clean: maintainer-clean-am
 	-rm -f Makefile
-maintainer-clean-am: distclean-am maintainer-clean-generic \
-	maintainer-clean-local
+maintainer-clean-am: distclean-am maintainer-clean-generic
 
 mostlyclean: mostlyclean-am
 
@@ -511,9 +511,9 @@ uninstall-man: uninstall-man1
 	install-man1 install-pdf install-pdf-am install-ps \
 	install-ps-am install-strip installcheck installcheck-am \
 	installdirs maintainer-clean maintainer-clean-generic \
-	maintainer-clean-local mostlyclean mostlyclean-generic pdf \
-	pdf-am ps ps-am tags-am uninstall uninstall-am \
-	uninstall-dist_docDATA uninstall-man uninstall-man1
+	mostlyclean mostlyclean-generic pdf pdf-am ps ps-am tags-am \
+	uninstall uninstall-am uninstall-dist_docDATA uninstall-man \
+	uninstall-man1
 
 .PRECIOUS: Makefile
 
@@ -528,8 +528,8 @@ uninstall-man: uninstall-man1
 @BUILD_DOCS_TRUE@	nroff -man ${MANPAGEEN} | col -b > $@
 @BUILD_DOCS_TRUE@	unix2dos $@
 
-@BUILD_DOCS_TRUE@maintainer-clean-local:
-@BUILD_DOCS_TRUE@	rm -rf netmonen-m1.1 netmonen-m2.1
+# maintainer-clean-local:
+#     rm -rf netmonen-m1.1 netmonen-m2.1
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

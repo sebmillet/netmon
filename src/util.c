@@ -42,7 +42,7 @@ const struct connection_table_t connection_table[] = {
     {conn_ssl_read,     "SSL<<< ", conn_ssl_write,   "SSL>>> "} // CONNTYPE_SSL
 };
 
-extern int g_test_mode;
+int g_flush_log = 1;
 
 #ifdef MY_WINDOWS
 
@@ -72,14 +72,14 @@ static void os_set_sock_nonblocking_mode(int sock) {
     u_long iMode = 1;
     int iResult = ioctlsocket(sock, FIONBIO, &iMode);
     if (iResult != NO_ERROR)
-        fatal_error("ioctlsocket failed with error: %ld", iResult);
+        fatal_error("ioctlsocket failed with error: %ld", (long int)iResult);
 }
 
 static void os_set_sock_blocking_mode(int sock) {
     u_long iMode = 0;
     int iResult = ioctlsocket(sock, FIONBIO, &iMode);
     if (iResult != NO_ERROR)
-        fatal_error("ioctlsocket failed with error: %ld", iResult);
+        fatal_error("ioctlsocket failed with error: %ld", (long int)iResult);
 }
 
 int os_setsock_timeout(int sock, int timeout_in_seconds) {
@@ -230,7 +230,7 @@ int add_reader_access_right(const char *f) {
     if (r) {
         char s_err[SMALLSTRSIZE];
         errno_error(s_err, sizeof(s_err));
-        my_logf(LL_ERROR, LP_DATETIME, "Unable to change mode of file '%s': ", f,
+        my_logf(LL_ERROR, LP_DATETIME, "Unable to change mode of file '%s': %s", f,
                 s_err);
     }
     return -1;
@@ -258,7 +258,7 @@ void dbg_write(const char *fmt, ...) {
 #ifdef DEBUG_DYNMEM
 
 //
-// Debug calls to malloc...
+// Debug calls to malloc
 // Linked to DEBUG_DYNMEM macro definition
 //
 void *debug_malloc(size_t size, const char *var, const char *source_file,
@@ -275,7 +275,7 @@ void *debug_malloc(size_t size, const char *var, const char *source_file,
 }
 
 //
-// Debug calls to realloc...
+// Debug calls to realloc
 // Linked to DEBUG_DYNMEM macro definition
 //
 void *debug_realloc(void *ptr, size_t size, const char *var,
@@ -292,7 +292,7 @@ void *debug_realloc(void *ptr, size_t size, const char *var,
 }
 
 //
-// Debug calls to free...
+// Debug calls to free
 // Linked to DEBUG_DYNMEM macro definition
 //
 void debug_free(void *ptr, const char *var, const char *source_file,
@@ -365,7 +365,7 @@ ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
         // Now read one character from stream
         c = getc(stream);
 
-        /*      dbg_write("Char: %i (%c) [*n = %lu]\n", c, c, *n);*/
+        dbg_write("Char: %i (%c) [*n = %lu]\n", c, c, *n);
 
         // Deal with /IO error
         if (ferror(stream) != 0)
@@ -512,7 +512,7 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
                 strncpy(var, p + 2, sizeof(var));
                 var[sizeof(var) - 1] = '\0';
 
-                /*              dbg_write("Found variable '%s'\n", var);*/
+                dbg_write("Found variable '%s'\n", var);
 
                 int i;
 
@@ -532,7 +532,7 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
                     }
                 }
 
-                /*              dbg_write("=== before: '%s'\n", sc);*/
+                dbg_write("=== before: '%s'\n", sc);
 
                 size_t buf_len = strlen(c + 1) + 1;
                 char *buf = (char *)MYMALLOC(buf_len, buf);
@@ -542,7 +542,7 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
                 if (need_len > sc_len) {
                     char *new_sc = (char *)MYREALLOC(sc, need_len);
 
-                    /*                    dbg_write("Reallocated from %lu to %lu\n", sc_len, need_len);*/
+                    dbg_write("Reallocated from %lu to %lu\n", sc_len, need_len);
 
                     sc_len = need_len;
                     p += (new_sc - sc);
@@ -552,7 +552,7 @@ char *dollar_subst_alloc(const char *s, const struct subst_t *subst,
                 strncat(sc, buf, sc_len);
                 MYFREE(buf);
 
-                /*              dbg_write("=== after:  '%s'\n", sc);*/
+                dbg_write("=== after:  '%s'\n", sc);
             }
         }
     }
@@ -655,7 +655,7 @@ void my_log_core_output(const char *s, size_t dt_len) {
         fputs(s, log_fd);
         fputs("\n", log_fd);
 
-        if (g_test_mode)
+        if (g_flush_log)
             fflush(log_fd);
     }
 
@@ -669,7 +669,7 @@ void my_log_core_output(const char *s, size_t dt_len) {
         }
         puts(t);
 
-        if (g_test_mode)
+        if (g_flush_log)
             fflush(stdout);
     }
 }
@@ -837,7 +837,7 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
 
     // Assume we are a v2 or v3 client
     if ((conn->ssl_context = SSL_CTX_new(SSLv23_client_method())) == NULL) {
-        my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
+        my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %lu (%s)",
                 prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err,
                         sizeof(s_err)));
         cr = CONNRES_SSL_CONNECTION_ERROR;
@@ -845,7 +845,7 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
 
     /* Create SSL connection */
     else if ((conn->ssl = SSL_new(conn->ssl_context)) == NULL) {
-        my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
+        my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %lu (%s)",
                 prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err,
                         sizeof(s_err)));
         cr =    CONNRES_SSL_CONNECTION_ERROR;
@@ -853,7 +853,7 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
 
     /* Connect the SSL struct to our connection */
     else if (!SSL_set_fd(conn->ssl, conn->sock)) {
-        my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
+        my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %lu (%s)",
                 prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err,
                         sizeof(s_err)));
         cr = CONNRES_SSL_CONNECTION_ERROR;
@@ -861,7 +861,7 @@ int conn_connect(connection_t *conn, const struct sockaddr_in *server,
 
     /* Initiate SSL handshake */
     else if (SSL_connect(conn->ssl) != 1) {
-        my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %d (%s)",
+        my_logf(LL_ERROR, LP_DATETIME, "%s SSL error: %lu (%s)",
                 prefix, ERR_get_error(), ssl_get_error(ERR_get_error(), s_err,
                         sizeof(s_err)));
         cr = CONNRES_SSL_CONNECTION_ERROR;

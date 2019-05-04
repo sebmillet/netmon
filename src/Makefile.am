@@ -6,7 +6,9 @@ netmon_SOURCES=main.c main.h util.c util.h webserver.c \
 	img/st-unknown.png img/st-unknown.c \
 	img/st-ok.png img/st-ok.c \
 	img/st-fail.png img/st-fail.c \
-  netmon.html.c
+	img/rdtosrc.sh img/st.xcf \
+	build-embdoc.sh check.sh \
+	printargs.sh netmon.html.c
 
 img/st-undef.c: img/st-undef.png
 	img/rdtosrc.sh $<

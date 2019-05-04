@@ -836,6 +836,10 @@ INITIALIZATION FILES
 		"log" alert only -> log file to write to.
 		Mandatory
 		No default value
+		WARNING
+		When  running  with -d (daemon), current working directory be‐
+	      comes / (after
+		program initialization). Use an absolute path here.
 
 
        log_string
@@ -847,10 +851,10 @@ INITIALIZATION FILES
 AUTHOR
        Written by Sébastien Millet <milletseb@laposte.net>
 
-       Permission  is  granted to copy, distribute and/or modify this document
-       under the terms of the GNU General Public License, Version 3  published
+       Permission is granted to copy, distribute and/or modify	this  document
+       under  the terms of the GNU General Public License, Version 3 published
        by the Free Software Foundation.
 
 
 
-May 2019			 version 1.1.4			     netmon(1)
+May 2019			 version 1.1.5			     netmon(1)

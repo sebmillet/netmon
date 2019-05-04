@@ -1,4 +1,4 @@
-netmon 1.1.4 start
+netmon 1.1.5 start
 Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 3: variable name not allowed in this section
 Configuration file 'netmon.ini', line 4: syntax error
@@ -285,4 +285,5 @@ Running gethosbyname() on a.b.c
 Unknown host a.b.c, code=0 (Success)
 Test avec nom inconnu -> ** ?? **
 Check done in 0.123450s
-netmon end
+netmon
+end

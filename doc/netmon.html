@@ -912,6 +912,9 @@ The file <b>netmon-sample.ini</b>, provided with netmon, contains all ini
      &quot;log&quot; alert only -&gt; log file to write to.
      Mandatory
      No default value
+     WARNING
+     When running with -d (daemon), current working directory becomes / (after
+     program initialization). Use an absolute path here.
     <p class="Pp"></p>
   </dd>
   <dt><i>log_string</i></dt>
@@ -937,7 +940,7 @@ The file <b>netmon-sample.ini</b>, provided with netmon, contains all ini
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">version 1.1.4</td>
+    <td class="foot-date">version 1.1.5</td>
     <td class="foot-os">May 2019</td>
   </tr>
 </table>

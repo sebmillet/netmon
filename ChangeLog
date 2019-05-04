@@ -1,3 +1,11 @@
+2019-05-04 Sébastien Millet <milletseb@laposte.net>
+
+	* Release 1.1.5 built
+	* Provides a link on the status web page to download the log
+	* Improves status icons
+	* Improves .tar.gz source archive (some important intermediate scripts were
+	  missing).
+
 2019-05-02 Sébastien Millet <milletseb@laposte.net>
 
 	* Release 1.1.4 built

@@ -5,7 +5,7 @@
 
 AC_PREREQ([2.68])
 
-AC_INIT([netmon], [1.1.4], [milletseb@laposte.net])
+AC_INIT([netmon], [1.1.5], [milletseb@laposte.net])
 
 AC_CONFIG_SRCDIR([src/main.h])
 AC_CONFIG_AUX_DIR([admin])
@@ -41,7 +41,7 @@ fi
 # http://ubuntuforums.org/showthread.php?p=11347972&posted=1#post11347972
 # It is gruiiik, but don't know how to change the options order
 # in gcc call.
-CFLAGS="-Wl,--no-as-needed $CFLAGS"
+CFLAGS="-Wformat -Wl,--no-as-needed $CFLAGS"
 
 # Checks for programs.
 AC_PROG_CC

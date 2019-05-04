@@ -1,4 +1,4 @@
-netmon 1.1.4 start
+netmon 1.1.5 start
 Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 12: empty value not allowed
 Configuration file 'netmon.ini', line 12: variable program_command not compatible with guessed method 'tcp'
@@ -260,4 +260,5 @@ Running gethosbyname() on a.b.c
 Unknown host a.b.c, code=0 (Success)
 Test avec nom inconnu -> ** ?? **
 Check done in 0.123450s
-netmon end
+netmon
+end

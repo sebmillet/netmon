@@ -1,4 +1,4 @@
-netmon 1.1.4 start
+netmon 1.1.5 start
 Reading configuration from 'netmon.ini'
 Configuration file 'netmon.ini', line 2: variable display_name not allowed in this section
 Configuration file 'netmon.ini', line 3: variable check_interval not allowed in this section
@@ -157,4 +157,5 @@ exit 127
 Program check(my program check): return code: 127
 my program check -> ** ?? **
 Check done in 0.123450s
-netmon end
+netmon
+end

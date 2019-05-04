@@ -12,6 +12,8 @@
 #include <wchar.h>
 #include <sys/stat.h>
 
+#include <signal.h>
+
 #define DEFAULT_HTML_DIRECTORY (".")
 #define DEFAULT_HTML_FILE      "status.html"
 #define CSS_FILE               (PACKAGE_NAME ".css")
@@ -110,12 +112,17 @@ extern const char *netmon[];
 extern size_t const netmon_len;
 
 extern int g_trace_network_traffic;
-
 extern long int g_netio_timeout;
-
 extern int g_test_mode;
+extern char g_log_file[SMALLSTRSIZE];
+extern FILE *log_fd;
 
 const size_t buffer_size = 5000;
+
+void wlogf(const loglevel_t log_level, const logdisp_t log_disp,
+           const char *format, ...)
+     __attribute__((format(printf, 3, 4)));
+
 
 ///
 /// webserver-specific log facility
@@ -124,7 +131,7 @@ const size_t buffer_size = 5000;
 extern int g_print_log;
 extern loglevel_t g_current_log_level;
 
-static FILE *web_log_fd = NULL;
+FILE *web_log_fd = NULL;
 char g_web_log_file[SMALLSTRSIZE];
 
 //
@@ -143,6 +150,7 @@ void my_web_log_open() {
 void my_web_log_close() {
     if (web_log_fd != NULL)
         fclose(web_log_fd);
+    web_log_fd = NULL;
 }
 
 //
@@ -242,7 +250,7 @@ void web_create_files_for_web() {
             char const *v = img_files[i].var;
             size_t l = img_files[i].var_len;
 
-            /*      dbg_write("Creating %s of size %lu\n", buf, l);*/
+            dbg_write("Creating %s of size %lu\n", buf, l);
 
             if (IMG != NULL) {
                 for (j = 0; (unsigned int)j < l; ++j) {
@@ -344,7 +352,7 @@ int server_accept(connection_t *listen_conn,
         conn_close(connect_conn);
         return 0;
     }
-    wlogf(LL_VERBOSE, LP_DATETIME, "connection accepted from %s",
+    wlogf(LL_NORMAL, LP_DATETIME, "connection accepted from %s",
           inet_ntoa(remote_sin->sin_addr));
 
     if (os_setsock_timeout(connect_conn->sock, WEB_NETIO_TIMEOUT)) {
@@ -368,7 +376,7 @@ void http_send_error_page(connection_t *conn, const char *e,
     conn_line_sendf(wlogf, conn, g_trace_network_traffic, "Connection: close");
     conn_line_sendf(wlogf, conn, g_trace_network_traffic,
                     "Content-type: text/html");
-    conn_line_sendf(wlogf, conn, g_trace_network_traffic, "");
+    conn_line_sendf(wlogf, conn, g_trace_network_traffic, "%s", "");
     conn_line_sendf(wlogf, conn, g_trace_network_traffic,
                     "<html><head><title>Not Found</title></head>");
     conn_line_sendf(wlogf, conn, g_trace_network_traffic,
@@ -504,13 +512,16 @@ void manage_web_transaction(connection_t *conn) {
         size_t size_internal_content = 0;
         size_t content_length = 0;
 
-        if (strcasecmp(url, MAN_EN) == 0)
+        if (strcasecmp(url, URL_MAN_EN) == 0)
             fs_concatene(path, FILE_MAN_EN, sizeof(path));
-        else if (strcasecmp(url, POEM_URL) == 0) {
+        else if (strcasecmp(url, URL_LOG) == 0) {
+            strncpy(path, g_log_file, sizeof(path));
+            fflush(log_fd);
+        } else if (strcasecmp(url, POEM_URL) == 0) {
             internal_content = POEM;
             size_internal_content = strlen(internal_content);
             wlogf(LL_DEBUG, LP_DATETIME,
-                  "Size of poem: %lu", size_internal_content);
+                  "Size of poem: %lu", (long unsigned int)size_internal_content);
             type_internal_content = POEM_TYPE;
         } else {
             fs_concatene(path, strlen(url) == 0 ? g_html_file : url, sizeof(path));
@@ -524,7 +535,7 @@ void manage_web_transaction(connection_t *conn) {
             if (stat(path, &s)) {
                 char s_err[SMALLSTRSIZE];
                 errno_error(s_err, sizeof(s_err));
-                wlogf(LL_ERROR, LP_DATETIME, "%s", s_err);
+                wlogf(LL_ERROR, LP_DATETIME, "unable to send requested file '%s': %s", path, s_err);
                 http_send_error_page(conn, "404 Not found", s_err);
                 conn_close(conn);
                 return;
@@ -591,7 +602,7 @@ void manage_web_transaction(connection_t *conn) {
         conn_line_sendf(wlogf, conn, g_trace_network_traffic, "Date: %s", dt_now);
         conn_line_sendf(wlogf, conn, g_trace_network_traffic, "Last-modified: %s",
                         dt_fileupdate);
-        conn_line_sendf(wlogf, conn, g_trace_network_traffic, "");
+        conn_line_sendf(wlogf, conn, g_trace_network_traffic, "%s", "");
 
         wlogf(LL_DEBUG, LP_DATETIME, "Will send content over the network");
 
@@ -616,7 +627,7 @@ void manage_web_transaction(connection_t *conn) {
             }
             fclose(F);
             MYFREE(buffer);
-            conn_line_sendf(wlogf, conn, g_trace_network_traffic, "");
+            conn_line_sendf(wlogf, conn, g_trace_network_traffic, "%s", "");
         } else {
             n = size_internal_content;
             char *walker = (char *)internal_content;
@@ -639,15 +650,12 @@ void manage_web_transaction(connection_t *conn) {
         if (keep_alive) {
             wlogf(LL_VERBOSE, LP_DATETIME,
                   "continuing connection with client");
-        } else {
-
-            conn_close(conn);
-
-            wlogf(LL_VERBOSE, LP_DATETIME,
-                  "terminated connection with client");
         }
 
     }
+
+    conn_close(conn);
+    wlogf(LL_NORMAL, LP_DATETIME, "terminated connection with client");
 
     return;
 }
@@ -677,13 +685,12 @@ void *webserver() {
         while (server_accept(&listen_conn, &remote_sin, (int)g_webserver_port,
                              &connect_conn) != -1) {
             manage_web_transaction(&connect_conn);
+            fflush(web_log_fd);
         }
     }
 
 /// Never executed
 
     my_web_log_close();
-
-    return NULL;
 }
 
